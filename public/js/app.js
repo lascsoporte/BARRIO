@@ -987,7 +987,7 @@ const App = {
             reported_phone: num 
           });
 
-          alert("Alerta enviada y el teléfono reportado quedará marcado como extraviado en la plataforma BARRIO para su rastreo.");
+          alert("Alerta enviada y el teléfono reportado quedará marcado como extraviado en la plataforma BARRIO.");
         } catch(e) { 
           this.toast('Error al reportar'); 
         } finally {
