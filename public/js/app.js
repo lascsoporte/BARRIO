@@ -966,11 +966,11 @@ const App = {
     });
 
     document.getElementById('btnReportarRobo').addEventListener('click', () => {
-      const num = prompt("Por seguridad, ingresa el NÚMERO DE TELÉFONO que te robaron:");
+      const num = prompt("Por seguridad, ingresa el NÚMERO DE TELÉFONO que extraviaste:");
       if (!num) return;
       this.requireAuth(async (user) => {
         try {
-          await API.sendAdminMessage({ usuario_id: user.id, mensaje: `🚨 URGENTE: ROBARON MI TELÉFONO. Número robado: ${num}` });
+          await API.sendAdminMessage({ usuario_id: user.id, mensaje: `🚨 URGENTE: EXTRAVIÉ MI TELÉFONO. Número extraviado: ${num}` });
           alert("Alerta enviada. El administrador marcará tu dispositivo para rastreo silencioso si se abre la app.");
         } catch(e) { this.toast('Error al reportar'); }
       });
