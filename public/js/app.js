@@ -64,6 +64,14 @@ const App = {
 
     window.addEventListener('hashchange', () => this.route());
     this.requestLocation();
+    
+    // Si no tenemos GPS después de inicializar, mostramos el modal persuasivo
+    setTimeout(() => {
+      if (!Geo.userLat && !localStorage.getItem('barrio_gps_dismissed')) {
+        this.showGpsModal();
+      }
+    }, 2000);
+    
     this.route();
   },
 
@@ -1008,6 +1016,45 @@ const App = {
     const f = document.createElement('div');
     f.innerHTML = this.footerHtml();
     container.appendChild(f);
+  },
+
+  showGpsModal() {
+    const modal = document.createElement('div');
+    modal.className = 'gps-modal-overlay';
+    modal.innerHTML = `
+      <div class="gps-modal-card">
+        <div class="gps-icon-anim">📍</div>
+        <div class="gps-title">Activar GPS de Seguridad</div>
+        <div class="gps-text">
+          Para que el botón de <b>Emergencia</b> y el <b>Rastreo</b> funcionen correctamente, BARRIO necesita conocer tu ubicación.
+        </div>
+        <button class="btn-gps-allow" id="btnGpsAllow">ACTIVAR AHORA</button>
+        <div class="gps-footer">
+          Si ya lo bloqueaste, activa los permisos en los Ajustes de tu teléfono.
+        </div>
+        <button class="btn btn-sm" style="margin-top:20px; background:transparent; color:#888;" id="btnGpsClose">Cerrar</button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById('btnGpsAllow').addEventListener('click', async () => {
+      const btn = document.getElementById('btnGpsAllow');
+      btn.textContent = 'Solicitando...';
+      try {
+        await Geo.getUserLocation();
+        modal.remove();
+        this.toast('GPS Activado ✅');
+        if (location.hash === '#/') this.renderHome(document.getElementById('app'));
+      } catch (e) {
+        btn.textContent = 'REINTENTAR';
+        alert('No pudimos acceder al GPS. Asegúrate de permitir el acceso en los ajustes de tu navegador o celular.');
+      }
+    });
+
+    document.getElementById('btnGpsClose').addEventListener('click', () => {
+      localStorage.setItem('barrio_gps_dismissed', '1');
+      modal.remove();
+    });
   }
 };
 
