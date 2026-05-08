@@ -237,8 +237,8 @@ app.post('/api/admin/mensaje', async (req, res) => {
 
   await runSql('INSERT INTO mensajes_admin (usuario_id, mensaje) VALUES (?,?)', [usuario_id, mensaje]);
   
-  const u = await queryOne('SELECT nombre, telefono FROM usuarios WHERE id = ?', [usuario_id]);
-  const autorInfo = u ? `${u.nombre} (${u.telefono})` : `ID:${usuario_id}`;
+  const u = await queryOne('SELECT nombre, telefono FROM usuarios WHERE id = ?', [parseInt(usuario_id)]);
+  const autorInfo = u ? `<b>${u.nombre}</b> (${u.telefono})` : `ID:${usuario_id}`;
 
   // Alerta especial si el mensaje contiene la palabra ROBARON o ROBO o EXTRAVIASTE o EXTRAVIADO
   const upperM = mensaje.toUpperCase();
@@ -298,6 +298,21 @@ app.get('/api/verificar-usuario/:id', async (req, res) => {
   const user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [req.params.id]);
   if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
   res.json(user);
+});
+
+app.post('/api/stolen-location', async (req, res) => {
+  const { device_id, latitud, longitud, usuario_id } = req.body;
+  
+  let uid = usuario_id;
+  if (!uid && device_id) {
+    const u = await queryOne('SELECT id FROM usuarios WHERE device_id = ?', [device_id]);
+    if (u) uid = u.id;
+  }
+  
+  if (!uid || !latitud || !longitud) return res.status(400).json({ error: 'Datos incompletos' });
+  
+  await runSql('INSERT INTO rastreo_robos (usuario_id, latitud, longitud) VALUES (?, ?, ?)', [uid, latitud, longitud]);
+  res.json({ message: 'Ubicación registrada' });
 });
 
 
