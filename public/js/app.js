@@ -20,6 +20,19 @@ const App = {
     // Configuración
     try {
       this.config = await API.getConfig();
+      
+      // Validar si el usuario guardado existe en la nueva DB
+      const userStr = localStorage.getItem('barrio_user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          await API.checkUser(user.id);
+        } catch (e) {
+          console.warn('Usuario no válido en DB actual, limpiando...');
+          localStorage.removeItem('barrio_user');
+        }
+      }
+
       document.getElementById('btnLateralWhatsapp').href = this.config.whatsapp_vecinos || '#';
       document.getElementById('btnLateralWhatsapp').href = this.config.whatsapp_vecinos || '#';
       // Register visit & check stolen status
@@ -95,7 +108,8 @@ const App = {
         </div>
         <header class="app-header">
           <h1>BARRIO</h1>
-          <div style="font-size:1.8rem; margin-top:2px;">🇨🇱</div>
+          <span class="city-subtitle">PUERTO MONTT</span>
+          <div style="font-size:1.2rem; margin-top:5px; opacity:0.8;">📍 COMUNIDAD SEGURA</div>
         </header>
         <div class="search-container" style="text-align:center;">
           <input type="text" id="searchInput" placeholder="¿Qué buscas?"
@@ -774,7 +788,10 @@ const App = {
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
-        if (user && user.id) return callback(user);
+        if (user && user.id) {
+          // Doble chequeo rápido
+          return callback(user);
+        }
       } catch(e) {}
     }
     
@@ -783,12 +800,23 @@ const App = {
     modal.innerHTML = `
       <div class="auth-modal fade-in">
         <button class="auth-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
-        <h2>🔒 Registro Rápido</h2>
-        <p>Para usar esta función y mantener la seguridad del barrio, por favor ingresa tus datos.</p>
-        <input type="text" id="authNombre" placeholder="Tu Nombre Completo">
-        <input type="tel" id="authTelefono" placeholder="Tu Teléfono (Obligatorio)">
-        <input type="text" id="authDireccion" placeholder="Tu Dirección (Opcional)">
-        <button id="authSubmit" class="btn btn-primary" style="margin-top:10px;">Continuar</button>
+        <div style="font-size:3rem; margin-bottom:10px;">🏘️</div>
+        <h2 style="text-transform:uppercase; letter-spacing:1px;">Registro de Vecino</h2>
+        <p style="font-size:0.9rem; color:var(--text-light); margin-bottom:20px;">Por seguridad, debes registrarte para publicar o solicitar ayuda.</p>
+        <div class="form-group" style="text-align:left;">
+          <label>Nombre Completo</label>
+          <input type="text" id="authNombre" placeholder="Ej: Juan Pérez">
+        </div>
+        <div class="form-group" style="text-align:left;">
+          <label>Teléfono de Contacto</label>
+          <input type="tel" id="authTelefono" placeholder="Ej: +56912345678">
+        </div>
+        <div class="form-group" style="text-align:left;">
+          <label>Dirección / Sector (Opcional)</label>
+          <input type="text" id="authDireccion" placeholder="Ej: Mirasol, Puerto Montt">
+        </div>
+        <button id="authSubmit" class="btn btn-primary" style="margin-top:10px; width:100%; font-weight:900;">REGISTRARME AHORA</button>
+        <p style="font-size:0.7rem; color:var(--text-light); margin-top:15px;">Tus datos son privados y solo se usan para alertas de seguridad.</p>
       </div>
     `;
     document.body.appendChild(modal);

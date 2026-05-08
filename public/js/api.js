@@ -65,6 +65,8 @@ const API = {
   sendAdminMessage(data) { return this.post('/api/admin/mensaje', data); },
   logEmergencia(data) { return this.post('/api/emergencia', data); },
   logStolenLocation(data) { return this.post('/api/stolen-location', data); },
+  checkUser(id) { return this.get(`/api/verificar-usuario/${id}`); },
+
 
   // Admin endpoints
   adminLogin(passwords) { return this.post('/api/admin/login', { passwords }); },

@@ -143,10 +143,15 @@ async function queryOne(sql, params = []) {
 
 async function runSql(sql, params = []) {
   if (useMysql) {
-    await mysqlPool.execute(sql, params);
+    const [result] = await mysqlPool.execute(sql, params);
+    return result;
   } else {
     sqliteDb.run(sql, params);
     saveSqlite();
+    // Obtener el último ID insertado en SQLite para compatibilidad
+    const last = sqliteDb.exec('SELECT last_insert_rowid() as id');
+    const id = last[0]?.values[0][0];
+    return { insertId: id };
   }
 }
 

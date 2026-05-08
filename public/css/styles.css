@@ -113,7 +113,17 @@ body {
   letter-spacing: 2px;
   text-transform: uppercase;
   filter: drop-shadow(0 4px 8px rgba(255,107,53,0.2));
+  margin-bottom: 4px;
+}
+
+.app-header .city-subtitle {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: 3px;
+  text-transform: uppercase;
   margin-bottom: 8px;
+  display: block;
 }
 
 .app-header .subtitle {
@@ -255,6 +265,13 @@ body {
 .badge-nostock { background: #FFF3E0; color: #E65100; }
 .badge-pay { background: #F3E5F5; color: #7B1FA2; }
 .badge-distance { background: #FFF8E1; color: #F57F17; }
+.badge-stolen { background: #FFEBEE; color: #D50000; border: 2px solid #D50000; font-weight: 900; animation: pulseStolen 1.5s infinite; }
+
+@keyframes pulseStolen {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(213, 0, 0, 0.4); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(213, 0, 0, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(213, 0, 0, 0); }
+}
 
 /* ===== Stars ===== */
 .stars { display: flex; gap: 2px; align-items: center; }
@@ -713,6 +730,19 @@ body {
 }
 
 @keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* ===== Legal Footer ===== */
+.legal-footer {
+  text-align: center;
+  padding: 20px 0;
+  font-size: 0.7rem;
+  color: var(--text-light);
+  font-weight: 600;
+  border-top: 1px solid rgba(0,0,0,0.05);
+  margin-top: 30px;
+}
+.legal-footer a { color: var(--primary); text-decoration: underline; }
+
 /* ===== Quick Access Grid (New Design) ===== */
 .qa-grid {
   display: grid;

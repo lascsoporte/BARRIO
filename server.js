@@ -67,7 +67,7 @@ async function queryOne(sql, params = []) {
 }
 
 async function runSql(sql, params = []) {
-  await dbHelper.runSql(sql, params);
+  return await dbHelper.runSql(sql, params);
 }
 
 // --- Auth ---
@@ -191,11 +191,11 @@ app.post('/api/registro', async (req, res) => {
 
   let user = await queryOne('SELECT * FROM usuarios WHERE telefono = ?', [telefono]);
   if (!user) {
-    await runSql('INSERT INTO usuarios (nombre, telefono, direccion, ip, device_id) VALUES (?,?,?,?,?)', 
+    const result = await runSql('INSERT INTO usuarios (nombre, telefono, direccion, ip, device_id) VALUES (?,?,?,?,?)', 
       [nombre, telefono, direccion || '', ip, device_id || '']);
-    user = await queryOne('SELECT * FROM usuarios WHERE id = (SELECT last_insert_rowid() FROM usuarios LIMIT 1)'); // Fallback para SQLite
-    if (!user) user = await queryOne('SELECT * FROM usuarios ORDER BY id DESC LIMIT 1'); // Fallback MySQL
-    sendTelegramAlert(`👤 <b>Nuevo Usuario Registrado</b>\nNombre: ${nombre}\nTel: ${telefono}\nDir: ${direccion || '-'}`);
+    const newId = result.insertId;
+    user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [newId]);
+    sendTelegramAlert(`👤 <b>Nuevo Usuario Registrado</b>\nNombre: ${nombre}\nTel: ${telefono}\nDir: ${direccion || '-'}\nCiudad: Puerto Montt`);
   } else {
     await runSql('UPDATE usuarios SET nombre=?, direccion=?, ip=?, device_id=? WHERE id=?', 
       [nombre, direccion || '', ip, device_id || '', user.id]);
@@ -203,6 +203,7 @@ app.post('/api/registro', async (req, res) => {
   }
   res.json({ message: 'Usuario registrado', user });
 });
+
 
 // ========== MURO COMUNITARIO ==========
 app.get('/api/muro', async (req, res) => {
@@ -251,12 +252,21 @@ app.post('/api/admin/mensaje', async (req, res) => {
 app.post('/api/emergencia', async (req, res) => {
   const { usuario_id, institucion, latitud, longitud } = req.body;
   if (!usuario_id || !institucion) return res.status(400).json({ error: 'Faltan datos' });
-  await runSql('INSERT INTO registro_emergencias (usuario_id, institucion, latitud, longitud) VALUES (?,?,?,?)', 
+
+  const user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [usuario_id]);
+  if (!user) return res.status(404).json({ error: 'Usuario no identificado' });
+
+  await runSql('INSERT INTO registro_emergencias (usuario_id, institucion, latitud, longitud) VALUES (?, ?, ?, ?)', 
     [usuario_id, institucion, latitud || null, longitud || null]);
   
-  const u = await queryOne('SELECT nombre, telefono FROM usuarios WHERE id = ?', [usuario_id]);
-  let mapLink = (latitud && longitud) ? `\n📍 <a href="https://maps.google.com/?q=${latitud},${longitud}">Ver Ubicación</a>` : '';
-  sendTelegramAlert(`🆘 <b>LLAMADA DE EMERGENCIA</b>\nInstitución: ${institucion}\nUsuario: ${u ? u.nombre : 'ID:'+usuario_id}\nTel: ${u ? u.telefono : '-'}${mapLink}`);
+  const googleMapsLink = latitud && longitud ? `https://maps.google.com/?q=${latitud},${longitud}` : 'Sin GPS';
+  
+  sendTelegramAlert(`🚨 <b>LLAMADA DE EMERGENCIA</b>\n` +
+    `Institución: ${institucion}\n` +
+    `Vecino: ${user.nombre}\n` +
+    `Teléfono: ${user.telefono}\n` +
+    `Dirección: ${user.direccion || 'No especificada'}\n` +
+    `Mapa: ${googleMapsLink}`);
 
   res.json({ message: 'Emergencia registrada' });
 });
@@ -278,6 +288,12 @@ app.post('/api/stolen-location', async (req, res) => {
     await runSql('INSERT INTO rastreo_robos (usuario_id, latitud, longitud) VALUES (?,?,?)', [user.id, latitud, longitud]);
   }
   res.json({ message: 'Ok' });
+});
+
+app.get('/api/verificar-usuario/:id', async (req, res) => {
+  const user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [req.params.id]);
+  if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+  res.json(user);
 });
 
 
