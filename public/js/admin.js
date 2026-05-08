@@ -49,18 +49,18 @@ const Admin = {
           <button class="btn btn-outline btn-sm" style="width:auto;font-size:0.8rem;" id="logoutBtn">Cerrar Sesión</button>
         </div>
         <div class="admin-tabs">
-          <button class="admin-tab ${this.currentTab === 'locales' ? 'active' : ''}" data-tab="locales">🏪 Locales</button>
-          <button class="admin-tab ${this.currentTab === 'productos' ? 'active' : ''}" data-tab="productos">🛒 Productos</button>
-          <button class="admin-tab ${this.currentTab === 'servicios' ? 'active' : ''}" data-tab="servicios">🔧 Servicios</button>
-          <button class="admin-tab ${this.currentTab === 'mascotas' ? 'active' : ''}" data-tab="mascotas">🐶 Mascotas</button>
-          <button class="admin-tab ${this.currentTab === 'mensajes' ? 'active' : ''}" data-tab="mensajes">✉️ Buzón</button>
-          <button class="admin-tab ${this.currentTab === 'muro' ? 'active' : ''}" data-tab="muro">💬 Muro</button>
-          <button class="admin-tab ${this.currentTab === 'usuarios' ? 'active' : ''}" data-tab="usuarios">👥 Usuarios</button>
-          <button class="admin-tab ${this.currentTab === 'emergencias' ? 'active' : ''}" data-tab="emergencias">🚨 Emergencias</button>
-          <button class="admin-tab ${this.currentTab === 'rastreo' ? 'active' : ''}" data-tab="rastreo">📍 Rastreo</button>
-          <button class="admin-tab ${this.currentTab === 'config' ? 'active' : ''}" data-tab="config">⚙️ Config</button>
-          <button class="admin-tab ${this.currentTab === 'stats' ? 'active' : ''}" data-tab="stats">📊 Stats</button>
-          <button class="admin-tab ${this.currentTab === 'seguridad' ? 'active' : ''}" data-tab="seguridad">🔐 Claves</button>
+          <button class="admin-tab ${this.currentTab === 'locales' ? 'active' : ''}" data-tab="locales">Locales</button>
+          <button class="admin-tab ${this.currentTab === 'productos' ? 'active' : ''}" data-tab="productos">Productos</button>
+          <button class="admin-tab ${this.currentTab === 'servicios' ? 'active' : ''}" data-tab="servicios">Servicios</button>
+          <button class="admin-tab ${this.currentTab === 'mascotas' ? 'active' : ''}" data-tab="mascotas">Mascotas</button>
+          <button class="admin-tab ${this.currentTab === 'mensajes' ? 'active' : ''}" data-tab="mensajes">Buzón</button>
+          <button class="admin-tab ${this.currentTab === 'muro' ? 'active' : ''}" data-tab="muro">Muro</button>
+          <button class="admin-tab ${this.currentTab === 'usuarios' ? 'active' : ''}" data-tab="usuarios">Usuarios</button>
+          <button class="admin-tab ${this.currentTab === 'emergencias' ? 'active' : ''}" data-tab="emergencias">Emergencias</button>
+          <button class="admin-tab ${this.currentTab === 'rastreo' ? 'active' : ''}" data-tab="rastreo">Rastreo</button>
+          <button class="admin-tab ${this.currentTab === 'config' ? 'active' : ''}" data-tab="config">Config</button>
+          <button class="admin-tab ${this.currentTab === 'stats' ? 'active' : ''}" data-tab="stats">Stats</button>
+          <button class="admin-tab ${this.currentTab === 'seguridad' ? 'active' : ''}" data-tab="seguridad">Claves</button>
         </div>
         <div id="adminContent"><div class="loading"><div class="spinner"></div></div></div>
       </div>
@@ -398,17 +398,18 @@ const Admin = {
     c.innerHTML = `
       <h3 style="margin-bottom:15px; color:var(--primary);">Avisos de Mascotas</h3>
       <div id="adminMascotasList">${mascotas.map(m => `
-        <div class="admin-list-item">
+        <div class="admin-list-item" style="flex-direction:column; align-items:flex-start; gap:10px;">
+          ${m.foto_base64 ? `<img src="${m.foto_base64}" style="width:100px; height:100px; object-fit:cover; border-radius:8px;">` : '<div style="width:100px; height:100px; background:#EEE; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; color:#999;">Sin Foto</div>'}
           <div class="item-info">
-            <div class="item-name">${m.tipo_animal === 'Gato' ? '🐱' : (m.tipo_animal === 'Perro' ? '🐶' : '🐾')} ${m.nombre_mascota || m.tipo_animal || 'Mascota'} - ${m.ubicacion_extravio}</div>
+            <div class="item-name">${m.nombre_mascota || m.tipo_animal || 'Mascota'} - ${m.ubicacion_extravio}</div>
             <div class="item-detail">
               <strong>Contacto:</strong> ${m.nombre_contacto} | <strong>Tel:</strong> ${m.telefono}<br>
-              <strong>Características:</strong> ${m.caracteristicas || '-'}<br>
+              <strong>Tipo:</strong> ${m.tipo_animal} | <strong>Características:</strong> ${m.caracteristicas || '-'}<br>
               <small>${new Date(m.created_at).toLocaleDateString()}</small>
             </div>
           </div>
           <div class="admin-actions">
-            <button class="btn-delete" onclick="if(confirm('¿Borrar aviso permanentemente?')) Admin.deleteMascota(${m.id})">Borrar</button>
+            <button class="btn-delete" onclick="if(confirm('¿Borrar aviso?')) Admin.deleteMascota(${m.id})">Borrar</button>
           </div>
         </div>
       `).join('') || '<p style="text-align:center;color:var(--text-light);">No hay avisos de mascotas.</p>'}</div>
@@ -424,15 +425,9 @@ const Admin = {
     const config = await API.getConfig();
     c.innerHTML = `
       <div class="admin-form">
-        <h3 style="margin-bottom:15px; color:var(--primary);">Configuración Global</h3>
-        <div class="form-group">
-          <label>whatsapp admin</label>
-          <input type="text" id="confAdminWhatsapp" value="${config.admin_whatsapp || ''}" placeholder="Ej: 56912345678">
-        </div>
-        <div class="form-group">
-          <label>link whatsapp usuarios</label>
-          <input type="url" id="confWhatsappVecinos" value="${config.whatsapp_vecinos || ''}" placeholder="https://chat.whatsapp.com/...">
-        </div>
+        <h3 style="margin-bottom:15px; color:var(--primary);">Configuración de Emergencias</h3>
+        <p style="font-size:0.85rem; color:#666; margin-bottom:20px;">Edita los números que aparecerán en la sección de Emergencias de la App.</p>
+
 
         <h3 style="margin-top:25px; margin-bottom:15px; color:#E65100;">🚨 Teléfonos de Emergencia</h3>
         <div class="form-group">
@@ -461,14 +456,13 @@ const Admin = {
     `;
     document.getElementById('btnSaveConfig').addEventListener('click', async () => {
       const data = {
-        admin_whatsapp: document.getElementById('confAdminWhatsapp').value.trim(),
-        whatsapp_vecinos: document.getElementById('confWhatsappVecinos').value.trim(),
         tel_carabineros: document.getElementById('confCarabineros').value.trim(),
         tel_bomberos: document.getElementById('confBomberos').value.trim(),
         tel_pdi: document.getElementById('confPdi').value.trim(),
         tel_ambulancia: document.getElementById('confAmbulancia').value.trim(),
         tel_seguridad: document.getElementById('confSeguridad').value.trim()
       };
+
       const btn = document.getElementById('btnSaveConfig');
       btn.disabled = true; btn.textContent = 'Guardando...';
       try {
@@ -576,7 +570,7 @@ const Admin = {
       <div id="adminMensajesList">${mensajes.map(m => `
         <div class="admin-list-item" style="${m.leido ? 'opacity:0.6;' : 'border-left: 4px solid var(--primary);'}">
           <div class="item-info">
-            <div class="item-name">${m.nombre} <span style="font-size:0.8rem; font-weight:normal; color:#666;">(${m.telefono})</span></div>
+            <div class="item-name">${m.nombre || 'Usuario Desconocido'} <span style="font-size:0.8rem; font-weight:normal; color:#666;">(${m.telefono || 'Sin Tel'})</span></div>
             <div class="item-detail" style="color:#222; margin-top:5px; font-size:1rem; font-weight:${m.leido ? 'normal' : 'bold'};">${m.mensaje}</div>
             <div style="font-size:0.75rem; color:#999; margin-top:5px;">${new Date(m.created_at).toLocaleString()}</div>
           </div>
@@ -585,6 +579,7 @@ const Admin = {
           </div>
         </div>
       `).join('') || '<p style="text-align:center;color:var(--text-light);">Buzón vacío.</p>'}</div>
+
     `;
   },
   async markLeido(id) {
@@ -631,27 +626,38 @@ const Admin = {
         <button class="btn btn-outline btn-sm" onclick="Admin.downloadCSV(window._tempUsuarios, 'usuarios_barrio.csv')">📥 Descargar CSV</button>
       </div>
       <div id="adminUsuariosList">${usuarios.map(u => `
-        <div class="admin-list-item" style="${u.is_blocked ? 'background:#ffebee; border-left:4px solid #D32F2F;' : ''}">
+        <div class="admin-list-item" style="${u.is_blocked ? 'background:#ffebee;' : (u.is_verified ? '' : 'background:#e3f2fd;')} border-left: 5px solid ${u.is_blocked ? '#D32F2F' : (u.is_verified ? '#4CAF50' : '#1976D2')};">
           <div class="item-info">
-            <div class="item-name">${u.is_blocked ? '🚫 ' : ''}${u.nombre}</div>
+            <div class="item-name">${u.nombre} ${u.is_verified ? '✅' : '⏳'}</div>
             <div class="item-detail">
               <strong>Tel:</strong> ${u.telefono} | <strong>Dir:</strong> ${u.direccion || '-'}<br>
               <small>Registro: ${new Date(u.created_at).toLocaleDateString()}</small>
             </div>
           </div>
-          <div class="admin-actions">
+          <div class="admin-actions" style="flex-direction:column; gap:5px;">
+            ${!u.is_verified ? `<button class="btn-sm" style="background:#4CAF50; color:white;" onclick="Admin.toggleVerifyUsuario(${u.id}, 1)">Aceptar Usuario</button>` : `<button class="btn-sm" style="background:#9E9E9E; color:white;" onclick="Admin.toggleVerifyUsuario(${u.id}, 0)">Quitar Verificación</button>`}
             <button class="btn-sm ${u.is_blocked ? 'btn-primary' : 'btn-delete'}" onclick="Admin.toggleBlockUsuario(${u.id}, ${u.is_blocked ? 0 : 1})">
               ${u.is_blocked ? 'Desbloquear' : 'Bloquear'}
             </button>
-            <button class="btn-sm ${u.is_stolen ? 'btn-primary' : 'btn-delete'}" style="margin-top:5px; background:${u.is_stolen ? '#2E7D32' : '#F57C00'}; color:white;" onclick="Admin.toggleStolenUsuario(${u.id}, ${u.is_stolen ? 0 : 1})">
-              ${u.is_stolen ? 'Desmarcar Robo' : 'Marcar Robado'}
+            <button class="btn-sm" style="background:${u.is_stolen ? '#2E7D32' : '#F57C00'}; color:white;" onclick="Admin.toggleStolenUsuario(${u.id}, ${u.is_stolen ? 0 : 1})">
+              ${u.is_stolen ? 'No está extraviado' : 'Marcar Extraviado'}
             </button>
+            <button class="btn-sm" style="background:#222; color:white;" onclick="Admin.deleteUsuario(${u.id})">ELIMINAR DEFINITIVO</button>
           </div>
         </div>
       `).join('') || '<p style="text-align:center;color:var(--text-light);">No hay usuarios.</p>'}</div>
     `;
   },
+  async toggleVerifyUsuario(id, is_verified) {
+    try { await API.post(`/api/admin/usuarios/${id}/verificar`, { is_verified }, this.token); App.toast('Usuario actualizado'); this.loadTab(); } catch(e) { App.toast('Error'); }
+  },
+  async deleteUsuario(id) {
+    if(confirm('¿ELIMINAR DEFINITIVAMENTE A ESTE USUARIO? Se borrarán todos sus registros.')) {
+      try { await API.del(`/api/admin/usuarios/${id}`, this.token); App.toast('Usuario eliminado'); this.loadTab(); } catch(e) { App.toast('Error'); }
+    }
+  },
   async toggleBlockUsuario(id, is_blocked) {
+
     if(confirm(is_blocked ? '¿Bloquear usuario? No podrá publicar.' : '¿Desbloquear usuario?')) {
       try { await API.adminToggleBlockUsuario(id, is_blocked, this.token); App.toast('Estado actualizado'); this.loadTab(); } catch(e) { App.toast('Error'); }
     }

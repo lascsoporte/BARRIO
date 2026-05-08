@@ -237,13 +237,17 @@ app.post('/api/admin/mensaje', async (req, res) => {
 
   await runSql('INSERT INTO mensajes_admin (usuario_id, mensaje) VALUES (?,?)', [usuario_id, mensaje]);
   
-  // Alerta especial si el mensaje contiene la palabra ROBARON o ROBO
-  if (mensaje.toUpperCase().includes('ROBARON') || mensaje.toUpperCase().includes('ROBO') || mensaje.includes('🚨')) {
-    const u = await queryOne('SELECT nombre, telefono FROM usuarios WHERE id = ?', [usuario_id]);
-    sendTelegramAlert(`🚨 <b>ALERTA DE ROBO</b>\nUsuario: ${u ? u.nombre : 'ID:'+usuario_id}\nTel: ${u ? u.telefono : '-'}\nDetalle: ${mensaje}`);
+  const u = await queryOne('SELECT nombre, telefono FROM usuarios WHERE id = ?', [usuario_id]);
+  const autorInfo = u ? `${u.nombre} (${u.telefono})` : `ID:${usuario_id}`;
+
+  // Alerta especial si el mensaje contiene la palabra ROBARON o ROBO o EXTRAVIASTE o EXTRAVIADO
+  const upperM = mensaje.toUpperCase();
+  if (upperM.includes('ROBARON') || upperM.includes('ROBO') || upperM.includes('EXTRAVIASTE') || upperM.includes('EXTRAVIADO') || mensaje.includes('🚨')) {
+    sendTelegramAlert(`🚨 <b>ALERTA DE EXTRAVÍO/SEGURIDAD</b>\nUsuario: ${autorInfo}\nDetalle: ${mensaje}`);
   } else {
-    sendTelegramAlert(`✉️ <b>Nuevo Mensaje en Buzón</b>\nDe: ${usuario_id}\nContenido: ${mensaje.slice(0, 50)}...`);
+    sendTelegramAlert(`✉️ <b>Nuevo Mensaje en Buzón</b>\nDe: ${autorInfo}\nContenido: ${mensaje.slice(0, 50)}...`);
   }
+
 
   res.json({ message: 'Mensaje enviado al administrador' });
 });
@@ -405,7 +409,7 @@ app.post('/api/admin/resolve-map', authMw, async (req, res) => {
 // Mensajes Admin
 app.get('/api/admin/mensajes', authMw, async (req, res) => {
   const rows = await queryAll(`
-    SELECT m.id, m.mensaje, m.leido, m.created_at, u.nombre as autor, u.telefono as telefono_autor
+    SELECT m.*, u.nombre, u.telefono 
     FROM mensajes_admin m
     JOIN usuarios u ON m.usuario_id = u.id
     ORDER BY m.created_at DESC
@@ -617,7 +621,19 @@ app.post('/api/emergency-reset', (req, res) => {
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // Start
+app.put('/api/admin/usuarios/:id/verificar', authMw, async (req, res) => {
+  const { is_verified } = req.body;
+  await runSql('UPDATE usuarios SET is_verified = ? WHERE id = ?', [is_verified ? 1 : 0, req.params.id]);
+  res.json({ message: 'Estado de verificación actualizado' });
+});
+
+app.delete('/api/admin/usuarios/:id', authMw, async (req, res) => {
+  await runSql('DELETE FROM usuarios WHERE id = ?', [req.params.id]);
+  res.json({ message: 'Usuario eliminado' });
+});
+
 async function start() {
+
   await initDatabase();
   sendTelegramAlert('🚀 <b>Sistema Barrio Iniciado</b>\nLas notificaciones de Telegram están activas.');
 

@@ -107,9 +107,9 @@ const App = {
           <button onclick="document.getElementById('installBanner').style.display='none'" style="background:transparent; color:white; border:none; margin-left:10px; font-size:1.2rem; cursor:pointer; vertical-align:middle;">&times;</button>
         </div>
         <header class="app-header">
-          <h1>BARRIO</h1>
+          <div class="formal-flag"></div>
+          <h1 style="margin-top:10px;">BARRIO</h1>
           <span class="city-subtitle">PUERTO MONTT</span>
-          <div style="font-size:1.2rem; margin-top:5px; opacity:0.8;">📍 COMUNIDAD SEGURA</div>
         </header>
         <div class="search-container" style="text-align:center;">
           <input type="text" id="searchInput" placeholder="¿Qué buscas?"
@@ -150,7 +150,7 @@ const App = {
               <span class="btn-icon">📲</span> Compartir App
             </button>
             <button onclick="location.hash='#/contacto'" class="btn btn-whatsapp btn-sm">
-              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+              <svg class="whatsapp-logo-large" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
               Contactar Administrador
             </button>
           </div>
@@ -767,18 +767,18 @@ const App = {
     });
   },
 
-  logLlamada(institucion) {
+  async logLlamada(institucion) {
+    // Intentar obtener ubicación fresca antes de loguear
+    await Geo.getUserLocation().catch(() => {});
+    
     this.requireAuth((user) => {
-      const data = { usuario_id: user.id, institucion: institucion };
-      if (Geo.userLat && Geo.userLng) {
-        data.latitud = Geo.userLat;
-        data.longitud = Geo.userLng;
-      }
-      API.logEmergencia(data).then(()=>{
-        App.toast('Emergencia registrada y llamada en curso...');
-      }).catch((e)=>{
-        if(e.message) App.toast(e.message);
-      });
+      const data = { 
+        usuario_id: user.id, 
+        institucion: institucion,
+        latitud: Geo.userLat || null,
+        longitud: Geo.userLng || null
+      };
+      API.logEmergencia(data).catch(() => {});
     });
   },
 
@@ -789,7 +789,11 @@ const App = {
       try {
         const user = JSON.parse(userStr);
         if (user && user.id) {
-          // Doble chequeo rápido
+          // Si no está verificado, mostrar aviso y no dejar continuar
+          if (!user.is_verified) {
+            this.showPendingVerification();
+            return;
+          }
           return callback(user);
         }
       } catch(e) {}
@@ -835,15 +839,32 @@ const App = {
       try {
         const res = await API.registerUser({ nombre, telefono, direccion, device_id: this.deviceId });
         localStorage.setItem('barrio_user', JSON.stringify(res.user));
-        this.toast('¡Registro exitoso!');
+        this.toast('¡Registro enviado!');
         modal.remove();
-        callback(res.user);
+        this.showPendingVerification();
       } catch (err) {
         btn.disabled = false;
         btn.textContent = 'Continuar';
         this.toast(err.message || 'Error al registrar');
       }
     });
+  },
+
+  showPendingVerification() {
+    const modal = document.createElement('div');
+    modal.className = 'auth-overlay';
+    modal.innerHTML = `
+      <div class="auth-modal fade-in" style="border-top: 5px solid #1976D2;">
+        <div style="font-size:3rem; margin-bottom:10px;">⏳</div>
+        <h2 style="color:#1976D2; font-size:1.4rem;">Cuenta en Verificación</h2>
+        <p style="margin-bottom:20px; font-size:0.95rem;">Tu registro ha sido enviado al administrador de <b>Barrio Puerto Montt</b>.</p>
+        <p style="font-size:0.85rem; color:#666; background:#F5F5F5; padding:15px; border-radius:8px; text-align:justify;">
+          Por seguridad de todos los vecinos, un administrador debe aprobar tu cuenta antes de que puedas publicar en el muro o reportar emergencias. Recibirás una notificación cuando seas aceptado.
+        </p>
+        <button onclick="this.parentElement.parentElement.remove()" class="btn btn-primary" style="margin-top:20px; width:100%; justify-content:center;">Entendido</button>
+      </div>
+    `;
+    document.body.appendChild(modal);
   },
 
   // ===== MURO COMUNITARIO =====
@@ -873,6 +894,7 @@ const App = {
       });
     });
     this.loadMuro();
+    container.innerHTML += this.footerHtml();
   },
 
   async loadMuro() {
@@ -907,8 +929,8 @@ const App = {
         <textarea id="contactoInput" placeholder="Escribe tu mensaje aquí..." rows="5" style="width:100%; padding:14px; border-radius:8px; border:2px solid #E5E7EB; margin-bottom:15px; font-family:inherit; resize:vertical; outline:none; font-size:1rem;"></textarea>
         <button id="btnEnviarContacto" class="btn btn-primary" style="width:100%; margin-bottom:15px;">Enviar Mensaje</button>
         <div style="border-top:1px solid #EEE; padding-top:15px; text-align:center;">
-          <p style="font-size:0.85rem; color:#666; margin-bottom:8px;">¿Te robaron el celular y tenías la app instalada?</p>
-          <button id="btnReportarRobo" class="btn btn-sm" style="background:#D32F2F; color:white; width:100%; justify-content:center;">🚨 Reportar Teléfono Robado</button>
+          <p style="font-size:0.85rem; color:#666; margin-bottom:8px;">¿Extraviaste el celular y tenías la app instalada?</p>
+          <button id="btnReportarRobo" class="btn btn-sm" style="background:#D32F2F; color:white; width:100%; justify-content:center;">Reporta teléfono extraviado al administrador</button>
         </div>
       </div>
     `;
@@ -944,7 +966,9 @@ const App = {
         } catch(e) { this.toast('Error al reportar'); }
       });
     });
+    container.innerHTML += this.footerHtml();
   }
 };
+
 
 document.addEventListener('DOMContentLoaded', () => App.init());

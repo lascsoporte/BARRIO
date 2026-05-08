@@ -55,7 +55,8 @@ async function createCloudTables() {
   const queries = [
     `CREATE TABLE IF NOT EXISTS usuarios (
       id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(255) NOT NULL, telefono VARCHAR(50) NOT NULL UNIQUE,
-      direccion TEXT, ip VARCHAR(100), device_id VARCHAR(255), is_blocked TINYINT(1) DEFAULT 0, is_stolen TINYINT(1) DEFAULT 0,
+      direccion TEXT, ip VARCHAR(100), device_id VARCHAR(255), 
+      is_blocked TINYINT(1) DEFAULT 0, is_stolen TINYINT(1) DEFAULT 0, is_verified TINYINT(1) DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS locales (
