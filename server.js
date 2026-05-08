@@ -617,10 +617,7 @@ app.post('/api/emergency-reset', (req, res) => {
   res.json({ message: 'Claves restauradas a valores por defecto. Use las claves originales para ingresar.' });
 });
 
-// SPA fallback
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-
-// Start
+// Admin User Management
 app.put('/api/admin/usuarios/:id/verificar', authMw, async (req, res) => {
   const { is_verified } = req.body;
   await runSql('UPDATE usuarios SET is_verified = ? WHERE id = ?', [is_verified ? 1 : 0, req.params.id]);
@@ -632,9 +629,18 @@ app.delete('/api/admin/usuarios/:id', authMw, async (req, res) => {
   res.json({ message: 'Usuario eliminado' });
 });
 
-async function start() {
+// SPA fallback
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
+async function start() {
   await initDatabase();
+  
+  // MIGRACIÓN: Marcar usuarios antiguos como verificados
+  try {
+    const result = await dbHelper.runSql('UPDATE usuarios SET is_verified = 1 WHERE is_verified = 0 OR is_verified IS NULL');
+    console.log('✅ Migración de verificación completada');
+  } catch(e) { console.error('Error migración:', e); }
+
   sendTelegramAlert('🚀 <b>Sistema Barrio Iniciado</b>\nLas notificaciones de Telegram están activas.');
 
   // Keep-Alive para Render

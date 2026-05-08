@@ -649,13 +649,22 @@ const Admin = {
     `;
   },
   async toggleVerifyUsuario(id, is_verified) {
-    try { await API.post(`/api/admin/usuarios/${id}/verificar`, { is_verified }, this.token); App.toast('Usuario actualizado'); this.loadTab(); } catch(e) { App.toast('Error'); }
+    try { 
+      await API.adminVerifyUsuario(id, is_verified, this.token); 
+      App.toast('Estado de verificación actualizado'); 
+      this.loadTab(); 
+    } catch(e) { App.toast('Error al actualizar: ' + e.message); }
   },
   async deleteUsuario(id) {
     if(confirm('¿ELIMINAR DEFINITIVAMENTE A ESTE USUARIO? Se borrarán todos sus registros.')) {
-      try { await API.del(`/api/admin/usuarios/${id}`, this.token); App.toast('Usuario eliminado'); this.loadTab(); } catch(e) { App.toast('Error'); }
+      try { 
+        await API.adminDeleteUsuario(id, this.token); 
+        App.toast('Usuario eliminado'); 
+        this.loadTab(); 
+      } catch(e) { App.toast('Error: ' + e.message); }
     }
   },
+
   async toggleBlockUsuario(id, is_blocked) {
 
     if(confirm(is_blocked ? '¿Bloquear usuario? No podrá publicar.' : '¿Desbloquear usuario?')) {
@@ -674,8 +683,8 @@ const Admin = {
     window._tempEmergencias = emergencias;
     c.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-        <h3 style="color:var(--primary); margin:0;">🚨 Llamadas de Emergencia</h3>
-        <button class="btn btn-outline btn-sm" onclick="Admin.downloadCSV(window._tempEmergencias, 'emergencias_barrio.csv')">📥 Descargar CSV</button>
+        <h3 style="color:var(--primary); margin:0;">Llamadas de Emergencia</h3>
+        <button class="btn btn-outline btn-sm" onclick="Admin.downloadCSV(window._tempEmergencias, 'emergencias_barrio.csv')">Descargar CSV</button>
       </div>
       <div id="adminEmergenciasList">${emergencias.map(e => `
         <div class="admin-list-item">
@@ -697,8 +706,8 @@ const Admin = {
     window._tempRastreos = rastreos;
     c.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-        <h3 style="color:var(--primary); margin:0;">📍 Rastreo de Robos</h3>
-        <button class="btn btn-outline btn-sm" onclick="Admin.downloadCSV(window._tempRastreos, 'rastreo_robos.csv')">📥 Descargar CSV</button>
+        <h3 style="color:var(--primary); margin:0;">Rastreo de Robos</h3>
+        <button class="btn btn-outline btn-sm" onclick="Admin.downloadCSV(window._tempRastreos, 'rastreo_robos.csv')">Descargar CSV</button>
       </div>
       <div style="margin-bottom:15px; font-size:0.85rem; color:#666;">
         Los puntos de rastreo aparecen aquí si un teléfono fue marcado como "Robado" en la pestaña Usuarios y luego intentó abrir la aplicación BARRIO.
@@ -709,12 +718,13 @@ const Admin = {
             <div class="item-name">${r.nombre} <span style="font-size:0.75rem; color:#999;">(${new Date(r.created_at).toLocaleString()})</span></div>
             <div class="item-detail">
               Teléfono: <strong>${r.telefono}</strong><br>
-              <a href="https://maps.google.com/?q=${r.latitud},${r.longitud}" target="_blank" style="color:var(--primary); display:inline-flex; align-items:center; margin-top:5px; font-weight:bold;">📍 Ver Ubicación Exacta en Mapa</a>
+              <a href="https://maps.google.com/?q=${r.latitud},${r.longitud}" target="_blank" style="color:var(--primary); display:inline-flex; align-items:center; margin-top:5px; font-weight:bold;">Ver Ubicación Exacta en Mapa</a>
             </div>
           </div>
         </div>
       `).join('') || '<p style="text-align:center;color:var(--text-light);">No hay ubicaciones registradas.</p>'}</div>
     `;
+
   },
 
   // CSV Helper

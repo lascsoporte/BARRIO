@@ -109,11 +109,14 @@ const API = {
   adminGetUsuarios(token) {
     return fetch('/api/admin/usuarios', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
   },
-  adminToggleBlockUsuario(id, is_blocked, token) {
-    return this.put(`/api/admin/usuarios/${id}/bloquear`, { is_blocked }, token);
-  },
   adminToggleStolenUsuario(id, is_stolen, token) {
     return this.put(`/api/admin/usuarios/${id}/robado`, { is_stolen }, token);
+  },
+  adminVerifyUsuario(id, is_verified, token) {
+    return this.put(`/api/admin/usuarios/${id}/verificar`, { is_verified }, token);
+  },
+  adminDeleteUsuario(id, token) {
+    return this.del(`/api/admin/usuarios/${id}`, token);
   },
   adminGetEmergencias(token) {
     return fetch('/api/admin/emergencias', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());

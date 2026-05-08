@@ -867,3 +867,12 @@ body {
 .muro-author { font-weight: 800; color: var(--text); }
 .muro-date { color: var(--text-light); }
 .muro-content { font-size: 0.95rem; line-height: 1.5; color: #333; }
+
+.whatsapp-logo-large {
+  width: 40px !important;
+  height: 40px !important;
+  margin-right: 12px;
+  fill: currentColor;
+  vertical-align: middle;
+}
+
