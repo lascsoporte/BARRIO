@@ -966,12 +966,19 @@ const App = {
     });
 
     document.getElementById('btnReportarRobo').addEventListener('click', () => {
-      const num = prompt("Por seguridad, ingresa el NÚMERO DE TELÉFONO que extraviaste:");
+      const num = prompt("Por seguridad, ingresa el NÚMERO DE TELÉFONO que extraviaste (Formato: +569XXXXXXXX):");
       if (!num) return;
+      
+      // Validación formato WhatsApp (+ y 11 dígitos)
+      const phoneRegex = /^\+\d{11}$/;
+      if (!phoneRegex.test(num.replace(/\s+/g, ''))) {
+        return alert("Formato inválido. Debe comenzar con + y tener 11 números (Ej: +56912345678)");
+      }
+
       this.requireAuth(async (user) => {
         try {
           await API.sendAdminMessage({ usuario_id: user.id, mensaje: `🚨 URGENTE: EXTRAVIÉ MI TELÉFONO. Número extraviado: ${num}` });
-          alert("Alerta enviada. El administrador marcará tu dispositivo para rastreo silencioso si se abre la app.");
+          alert("Alerta enviada y tu teléfono quedará como extraviado en la plataforma BARRIO.");
         } catch(e) { this.toast('Error al reportar'); }
       });
     });
