@@ -1,0 +1,17 @@
+{
+  "name": "barrio",
+  "version": "1.0.0",
+  "description": "BARRIO - App de Comercio Vecinal PWA",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.0",
+    "mysql2": "^3.22.3",
+    "sql.js": "^1.10.0"
+  }
+}

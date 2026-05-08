@@ -1,0 +1,7 @@
+Nombre_Local,Dirección,Días_Atención,Horario,Métodos_Pago,Link_Maps
+Almacén Don Juan,Calle Los Olmos 45,lun-dom,09:00-21:00,Ambos,https://maps.app.goo.gl/ejemplo1
+
+Producto,Marca,Precio,Unidad,Stock
+Pan Batido,Artesanal,1800,kg,SI
+Azúcar 1kg,Iansa,1200,unidad,SI
+Leche Entera,Colun,1100,litro,SI

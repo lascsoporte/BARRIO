@@ -1,0 +1,13 @@
+{
+  "name": "BARRIO",
+  "short_name": "BARRIO",
+  "description": "Encuentra productos y servicios en tu barrio",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F9F1E7",
+  "theme_color": "#FF6B35",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icons/barrio-logo.png", "sizes": "1024x1024", "type": "image/png" }
+  ]
+}
