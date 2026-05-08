@@ -302,17 +302,34 @@ app.get('/api/verificar-usuario/:id', async (req, res) => {
 
 app.post('/api/stolen-location', async (req, res) => {
   const { device_id, latitud, longitud, usuario_id } = req.body;
-  
   let uid = usuario_id;
   if (!uid && device_id) {
     const u = await queryOne('SELECT id FROM usuarios WHERE device_id = ?', [device_id]);
     if (u) uid = u.id;
   }
-  
   if (!uid || !latitud || !longitud) return res.status(400).json({ error: 'Datos incompletos' });
-  
   await runSql('INSERT INTO rastreo_robos (usuario_id, latitud, longitud) VALUES (?, ?, ?)', [uid, latitud, longitud]);
   res.json({ message: 'Ubicación registrada' });
+});
+
+app.post('/api/reportar-extravio', async (req, res) => {
+  const { reporting_user_id, reported_phone } = req.body;
+  if (!reporting_user_id || !reported_phone) return res.status(400).json({ error: 'Datos incompletos' });
+
+  const reportedUser = await queryOne('SELECT id, nombre FROM usuarios WHERE telefono = ?', [reported_phone]);
+  const reporter = await queryOne('SELECT nombre, telefono FROM usuarios WHERE id = ?', [reporting_user_id]);
+  const reporterInfo = reporter ? `<b>${reporter.nombre}</b> (${reporter.telefono})` : `ID:${reporting_user_id}`;
+
+  const alertMsg = `🚨 <b>REPORTE DE EXTRAVÍO</b>\nDenunciante: ${reporterInfo}\nTeléfono Extraviado: <b>${reported_phone}</b>\nEstado: Marcado para rastreo silencioso.`;
+
+  if (reportedUser) {
+    await runSql('UPDATE usuarios SET is_stolen = 1 WHERE id = ?', [reportedUser.id]);
+    sendTelegramAlert(`${alertMsg}\n<i>Usuario identificado en el sistema.</i>`);
+  } else {
+    sendTelegramAlert(`${alertMsg}\n<i>⚠️ El número no está registrado en la base de datos de la App.</i>`);
+  }
+  await runSql('INSERT INTO mensajes_admin (usuario_id, mensaje) VALUES (?, ?)', [reporting_user_id, `🚨 REPORTE EXTRAVÍO: Se reportó el número ${reported_phone}`]);
+  res.json({ success: true, message: 'Reporte procesado' });
 });
 
 

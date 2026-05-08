@@ -977,37 +977,22 @@ const App = {
 
       this.requireAuth(async (user) => {
         const btn = document.getElementById('btnReportarRobo');
-        const oldText = btn.textContent;
         btn.disabled = true;
-        btn.textContent = 'Obteniendo GPS...';
+        btn.textContent = 'Procesando reporte...';
 
         try {
-          // Intentar obtener ubicación fresca si no está
-          if (!Geo.userLat || !Geo.userLng) {
-            await Geo.getUserLocation().catch(() => {});
-          }
-
-          const lat = Geo.userLat;
-          const lng = Geo.userLng;
-          const gpsText = (lat && lng) ? `\n📍 Ubicación GPS: https://maps.google.com/?q=${lat},${lng}` : "\n📍 Ubicación GPS: No disponible (GPS apagado)";
-          
-          // 1. Enviar mensaje al buzón (con GPS si hay)
-          await API.sendAdminMessage({ 
-            usuario_id: user.id, 
-            mensaje: `🚨 URGENTE: EXTRAVIÉ MI TELÉFONO. Número extraviado: ${num}${gpsText}` 
+          // Llamamos al nuevo sistema que separa al reportero del teléfono perdido
+          await API.reportarExtravio({ 
+            reporting_user_id: user.id, 
+            reported_phone: num 
           });
 
-          // 2. Registrar en la pestaña de RASTREO (si hay GPS)
-          if (lat && lng) {
-            await API.logStolenLocation({ usuario_id: user.id, latitud: lat, longitud: lng });
-          }
-
-          alert("Alerta enviada y tu teléfono quedará como extraviado en la plataforma BARRIO.");
+          alert("Alerta enviada y el teléfono reportado quedará marcado como extraviado en la plataforma BARRIO para su rastreo.");
         } catch(e) { 
           this.toast('Error al reportar'); 
         } finally {
           btn.disabled = false;
-          btn.textContent = oldText;
+          btn.textContent = "Reporta teléfono extraviado al administrador";
         }
       });
     });

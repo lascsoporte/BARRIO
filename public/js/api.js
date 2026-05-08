@@ -71,6 +71,7 @@ const API = {
   sendAdminMessage(data) { return this.post('/api/admin/mensaje', data); },
   logEmergencia(data) { return this.post('/api/emergencia', data); },
   logStolenLocation(data) { return this.post('/api/stolen-location', data); },
+  reportarExtravio(data) { return this.post('/api/reportar-extravio', data); },
   checkUser(id) { return this.get(`/api/verificar-usuario/${id}`); },
 
 
