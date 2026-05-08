@@ -382,7 +382,6 @@ const App = {
     } catch (e) {
       document.getElementById('mascotasList').innerHTML = `<div class="empty-state"><p>Error al cargar avisos.</p></div>`;
     }
-    }
     const f = document.createElement('div');
     f.innerHTML = this.footerHtml();
     container.appendChild(f);
