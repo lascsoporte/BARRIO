@@ -111,6 +111,14 @@ async function createCloudTables() {
     await mysqlPool.execute(q);
   }
 
+  // Asegurar que las nuevas columnas existan (para bases de datos ya creadas)
+  try {
+    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN is_verified TINYINT(1) DEFAULT 0');
+    console.log('✅ Columna is_verified añadida a usuarios');
+  } catch (e) {
+    // Si ya existe, fallará pero no pasa nada
+  }
+
   // Configuración inicial
   const [rows] = await mysqlPool.execute('SELECT COUNT(*) as count FROM configuracion');
   if (rows[0].count === 0) {

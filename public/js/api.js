@@ -22,14 +22,20 @@ const API = {
   async put(url, data, token) {
     const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
     const res = await fetch(this.base + url, { method: 'PUT', headers, body: JSON.stringify(data) });
-    if (!res.ok) throw new Error(`Error ${res.status}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Error ${res.status}`);
+    }
     return res.json();
   },
 
   async del(url, token) {
     const headers = { 'Authorization': `Bearer ${token}` };
     const res = await fetch(this.base + url, { method: 'DELETE', headers });
-    if (!res.ok) throw new Error(`Error ${res.status}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Error ${res.status}`);
+    }
     return res.json();
   },
 

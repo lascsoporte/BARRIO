@@ -791,8 +791,8 @@ const App = {
       try {
         const user = JSON.parse(userStr);
         if (user && user.id) {
-          // Si no está verificado, mostrar aviso y no dejar continuar
-          if (!user.is_verified) {
+          // Solo bloquear si is_verified es explícitamente 0
+          if (user.is_verified === 0) {
             this.showPendingVerification();
             return;
           }
