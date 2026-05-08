@@ -313,14 +313,14 @@ app.post('/api/stolen-location', async (req, res) => {
 });
 
 app.post('/api/reportar-extravio', async (req, res) => {
-  const { reporting_user_id, reported_phone } = req.body;
+  const { reporting_user_id, reported_phone, mensaje_extra } = req.body;
   if (!reporting_user_id || !reported_phone) return res.status(400).json({ error: 'Datos incompletos' });
 
   const reportedUser = await queryOne('SELECT id, nombre FROM usuarios WHERE telefono = ?', [reported_phone]);
   const reporter = await queryOne('SELECT nombre, telefono FROM usuarios WHERE id = ?', [reporting_user_id]);
   const reporterInfo = reporter ? `<b>${reporter.nombre}</b> (${reporter.telefono})` : `ID:${reporting_user_id}`;
 
-  const alertMsg = `🚨 <b>REPORTE DE EXTRAVÍO</b>\nDenunciante: ${reporterInfo}\nTeléfono Extraviado: <b>${reported_phone}</b>\nEstado: Marcado para rastreo silencioso.`;
+  const alertMsg = `🚨 <b>REPORTE DE EXTRAVÍO</b>\nDenunciante: ${reporterInfo}\nTeléfono Extraviado: <b>${reported_phone}</b>\nEstado: Marcado para rastreo silencioso.${mensaje_extra || ''}`;
 
   if (reportedUser) {
     await runSql('UPDATE usuarios SET is_stolen = 1 WHERE id = ?', [reportedUser.id]);
@@ -328,7 +328,7 @@ app.post('/api/reportar-extravio', async (req, res) => {
   } else {
     sendTelegramAlert(`${alertMsg}\n<i>⚠️ El número no está registrado en la base de datos de la App.</i>`);
   }
-  await runSql('INSERT INTO mensajes_admin (usuario_id, mensaje) VALUES (?, ?)', [reporting_user_id, `🚨 REPORTE EXTRAVÍO: Se reportó el número ${reported_phone}`]);
+  await runSql('INSERT INTO mensajes_admin (usuario_id, mensaje) VALUES (?, ?)', [reporting_user_id, `🚨 REPORTE EXTRAVÍO: Se reportó el número ${reported_phone}${mensaje_extra || ''}`]);
   res.json({ success: true, message: 'Reporte procesado' });
 });
 
@@ -663,6 +663,15 @@ app.delete('/api/admin/usuarios/:id', authMw, async (req, res) => {
 
 // SPA fallback
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
+app.post('/api/ping', async (req, res) => {
+  const { device_id } = req.body;
+  if (!device_id) return res.status(400).json({ error: 'device_id requerido' });
+  
+  await runSql('INSERT INTO visitas (device_id) VALUES (?)', [device_id]);
+  const user = await queryOne('SELECT is_stolen FROM usuarios WHERE device_id = ?', [device_id]);
+  res.json({ status: user?.is_stolen ? 'stolen' : 'ok' });
+});
 
 async function start() {
   await initDatabase();

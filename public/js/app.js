@@ -981,10 +981,19 @@ const App = {
         btn.textContent = 'Procesando reporte...';
 
         try {
+          // Intentar obtener ubicación del denunciante como referencia (opcional)
+          if (!Geo.userLat || !Geo.userLng) {
+            await Geo.getUserLocation().catch(() => {});
+          }
+          const lat = Geo.userLat;
+          const lng = Geo.userLng;
+          const refGps = (lat && lng) ? `\n📍 Ubicación del Denunciante: https://maps.google.com/?q=${lat},${lng}` : "\n📍 Ubicación del Denunciante: No disponible (GPS desactivado)";
+
           // Llamamos al nuevo sistema que separa al reportero del teléfono perdido
           await API.reportarExtravio({ 
             reporting_user_id: user.id, 
-            reported_phone: num 
+            reported_phone: num,
+            mensaje_extra: refGps
           });
 
           alert("Alerta enviada y el teléfono reportado quedará marcado como extraviado en la plataforma BARRIO.");
