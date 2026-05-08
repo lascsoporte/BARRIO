@@ -382,7 +382,12 @@ const App = {
     } catch (e) {
       document.getElementById('mascotasList').innerHTML = `<div class="empty-state"><p>Error al cargar avisos.</p></div>`;
     }
+    }
+    const f = document.createElement('div');
+    f.innerHTML = this.footerHtml();
+    container.appendChild(f);
   },
+
 
   footerHtml() {
     return `
@@ -423,6 +428,7 @@ const App = {
             <span style="font-size:0.9rem; margin-top:4px; opacity:0.9;">PUERTO MONTT</span>
           </a>
         </div>
+        ${this.footerHtml()}
       </div>
     `;
   },
@@ -896,7 +902,9 @@ const App = {
       });
     });
     this.loadMuro();
-    container.innerHTML += this.footerHtml();
+    const f = document.createElement('div');
+    f.innerHTML = this.footerHtml();
+    container.appendChild(f);
   },
 
   async loadMuro() {
@@ -968,7 +976,9 @@ const App = {
         } catch(e) { this.toast('Error al reportar'); }
       });
     });
-    container.innerHTML += this.footerHtml();
+    const f = document.createElement('div');
+    f.innerHTML = this.footerHtml();
+    container.appendChild(f);
   }
 };
 
