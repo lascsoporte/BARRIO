@@ -1024,9 +1024,9 @@ const App = {
     modal.innerHTML = `
       <div class="gps-modal-card">
         <div class="gps-icon-anim">📍</div>
-        <div class="gps-title">Activar GPS de Seguridad</div>
+        <div class="gps-title">Activa el GPS por Tu seguridad</div>
         <div class="gps-text">
-          Para que el botón de <b>Emergencia</b> y el <b>Rastreo</b> funcionen correctamente, BARRIO necesita conocer tu ubicación.
+          Para que el botón de emergencia funcione correctamente.
         </div>
         <button class="btn-gps-allow" id="btnGpsAllow">ACTIVAR AHORA</button>
         <div class="gps-footer">
