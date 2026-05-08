@@ -240,9 +240,9 @@ app.post('/api/admin/mensaje', async (req, res) => {
   const u = await queryOne('SELECT nombre, telefono FROM usuarios WHERE id = ?', [parseInt(usuario_id)]);
   const autorInfo = u ? `<b>${u.nombre}</b> (${u.telefono})` : `ID:${usuario_id}`;
 
-  // Alerta especial si el mensaje contiene la palabra ROBARON o ROBO o EXTRAVIASTE o EXTRAVIADO
+  // Alerta especial si el mensaje contiene la palabra EXTRAVIASTE o EXTRAVIADO
   const upperM = mensaje.toUpperCase();
-  if (upperM.includes('ROBARON') || upperM.includes('ROBO') || upperM.includes('EXTRAVIASTE') || upperM.includes('EXTRAVIADO') || mensaje.includes('🚨')) {
+  if (upperM.includes('EXTRAVIASTE') || upperM.includes('EXTRAVIADO') || mensaje.includes('🚨')) {
     sendTelegramAlert(`🚨 <b>ALERTA DE EXTRAVÍO/SEGURIDAD</b>\nUsuario: ${autorInfo}\nDetalle: ${mensaje}`);
   } else {
     sendTelegramAlert(`✉️ <b>Nuevo Mensaje en Buzón</b>\nDe: ${autorInfo}\nContenido: ${mensaje.slice(0, 50)}...`);
@@ -275,7 +275,7 @@ app.post('/api/emergencia', async (req, res) => {
   res.json({ message: 'Emergencia registrada' });
 });
 
-// Ping / Estadísticas y Rastreo Robos
+// Ping / Estadísticas y Rastreo Extravíos
 app.post('/api/ping', async (req, res) => {
   const { device_id } = req.body;
   if (!device_id) return res.status(400).json({ error: 'Faltan datos' });
@@ -557,7 +557,7 @@ app.put('/api/admin/usuarios/:id/bloquear', authMw, async (req, res) => {
 app.put('/api/admin/usuarios/:id/robado', authMw, async (req, res) => {
   const { is_stolen } = req.body;
   await runSql('UPDATE usuarios SET is_stolen=? WHERE id=?', [is_stolen ? 1 : 0, req.params.id]);
-  res.json({ message: 'Estado de robo actualizado' });
+  res.json({ message: 'Estado de extravío actualizado' });
 });
 
 // ===== EMERGENCIAS =====
@@ -582,7 +582,7 @@ app.delete('/api/admin/muro/:id', authMw, async (req, res) => {
   res.json({ message: 'Mensaje eliminado' });
 });
 
-// ===== RASTREO ROBOS =====
+// ===== RASTREO EXTRAVÍOS =====
 app.get('/api/admin/rastreo', authMw, async (req, res) => {
   const rows = await queryAll(`
     SELECT r.*, u.nombre, u.telefono 

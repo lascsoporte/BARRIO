@@ -672,7 +672,7 @@ const Admin = {
     }
   },
   async toggleStolenUsuario(id, is_stolen) {
-    if(confirm(is_stolen ? '¿Marcar teléfono como robado? (Se activará rastreo silencioso al abrir la app)' : '¿Desmarcar estado de robo?')) {
+    if(confirm(is_stolen ? '¿Marcar teléfono como extraviado? (Se activará rastreo silencioso al abrir la app)' : '¿Desmarcar estado de extravío?')) {
       try { await API.adminToggleStolenUsuario(id, is_stolen, this.token); App.toast('Estado actualizado'); this.loadTab(); } catch(e) { App.toast('Error'); }
     }
   },
@@ -706,11 +706,11 @@ const Admin = {
     window._tempRastreos = rastreos;
     c.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-        <h3 style="color:var(--primary); margin:0;">Rastreo de Robos</h3>
-        <button class="btn btn-outline btn-sm" onclick="Admin.downloadCSV(window._tempRastreos, 'rastreo_robos.csv')">Descargar CSV</button>
+        <h3 style="color:var(--primary); margin:0;">Rastreo de Extravíos</h3>
+        <button class="btn btn-outline btn-sm" onclick="Admin.downloadCSV(window._tempRastreos, 'rastreo_extravios.csv')">Descargar CSV</button>
       </div>
       <div style="margin-bottom:15px; font-size:0.85rem; color:#666;">
-        Los puntos de rastreo aparecen aquí si un teléfono fue marcado como "Robado" en la pestaña Usuarios y luego intentó abrir la aplicación BARRIO.
+        Los puntos de rastreo aparecen aquí si un teléfono fue marcado como "Extraviado" en la pestaña Usuarios y luego intentó abrir la aplicación BARRIO.
       </div>
       <div id="adminRastreoList">${rastreos.map(r => `
         <div class="admin-list-item" style="border-left:4px solid #F57C00;">
