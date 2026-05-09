@@ -631,6 +631,7 @@ const Admin = {
             <div class="item-name">${u.nombre} ${u.is_verified ? '✅' : '⏳'}</div>
             <div class="item-detail">
               <strong>Tel:</strong> ${u.telefono} | <strong>Dir:</strong> ${u.direccion || '-'}<br>
+              <strong>Términos:</strong> ${u.terms_accepted ? '✅ Aceptados' : '❌ Pendiente'}<br>
               <small>Registro: ${new Date(u.created_at).toLocaleDateString()}</small>
             </div>
           </div>

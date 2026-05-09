@@ -185,25 +185,30 @@ app.post('/api/mascotas', async (req, res) => {
 
 // ========== REGISTRO / USUARIOS ==========
 app.post('/api/registro', async (req, res) => {
-  const { nombre, telefono, direccion, device_id } = req.body;
+  const { nombre, telefono, direccion, device_id, terms_accepted } = req.body;
   if (!nombre || !telefono) return res.status(400).json({ error: 'Nombre y teléfono son obligatorios' });
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const termsVal = terms_accepted ? 1 : 0;
 
   let user = await queryOne('SELECT * FROM usuarios WHERE telefono = ?', [telefono]);
   if (!user) {
-    const result = await runSql('INSERT INTO usuarios (nombre, telefono, direccion, ip, device_id) VALUES (?,?,?,?,?)', 
-      [nombre, telefono, direccion || '', ip, device_id || '']);
+    const result = await runSql('INSERT INTO usuarios (nombre, telefono, direccion, ip, device_id, terms_accepted) VALUES (?,?,?,?,?,?)', 
+      [nombre, telefono, direccion || '', ip, device_id || '', termsVal]);
     const newId = result.insertId;
     user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [newId]);
     sendTelegramAlert(`👤 <b>Nuevo Usuario Registrado</b>\nNombre: ${nombre}\nTel: ${telefono}\nDir: ${direccion || '-'}\nCiudad: Puerto Montt`);
   } else {
-    await runSql('UPDATE usuarios SET nombre=?, direccion=?, ip=?, device_id=? WHERE id=?', 
-      [nombre, direccion || '', ip, device_id || '', user.id]);
-    user = { ...user, nombre, direccion, ip, device_id };
+    await runSql('UPDATE usuarios SET nombre=?, direccion=?, ip=?, device_id=?, terms_accepted=? WHERE id=?', 
+      [nombre, direccion || '', ip, device_id || '', termsVal, user.id]);
+    user = { ...user, nombre, direccion, ip, device_id, terms_accepted: termsVal };
   }
   res.json({ message: 'Usuario registrado', user });
 });
 
+app.put('/api/usuarios/:id/accept-terms', async (req, res) => {
+  await runSql('UPDATE usuarios SET terms_accepted = 1 WHERE id = ?', [req.params.id]);
+  res.json({ message: 'Términos aceptados' });
+});
 
 // ========== MURO COMUNITARIO ==========
 app.get('/api/muro', async (req, res) => {

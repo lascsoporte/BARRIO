@@ -73,8 +73,7 @@ const API = {
   logStolenLocation(data) { return this.post('/api/stolen-location', data); },
   reportarExtravio(data) { return this.post('/api/reportar-extravio', data); },
   checkUser(id) { return this.get(`/api/verificar-usuario/${id}`); },
-
-
+  acceptTerms(id) { return this.put(`/api/usuarios/${id}/accept-terms`, {}); },
   // Admin endpoints
   adminLogin(passwords) { return this.post('/api/admin/login', { passwords }); },
   adminResolveMap(url, token) { return this.post('/api/admin/resolve-map', { url }, token); },

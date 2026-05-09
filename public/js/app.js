@@ -766,18 +766,26 @@ const App = {
     modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
     modal.innerHTML = `
       <div class="card" style="max-width:400px; text-align:center; padding:30px; border-top: 5px solid #D32F2F;">
-        <h2 style="color:#D32F2F; margin-bottom:15px; font-size:1.5rem; font-weight:900;">⚠️ AVISO IMPORTANTE</h2>
-        <p style="font-size:0.95rem; color:#444; margin-bottom:20px; text-align:justify; line-height:1.6;">
-          <strong>BARRIO no es una aplicación oficial de emergencias.</strong><br><br>
-          Los botones de contacto son únicamente accesos directos de marcación telefónica hacia números públicos pre-grabados.<br><br>
-          Al continuar, aceptas que no garantizamos el éxito de la llamada ni nos hacemos responsables por fallas en las líneas telefónicas.
-        </p>
+        <h2 style="color:#D32F2F; margin-bottom:15px; font-size:1.5rem; font-weight:900;">⚠️ AVISO LEGAL Y TÉRMINOS DE USO</h2>
+        <div style="font-size:0.95rem; color:#444; margin-bottom:20px; text-align:justify; line-height:1.6; max-height:40vh; overflow-y:auto; padding-right:10px;">
+          <p style="margin-bottom:10px;"><strong>1. Uso de Emergencias:</strong> BARRIO no es una aplicación oficial de emergencias. Los botones de contacto son únicamente accesos directos.</p>
+          <p style="margin-bottom:10px;"><strong>2. Responsabilidad:</strong> No garantizamos el éxito de la llamada ni nos hacemos responsables por fallas de conexión o servicio.</p>
+          <p style="margin-bottom:10px;"><strong>3. Datos y Privacidad:</strong> La información mostrada es referencial e ingresada por la comunidad. PUERTOMAS SPA no la garantiza.</p>
+          <p>Al continuar, aceptas expresamente nuestras políticas de uso para poder ingresar a la plataforma.</p>
+        </div>
         <button id="btnAcceptDisclaimer" class="btn btn-primary" style="width:100%; justify-content:center; font-weight:bold; padding:15px; font-size:1.1rem; text-transform:uppercase;">Acepto y Comprendo</button>
       </div>
     `;
     document.body.appendChild(modal);
-    document.getElementById('btnAcceptDisclaimer').addEventListener('click', () => {
+    document.getElementById('btnAcceptDisclaimer').addEventListener('click', async () => {
       localStorage.setItem('barrio_disclaimer_accepted', 'true');
+      const userStr = localStorage.getItem('barrio_user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          await API.acceptTerms(user.id);
+        } catch(e) {}
+      }
       document.body.removeChild(modal);
     });
   },
@@ -852,7 +860,8 @@ const App = {
       btn.textContent = 'Registrando...';
 
       try {
-        const res = await API.registerUser({ nombre, telefono, direccion, device_id: this.deviceId });
+        const termsAccepted = localStorage.getItem('barrio_disclaimer_accepted') === 'true';
+        const res = await API.registerUser({ nombre, telefono, direccion, device_id: this.deviceId, terms_accepted: termsAccepted });
         localStorage.setItem('barrio_user', JSON.stringify(res.user));
         this.toast('¡Registro enviado!');
         modal.remove();

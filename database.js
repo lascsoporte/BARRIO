@@ -56,7 +56,7 @@ async function createCloudTables() {
     `CREATE TABLE IF NOT EXISTS usuarios (
       id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(255) NOT NULL, telefono VARCHAR(50) NOT NULL UNIQUE,
       direccion TEXT, ip VARCHAR(100), device_id VARCHAR(255), 
-      is_blocked TINYINT(1) DEFAULT 0, is_stolen TINYINT(1) DEFAULT 0, is_verified TINYINT(1) DEFAULT 0,
+      is_blocked TINYINT(1) DEFAULT 0, is_stolen TINYINT(1) DEFAULT 0, is_verified TINYINT(1) DEFAULT 0, terms_accepted TINYINT(1) DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS locales (
@@ -119,6 +119,13 @@ async function createCloudTables() {
     // Si ya existe, fallará pero no pasa nada
   }
 
+  try {
+    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN terms_accepted TINYINT(1) DEFAULT 0');
+    console.log('✅ Columna terms_accepted añadida a usuarios');
+  } catch (e) {
+    // Si ya existe, fallará pero no pasa nada
+  }
+
   // Configuración inicial
   const [rows] = await mysqlPool.execute('SELECT COUNT(*) as count FROM configuracion');
   if (rows[0].count === 0) {
@@ -173,7 +180,7 @@ function saveSqlite() {
 
 function initSqliteTables() {
   // Mantener lógica de SQLite para fallback local
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, telefono TEXT UNIQUE)`);
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, telefono TEXT UNIQUE, terms_accepted INTEGER DEFAULT 0)`);
   // ... (simplificado para fallback)
 }
 
