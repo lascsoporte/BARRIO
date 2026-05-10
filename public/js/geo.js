@@ -16,7 +16,7 @@ const Geo = {
           resolve({ lat: Geo.userLat, lng: Geo.userLng });
         },
         (err) => reject(err),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: forceFresh ? 0 : 300000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: forceFresh ? 10000 : 300000 }
       );
     });
   },

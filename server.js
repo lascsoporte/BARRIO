@@ -309,17 +309,7 @@ app.get('/api/verificar-usuario/:id', async (req, res) => {
   res.json(user);
 });
 
-app.post('/api/stolen-location', async (req, res) => {
-  const { device_id, latitud, longitud, usuario_id } = req.body;
-  let uid = usuario_id;
-  if (!uid && device_id) {
-    const u = await queryOne('SELECT id FROM usuarios WHERE device_id = ?', [device_id]);
-    if (u) uid = u.id;
-  }
-  if (!uid || !latitud || !longitud) return res.status(400).json({ error: 'Datos incompletos' });
-  await runSql('INSERT INTO rastreo_robos (usuario_id, latitud, longitud) VALUES (?, ?, ?)', [uid, latitud, longitud]);
-  res.json({ message: 'Ubicación registrada' });
-});
+
 
 app.post('/api/reportar-extravio', async (req, res) => {
   const { reporting_user_id, reported_phone, mensaje_extra } = req.body;
@@ -673,14 +663,7 @@ app.delete('/api/admin/usuarios/:id', authMw, async (req, res) => {
 // SPA fallback
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-app.post('/api/ping', async (req, res) => {
-  const { device_id } = req.body;
-  if (!device_id) return res.status(400).json({ error: 'device_id requerido' });
-  
-  await runSql('INSERT INTO visitas (device_id) VALUES (?)', [device_id]);
-  const user = await queryOne('SELECT is_stolen FROM usuarios WHERE device_id = ?', [device_id]);
-  res.json({ status: user?.is_stolen ? 'stolen' : 'ok' });
-});
+
 
 async function start() {
   await initDatabase();
