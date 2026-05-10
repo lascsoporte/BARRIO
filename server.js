@@ -363,7 +363,13 @@ app.post('/api/admin/login', (req, res) => {
   
   const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
   adminTokens.add(token);
+  sendTelegramAlert(`🔐 <b>Acceso Panel Admin</b>\nSe ha iniciado sesión en el Panel de Administración.`);
   res.json({ token });
+});
+
+app.post('/api/admin/notify-entry', authMw, (req, res) => {
+  sendTelegramAlert(`👀 <b>Ingreso al Panel Admin</b>\nUn administrador ha entrado a revisar el Panel.`);
+  res.json({ ok: true });
 });
 
 app.post('/api/admin/resolve-map', authMw, async (req, res) => {

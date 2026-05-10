@@ -5,7 +5,7 @@ const Admin = {
 
  route(container, hash) {
  if (!this.token) return this.renderLogin(container);
- this.renderPanel(container);
+ API.adminNotifyEntry(this.token).catch(()=>{}); this.renderPanel(container);
  },
 
  renderLogin(container) {
@@ -31,7 +31,7 @@ const Admin = {
  const { token } = await API.adminLogin([p1, p2, p3]);
  this.token = token;
  localStorage.setItem('barrio_admin_token', token);
- this.renderPanel(container);
+ API.adminNotifyEntry(this.token).catch(()=>{}); this.renderPanel(container);
  } catch (e) {
  const err = document.getElementById('adminError');
  err.textContent = 'Una o más llaves son incorrectas';

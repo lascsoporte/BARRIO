@@ -135,5 +135,6 @@ const API = {
   },
   adminClearMuro(token) { return this.del('/api/admin/muro', token); },
   adminDeleteMuroPost(id, token) { return this.del(`/api/admin/muro/${id}`, token); },
+  adminNotifyEntry(token) { return this.post('/api/admin/notify-entry', {}, token); },
   ping(device_id) { return this.post('/api/ping', { device_id }); }
 };
