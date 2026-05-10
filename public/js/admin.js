@@ -49,17 +49,17 @@ const Admin = {
  <button class="btn btn-outline btn-sm" style="width:auto;font-size:0.8rem;" id="logoutBtn">Cerrar Sesión</button>
  </div>
  <div class="admin-tabs">
+ <button class="admin-tab ${this.currentTab === 'usuarios' ? 'active' : ''}" data-tab="usuarios">Usuarios</button>
+ <button class="admin-tab ${this.currentTab === 'mensajes' ? 'active' : ''}" data-tab="mensajes">Buzón</button>
+ <button class="admin-tab ${this.currentTab === 'muro' ? 'active' : ''}" data-tab="muro">Muro</button>
+ <button class="admin-tab ${this.currentTab === 'emergencias' ? 'active' : ''}" data-tab="emergencias">Emergencias</button>
+ <button class="admin-tab ${this.currentTab === 'rastreo' ? 'active' : ''}" data-tab="rastreo">Rastreo</button>
+ <button class="admin-tab ${this.currentTab === 'mascotas' ? 'active' : ''}" data-tab="mascotas">Mascotas</button>
  <button class="admin-tab ${this.currentTab === 'locales' ? 'active' : ''}" data-tab="locales">Locales</button>
  <button class="admin-tab ${this.currentTab === 'productos' ? 'active' : ''}" data-tab="productos">Productos</button>
  <button class="admin-tab ${this.currentTab === 'servicios' ? 'active' : ''}" data-tab="servicios">Servicios</button>
- <button class="admin-tab ${this.currentTab === 'mascotas' ? 'active' : ''}" data-tab="mascotas">Mascotas</button>
- <button class="admin-tab ${this.currentTab === 'mensajes' ? 'active' : ''}" data-tab="mensajes">Buzón</button>
- <button class="admin-tab ${this.currentTab === 'muro' ? 'active' : ''}" data-tab="muro">Muro</button>
- <button class="admin-tab ${this.currentTab === 'usuarios' ? 'active' : ''}" data-tab="usuarios">Usuarios</button>
- <button class="admin-tab ${this.currentTab === 'emergencias' ? 'active' : ''}" data-tab="emergencias">Emergencias</button>
- <button class="admin-tab ${this.currentTab === 'rastreo' ? 'active' : ''}" data-tab="rastreo">Rastreo</button>
  <button class="admin-tab ${this.currentTab === 'config' ? 'active' : ''}" data-tab="config">Config</button>
- <button class="admin-tab ${this.currentTab === 'stats' ? 'active' : ''}" data-tab="stats">Stats</button>
+ <button class="admin-tab ${this.currentTab === 'stats' ? 'active' : ''}" data-tab="stats">Estadis</button>
  <button class="admin-tab ${this.currentTab === 'seguridad' ? 'active' : ''}" data-tab="seguridad">Claves</button>
  </div>
  <div id="adminContent"><div class="loading"><div class="spinner"></div></div></div>
