@@ -23,17 +23,17 @@ const App = {
  // Sincronizar el estado de verificación con el servidor antes de bloquear
  const userStr = localStorage.getItem('barrio_user');
  if (userStr) {
- try {
- const localUser = JSON.parse(userStr);
- if (localUser && localUser.id) {
- const serverUser = await API.checkUser(localUser.id);
- localStorage.setItem('barrio_user', JSON.stringify(serverUser));
- }
- } catch(e) {
- if (e.message && e.message.includes('404')) {
- localStorage.removeItem('barrio_user');
- }
- }
+  try {
+    const localUser = JSON.parse(userStr);
+    if (localUser && localUser.id) {
+      const serverUser = await API.checkUser(localUser.id);
+      localStorage.setItem('barrio_user', JSON.stringify(serverUser));
+    }
+  } catch(e) {
+    // Si el usuario no existe en la DB (404), borramos caché para forzar registro
+    localStorage.removeItem('barrio_user');
+    location.reload();
+  }
  }
 
  this.requireAuth((user) => {
