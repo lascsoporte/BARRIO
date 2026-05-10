@@ -905,8 +905,8 @@ const App = {
         <div style="font-size:3rem; margin-bottom:10px;">⏳</div>
         <h2 style="color:#1976D2; font-size:1.4rem;">Cuenta en Verificación</h2>
         <p style="margin-bottom:20px; font-size:0.95rem;">Tu registro ha sido enviado al administrador de <b>Barrio Puerto Montt</b>.</p>
-        <p style="font-size:0.85rem; color:#666; background:#F5F5F5; padding:15px; border-radius:8px; text-align:justify;">
-          Por seguridad de todos los vecinos, un administrador debe aprobar tu cuenta antes de que puedas publicar en el muro o reportar emergencias. Recibirás una notificación cuando seas aceptado.
+        <p style="font-size:0.85rem; color:#666; background:#F5F5F5; padding:15px; border-radius:8px; text-align:center;">
+          Por seguridad de todos los Vecinos, un administrador debe aceptar tu cuenta para que utilices la aplicación.
         </p>
         <button onclick="this.parentElement.parentElement.remove()" class="btn btn-primary" style="margin-top:20px; width:100%; justify-content:center;">Entendido</button>
       </div>
