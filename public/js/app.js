@@ -15,7 +15,7 @@ const App = {
       localStorage.setItem('barrio_device_id', this.deviceId);
     }
 
-    if (!localStorage.getItem('barrio_disclaimer_accepted')) {
+    if (!localStorage.getItem('barrio_disclaimer_v2')) {
       this.showDisclaimer();
       return;
     }
@@ -790,7 +790,7 @@ const App = {
       btn.textContent = 'ACTIVANDO GPS...';
       btn.disabled = true;
 
-      localStorage.setItem('barrio_disclaimer_accepted', 'true');
+      localStorage.setItem('barrio_disclaimer_v2', 'true');
       
       try {
         await Geo.getUserLocation();
@@ -883,7 +883,7 @@ const App = {
       btn.textContent = 'Registrando...';
 
       try {
-        const termsAccepted = localStorage.getItem('barrio_disclaimer_accepted') === 'true';
+        const termsAccepted = localStorage.getItem('barrio_disclaimer_v2') === 'true';
         const res = await API.registerUser({ nombre, telefono, direccion, device_id: this.deviceId, terms_accepted: termsAccepted });
         localStorage.setItem('barrio_user', JSON.stringify(res.user));
         this.toast('¡Registro enviado!');
