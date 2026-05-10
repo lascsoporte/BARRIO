@@ -818,7 +818,7 @@ const App = {
  modal.innerHTML = `
  <div class="card" style="max-width:400px; text-align:center; padding:30px; border-top: 5px solid #D32F2F;">
  <h2 style="color:#D32F2F; margin-bottom:15px; font-size:1.5rem; font-weight:900;">⚠️ AVISO LEGAL Y TÉRMINOS DE USO</h2>
- <div style="font-size:0.95rem; color:#444; margin-bottom:20px; text-align:justify; line-height:1.6; max-height:40vh; overflow-y:auto; padding-right:10px;">
+ <div style="font-size:0.95rem; color:#444; margin-bottom:20px; text-align:left; line-height:1.6; max-height:40vh; overflow-y:auto; padding-right:10px;">
  <p style="margin-bottom:10px;"><strong>1. Uso:</strong> BARRIO no es una aplicación oficial. Los botones de contacto son únicamente accesos directos. <strong style="color:#D32F2F;">SIEMPRE PRIORICE LLAMAR DIRECTAMENTE A LOS NUMEROS DE EMERGENCIA , ESTA APLICACION NO REEMPLAZA EN NINGUN CASO LA FORMA DE LLAMAR TRADICIONALMENTE A INTITUCIONES DE EMERGENCIAS</strong></p>
  <p style="margin-bottom:10px;"><strong>2. Responsabilidad:</strong> No garantizamos el éxito de la llamada ni nos hacemos responsables por fallas de conexión o servicio.</p>
  <p style="margin-bottom:10px;"><strong>3. Datos y Privacidad:</strong> La información mostrada es referencial e ingresada por la comunidad. PUERTOMAS SPA no la garantiza.</p>
