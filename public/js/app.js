@@ -470,7 +470,7 @@ const App = {
  <h2 style="color:var(--primary); margin-bottom: 20px;">📋 Aviso Legal</h2>
  <div class="card" style="line-height: 1.7; font-size: 0.9rem; color: #444;">
  <h3 style="margin-bottom: 10px; font-size: 1rem; color:#D32F2F;">⚠️ Aviso</h3>
- <p style="margin-bottom: 15px;"><strong>BARRIO no es una aplicación oficial.</strong> Los botones de contacto son únicamente accesos directos de marcación telefónica hacia números públicos pre-grabados. No garantizamos el éxito de la llamada ni nos hacemos responsables por fallas en las líneas telefónicas.</p>
+ <p style="margin-bottom: 15px;"><strong>BARRIO no es una aplicación oficial.</strong> Los botones de contacto son únicamente accesos directos de marcación telefónica hacia números públicos pre-grabados. No garantizamos el éxito de la llamada ni nos hacemos responsables por fallas en las líneas telefónicas. <strong style="color:#D32F2F;">SIEMPRE PRIORICE LLAMAR DIRECTAMENTE A LOS NUMEROS DE EMERGENCIA , ESTA APLICACION NO REEMPLAZA EN NINGUN CASO LA FORMA DE LLAMAR TRADICIONALMENTE A INTITUCIONES DE EMERGENCIAS</strong></p>
  <hr style="margin:15px 0; border:0; border-top:1px solid #eee;">
  <h3 style="margin-bottom: 10px; font-size: 1rem;">BARRIO - Plataforma de Visualización Comunitaria</h3>
  <p><strong>Propiedad de PUERTOMAS SPA.</strong></p>
@@ -791,7 +791,7 @@ const App = {
  <div class="card" style="max-width:400px; text-align:center; padding:30px; border-top: 5px solid #D32F2F;">
  <h2 style="color:#D32F2F; margin-bottom:15px; font-size:1.5rem; font-weight:900;">⚠️ AVISO LEGAL Y TÉRMINOS DE USO</h2>
  <div style="font-size:0.95rem; color:#444; margin-bottom:20px; text-align:justify; line-height:1.6; max-height:40vh; overflow-y:auto; padding-right:10px;">
- <p style="margin-bottom:10px;"><strong>1. Uso:</strong> BARRIO no es una aplicación oficial. Los botones de contacto son únicamente accesos directos.</p>
+ <p style="margin-bottom:10px;"><strong>1. Uso:</strong> BARRIO no es una aplicación oficial. Los botones de contacto son únicamente accesos directos. <strong style="color:#D32F2F;">SIEMPRE PRIORICE LLAMAR DIRECTAMENTE A LOS NUMEROS DE EMERGENCIA , ESTA APLICACION NO REEMPLAZA EN NINGUN CASO LA FORMA DE LLAMAR TRADICIONALMENTE A INTITUCIONES DE EMERGENCIAS</strong></p>
  <p style="margin-bottom:10px;"><strong>2. Responsabilidad:</strong> No garantizamos el éxito de la llamada ni nos hacemos responsables por fallas de conexión o servicio.</p>
  <p style="margin-bottom:10px;"><strong>3. Datos y Privacidad:</strong> La información mostrada es referencial e ingresada por la comunidad. PUERTOMAS SPA no la garantiza.</p>
  <p style="margin-bottom:10px; color:#D32F2F; font-weight:bold;"><strong>4. Activación de GPS:</strong> Al aceptar estos términos y condiciones, se solicitará y activará automáticamente el GPS de tu dispositivo, necesario para mostrar la información del barrio y para el correcto funcionamiento de las alertas.</p>
