@@ -194,9 +194,21 @@ const App = {
  </div>
  `;
  const input = document.getElementById('searchInput');
- const doSearch = () => {
+ const doSearch = async () => {
  const q = input.value.trim();
- if (q) location.hash = `#/buscar?q=${encodeURIComponent(q)}`;
+ if (!q) return;
+ 
+ const btn = document.getElementById('btnSearchProducts');
+ if (!Geo.userLat) {
+   const origText = btn.innerHTML;
+   btn.innerHTML = '📍 UBICANDO...';
+   btn.style.opacity = '0.7';
+   await Geo.getUserLocation().catch(() => {});
+   btn.innerHTML = origText;
+   btn.style.opacity = '1';
+ }
+ 
+ location.hash = `#/buscar?q=${encodeURIComponent(q)}`;
  };
  input.addEventListener('keypress', (e) => { if (e.key === 'Enter') doSearch(); });
  document.getElementById('btnSearchProducts').addEventListener('click', doSearch);
