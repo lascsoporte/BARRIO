@@ -567,18 +567,25 @@ const Admin = {
  const mensajes = await API.adminGetMensajes(this.token);
  c.innerHTML = `
  <h3 style="margin-bottom:15px; color:var(--primary);">✉️ Buzón de Mensajes</h3>
- <div id="adminMensajesList">${mensajes.map(m => `
+ <div id="adminMensajesList">${mensajes.map(m => {
+  let displayMessage = m.mensaje;
+  const mapRegex = /https:\/\/maps\.google\.com\/\?q=([\d.-]+),([\d.-]+)/;
+  const match = displayMessage.match(mapRegex);
+  if (match) {
+    displayMessage = displayMessage.replace(mapRegex, `<a href="https://maps.google.com/?q=${match[1]},${match[2]}" target="_blank" style="color:var(--primary); font-weight:bold; text-decoration:underline;">Ver en Mapa</a>`);
+  }
+  return `
  <div class="admin-list-item" style="${m.leido ? 'opacity:0.6;' : 'border-left: 4px solid var(--primary);'}">
  <div class="item-info">
  <div class="item-name">${m.nombre || 'Usuario Desconocido'} <span style="font-size:0.8rem; font-weight:normal; color:#666;">(${m.telefono || 'Sin Tel'})</span></div>
- <div class="item-detail" style="color:#222; margin-top:5px; font-size:1rem; font-weight:${m.leido ? 'normal' : 'bold'};">${m.mensaje}</div>
+ <div class="item-detail" style="color:#222; margin-top:5px; font-size:1rem; font-weight:${m.leido ? 'normal' : 'bold'}; white-space:pre-line;">${displayMessage}</div>
  <div style="font-size:0.75rem; color:#999; margin-top:5px;">${new Date(m.created_at).toLocaleString()}</div>
  </div>
  <div class="admin-actions">
  ${!m.leido ? `<button class="btn btn-outline btn-sm" onclick="Admin.markLeido(${m.id})">Marcar Leído</button>` : ''}
  </div>
  </div>
- `).join('') || '<p style="text-align:center;color:var(--text-light);">Buzón vacío.</p>'}</div>
+ `}).join('') || '<p style="text-align:center;color:var(--text-light);">Buzón vacío.</p>'}</div>
 
  `;
  },
