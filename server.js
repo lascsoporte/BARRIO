@@ -180,6 +180,14 @@ app.post('/api/mascotas', async (req, res) => {
 
   await runSql('INSERT INTO mascotas_perdidas (nombre_contacto,telefono,ubicacion_extravio,direccion,foto_base64,tipo_animal,caracteristicas,nombre_mascota,comentarios,latitud,longitud) VALUES (?,?,?,?,?,?,?,?,?,?,?)', 
     [nombre_contacto, telefono, ubicacion_extravio||'', direccion||'', foto_base64||'', tipo_animal||'', caracteristicas||'', nombre_mascota||'', comentarios||'', latitud || null, longitud || null]);
+  
+  sendTelegramAlert(`🐾 <b>Nueva Mascota Perdida</b>\n` +
+    `Tipo: ${tipo_animal || 'No especificado'}\n` +
+    `Nombre Mascota: ${nombre_mascota || '-'}\n` +
+    `Contacto: ${nombre_contacto} (${telefono})\n` +
+    `Ubicación: ${ubicacion_extravio || '-'}\n` +
+    `Características: ${caracteristicas || '-'}`);
+
   res.json({ message: 'Aviso publicado' });
 });
 
