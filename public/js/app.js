@@ -299,7 +299,7 @@ const App = {
 
  <div class="card" style="margin-bottom:20px; background: #FFF3E0; border: 1px solid #FFCC80;">
  <h3 style="color:#E65100; margin-bottom:10px;">Reportar Mascota Perdida</h3>
- <p style="font-size:0.85rem; color:#666; margin-bottom:10px;">Haz clic en el mapa de arriba para fijar el punto exacto donde se perdió.</p>
+ <p style="font-size:0.85rem; color:#666; margin-bottom:10px;">Haz clic en el mapa de arriba para fijar el punto exacto donde se perdió. <b>La publicación dura 30 días en la plataforma, avísanos si encontraste tu mascota para eliminar tu publicación.</b></p>
  <select id="mascotaTipo" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #CCC; background:white;">
  <option value="">Tipo de mascota...</option>
  <option value="Perro">Perro</option>
@@ -450,7 +450,7 @@ const App = {
  &copy; 2026 BARRIO - PUERTOMAS SPA | 
  <a href="#/legal" style="color:var(--primary); text-decoration:underline; cursor:pointer;">Aviso Legal</a>
  </p>
- <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); margin-top: 8px; text-align: right;">v.1.2</div>
+ <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); margin-top: 8px; text-align: right;">v.1.3</div>
  </footer>
  `;
  },

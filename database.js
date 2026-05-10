@@ -184,4 +184,17 @@ function initSqliteTables() {
   // ... (simplificado para fallback)
 }
 
-module.exports = { initDatabase, queryAll, queryOne, runSql };
+async function cleanupMascotas() {
+  const sql = useMysql 
+    ? "DELETE FROM mascotas_perdidas WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)"
+    : "DELETE FROM mascotas_perdidas WHERE created_at < DATETIME('now', '-30 days')";
+  try {
+    const result = await runSql(sql);
+    return result.affectedRows || 0;
+  } catch (e) {
+    console.error('Error en limpieza de mascotas:', e);
+    return 0;
+  }
+}
+
+module.exports = { initDatabase, queryAll, queryOne, runSql, cleanupMascotas };

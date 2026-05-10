@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const https = require('https');
-const { initDatabase, ...dbHelper } = require('./database');
+const { initDatabase, cleanupMascotas, ...dbHelper } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -753,6 +753,14 @@ async function start() {
     const result = await dbHelper.runSql('UPDATE usuarios SET is_verified = 1 WHERE is_verified = 0 OR is_verified IS NULL');
     console.log('✅ Migración de verificación completada');
   } catch(e) { console.error('Error migración:', e); }
+
+  // LIMPIEZA: Mascotas de más de 30 días
+  try {
+    const deletedCount = await cleanupMascotas();
+    if (deletedCount > 0) {
+      sendTelegramAlert(`🧹 <b>Limpieza Automática</b>\nSe han eliminado ${deletedCount} avisos de mascotas por cumplir 30 días de antigüedad.`);
+    }
+  } catch(e) { console.error('Error cleanup:', e); }
 
   sendTelegramAlert('✅ <b>BARRIO ACTUALIZADO</b>\nEl sistema se ha reiniciado con las últimas mejoras (v1.2).\nLas notificaciones están activas.');
 
