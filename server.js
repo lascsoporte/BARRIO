@@ -30,7 +30,7 @@ function sendTelegramAlert(message) {
     headers: { 'Content-Type': 'application/json', 'Content-Length': data.length }
   };
   const req = https.request(url, options, (res) => {
-    res.on('data', (d) => { /* console.log(d.toString()); */ });
+    res.on('data', (d) => { console.log('Telegram API Response:', d.toString()); });
   });
   req.on('error', (error) => { console.error('Error Telegram:', error); });
   req.write(data);
@@ -721,7 +721,7 @@ async function start() {
     console.log('✅ Migración de verificación completada');
   } catch(e) { console.error('Error migración:', e); }
 
-  sendTelegramAlert('🚀 <b>Sistema Barrio Iniciado</b>\nLas notificaciones de Telegram están activas.');
+  sendTelegramAlert('✅ <b>BARRIO ACTUALIZADO</b>\nEl sistema se ha reiniciado con las últimas mejoras (v1.2).\nLas notificaciones están activas.');
 
   // Keep-Alive para Render
   const externalUrl = process.env.RENDER_EXTERNAL_URL;

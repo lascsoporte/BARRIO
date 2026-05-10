@@ -1,6 +1,7 @@
 // BARRIO - Main Application
 const App = {
  deviceId: null,
+ deferredPrompt: null,
 
  async init() {
  // Excepción para el panel de administración
@@ -84,14 +85,6 @@ const App = {
  }
  }
 
- this.deferredPrompt = null;
- window.addEventListener('beforeinstallprompt', (e) => {
- e.preventDefault();
- this.deferredPrompt = e;
- const banner = document.getElementById('installBanner');
- if (banner) banner.style.display = 'block';
- });
-
  window.addEventListener('hashchange', () => this.route());
  
  setTimeout(() => {
@@ -139,7 +132,7 @@ const App = {
 
  container.innerHTML = `
  <div class="fade-in">
- <div id="installBanner" style="display:none; background:var(--primary); color:white; padding:12px; text-align:center; font-size:0.85rem; font-weight:700; position:relative;">
+ <div id="installBanner" style="display:${this.deferredPrompt ? 'block' : 'none'}; background:var(--primary); color:white; padding:12px; text-align:center; font-size:0.85rem; font-weight:700; position:relative;">
  📲 ¡Instala BARRIO en tu celular! 
  <button onclick="App.installPWA()" style="background:white; color:var(--primary); border:none; padding:4px 12px; border-radius:12px; margin-left:10px; font-weight:900; cursor:pointer;">Instalar</button>
  <button onclick="document.getElementById('installBanner').style.display='none'" style="background:transparent; color:white; border:none; margin-left:10px; font-size:1.2rem; cursor:pointer; vertical-align:middle;">&times;</button>
@@ -147,15 +140,10 @@ const App = {
  <header class="app-header">
  <h1 style="margin-top:0;">BARRIO</h1>
  <span class="city-subtitle">PUERTO MONTT</span>
- <div class="formal-flag-container">
- <div class="chilean-flag">
- <div class="flag-top">
- <div class="flag-blue"><div class="flag-star">★</div></div>
- <div class="flag-white"></div>
- </div>
- <div class="flag-red"></div>
- </div>
- </div>
+ <div style="font-size:1.8rem; margin: 5px 0 15px;">🇨🇱</div>
+
+
+
  </header>
  <div class="search-container" style="text-align:center;">
  <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="text" id="searchInput" placeholder="¿Qué buscas?"
@@ -462,7 +450,7 @@ const App = {
  &copy; 2026 BARRIO - PUERTOMAS SPA | 
  <a href="#/legal" style="color:var(--primary); text-decoration:underline; cursor:pointer;">Aviso Legal</a>
  </p>
- <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); margin-top: 8px; text-align: right;">v.1.0</div>
+ <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); margin-top: 8px; text-align: right;">v.1.2</div>
  </footer>
  `;
  },
@@ -470,67 +458,13 @@ const App = {
  // ===== EMERGENCIA =====
  renderEmergencia(container) {
  container.innerHTML = `
- <style>
- .app-header .city-subtitle {
-  font-size: 1.1rem;
-  font-weight: 800;
-  color: var(--text);
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-  display: block;
-}
-
-.formal-flag-container {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 5px;
-}
-
-.chilean-flag {
-  width: 45px;
-  height: 30px;
-  position: relative;
-  border: 1px solid rgba(0,0,0,0.1);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.flag-top {
-  display: flex;
-  height: 50%;
-}
-
-.flag-blue {
-  background-color: #0039a6;
-  width: 33.33%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.flag-star {
-  color: white;
-  font-size: 12px;
-}
-
-.flag-white {
-  background-color: white;
-  width: 66.67%;
-  height: 100%;
-}
-
-.flag-red {
-  background-color: #d52b1e;
-  height: 50%;
-  width: 100%;
-}
- </style>
  <div class="fade-in" style="padding: 20px; max-width: 600px; margin: 0 auto; text-align: center;">
  
  <h2 style="color:#222; margin-bottom: 5px; font-size:1.6rem; font-weight:900; text-transform:uppercase; letter-spacing:1px; display:inline-block;">TELÉFONOS DE EMERGENCIA</h2>
- <div style="font-size:1.8rem; margin-bottom:15px;">🇨🇱</div>
+ <div style="font-size:1.8rem; margin: 5px 0 15px;">🇨🇱</div>
+
  <div style="border-bottom:3px solid #222; margin-bottom:30px; width:100%; max-width:250px; margin-left:auto; margin-right:auto;"></div>
+
  
  <div style="display:flex; flex-direction:column; gap:16px;">
  <a href="tel:${this.config.tel_carabineros || '133'}" onclick="App.logLlamada('133 - Carabineros')" class="btn" style="background:#006633; color:white; justify-content:center; padding:20px; font-size:1.2rem; font-weight:bold; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
@@ -1198,5 +1132,12 @@ const App = {
  }
 };
 
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  App.deferredPrompt = e;
+  const banner = document.getElementById('installBanner');
+  if (banner) banner.style.display = 'block';
+});
 
 document.addEventListener('DOMContentLoaded', () => App.init());

@@ -11,7 +11,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏘️</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="/css/styles.css?v=4">
+  <link rel="stylesheet" href="/css/styles.css?v=6">
 </head>
 <body>
   <div id="app">
@@ -19,7 +19,9 @@
       <div class="splash-content">
         <div class="splash-logo">🏘️</div>
         <h1 class="splash-title">BARRIO</h1>
-        <div style="font-size:1.2rem; font-weight:800; letter-spacing:4px; margin-top:-20px; margin-bottom:30px; color:var(--text-light);">PUERTO MONTT</div>
+        <div style="font-size:1.2rem; font-weight:800; letter-spacing:4px; margin-top:-20px; margin-bottom:10px; color:var(--text-light);">PUERTO MONTT</div>
+        <div style="font-size:1.8rem; margin: 10px 0 20px;">🇨🇱</div>
+
 
         <div class="splash-spinner"></div>
         <p class="splash-text">Conectando con tu barrio...</p>
@@ -27,11 +29,20 @@
     </div>
   </div>
 
-  <script src="/js/geo.js?v=4" defer></script>
+  <script src="/js/geo.js?v=6" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/js/api.js?v=4" defer></script>
-  <script src="/js/admin.js?v=4"></script>
+  <script src="/js/api.js?v=6" defer></script>
+  <script src="/js/admin.js?v=6"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('Service Worker registrado', reg))
+          .catch(err => console.warn('Error al registrar Service Worker', err));
+      });
+    }
+  </script>
   <script src="/js/app.js?v=4"></script>
 </body>
 </html>

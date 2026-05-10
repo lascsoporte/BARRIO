@@ -135,6 +135,46 @@ body {
   font-style: italic;
 }
 
+/* Flag Styles */
+.formal-flag-container {
+  display: flex;
+  justify-content: center;
+  margin: 10px 0;
+}
+.chilean-flag {
+  width: 45px;
+  height: 30px;
+  position: relative;
+  border: 1px solid rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.flag-top {
+  display: flex;
+  height: 50%;
+}
+.flag-blue {
+  background-color: #0039a6;
+  width: 33.33%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.flag-star {
+  color: white;
+  font-size: 12px;
+}
+.flag-white {
+  background-color: white;
+  width: 66.67%;
+  height: 100%;
+}
+.flag-red {
+  background-color: #d52b1e;
+  height: 50%;
+  width: 100%;
+}
+
 /* ===== Search Bar ===== */
 .search-container {
   position: relative;
