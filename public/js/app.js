@@ -975,7 +975,14 @@ const App = {
  if (!content) return this.toast('Escribe algo primero');
  this.requireAuth(async (user) => {
  try {
- await API.postMuro({ usuario_id: user.id, contenido: content });
+ // Capturar ubicación actual antes de enviar
+ await Geo.getUserLocation().catch(() => {});
+ await API.postMuro({ 
+ usuario_id: user.id, 
+ contenido: content,
+ latitud: Geo.userLat,
+ longitud: Geo.userLng
+ });
  document.getElementById('muroInput').value = '';
  this.toast('Publicado correctamente');
  this.loadMuro();
@@ -1035,7 +1042,14 @@ const App = {
  btn.disabled = true;
  btn.textContent = 'Enviando...';
  try {
- await API.sendAdminMessage({ usuario_id: user.id, mensaje: msj });
+ // Capturar ubicación actual antes de enviar
+ await Geo.getUserLocation().catch(() => {});
+ await API.sendAdminMessage({ 
+ usuario_id: user.id, 
+ mensaje: msj,
+ latitud: Geo.userLat,
+ longitud: Geo.userLng
+ });
  document.getElementById('contactoInput').value = '';
  this.toast('Mensaje enviado exitosamente');
  setTimeout(() => location.hash = '#/', 2000);

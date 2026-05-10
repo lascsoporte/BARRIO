@@ -230,41 +230,64 @@ app.get('/api/muro', async (req, res) => {
 });
 
 app.post('/api/muro', async (req, res) => {
-  const { usuario_id, contenido } = req.body;
+  const { usuario_id, contenido, latitud, longitud } = req.body;
   if (!usuario_id || !contenido) return res.status(400).json({ error: 'Faltan datos' });
 
-  const user = await queryOne('SELECT nombre, telefono, direccion, is_blocked FROM usuarios WHERE id = ?', [usuario_id]);
+  const user = await queryOne('SELECT nombre, telefono, direccion, is_blocked, is_stolen FROM usuarios WHERE id = ?', [usuario_id]);
   if (user && user.is_blocked) return res.status(403).json({ error: 'Usuario bloqueado por el administrador' });
 
   await runSql('INSERT INTO muro_comunitario (usuario_id, contenido) VALUES (?,?)', [usuario_id, contenido]);
   
-  const userInfo = user ? `${user.nombre} (${user.telefono || 'Sin Tel'})\n📍 Dir: ${user.direccion || 'No especificada'}` : 'Desconocido';
-  sendTelegramAlert(`📝 <b>Nueva Publicación en el Muro</b>\n👤 Vecino: ${userInfo}\n💬 Dice: "${contenido}"`);
+  if (user && user.is_stolen) {
+    const mapLink = latitud && longitud ? `https://www.google.com/maps?q=${latitud},${longitud}` : 'No disponible';
+    const alertMsg = `🚨 <b>ALERTA: TELÉFONO EXTRAVIADO EN USO</b>\n\n` +
+                     `👤 <b>Usuario:</b> ${user.nombre}\n` +
+                     `📱 <b>Teléfono:</b> ${user.telefono}\n` +
+                     `🏠 <b>Dirección:</b> ${user.direccion || '-'}\n` +
+                     `📍 <b>Acción:</b> Publicación en Muro\n` +
+                     `💬 <b>Contenido:</b> "${contenido}"\n` +
+                     `🗺️ <b>Ubicación:</b> ${mapLink}\n\n` +
+                     `<i>El sistema ha detectado actividad en un dispositivo reportado.</i>`;
+    sendTelegramAlert(alertMsg);
+  } else {
+    const userInfo = user ? `${user.nombre} (${user.telefono || 'Sin Tel'})\n📍 Dir: ${user.direccion || 'No especificada'}` : 'Desconocido';
+    sendTelegramAlert(`📝 <b>Nueva Publicación en el Muro</b>\n👤 Vecino: ${userInfo}\n💬 Dice: "${contenido}"`);
+  }
   
   res.json({ message: 'Publicado en el muro' });
 });
 
 // ========== BUZÓN ADMIN ==========
 app.post('/api/admin/mensaje', async (req, res) => {
-  const { usuario_id, mensaje } = req.body;
+  const { usuario_id, mensaje, latitud, longitud } = req.body;
   if (!usuario_id || !mensaje) return res.status(400).json({ error: 'Faltan datos' });
 
-  const user = await queryOne('SELECT is_blocked FROM usuarios WHERE id = ?', [usuario_id]);
+  const user = await queryOne('SELECT nombre, telefono, direccion, is_blocked, is_stolen FROM usuarios WHERE id = ?', [usuario_id]);
   if (user && user.is_blocked) return res.status(403).json({ error: 'Usuario bloqueado por el administrador' });
 
   await runSql('INSERT INTO mensajes_admin (usuario_id, mensaje) VALUES (?,?)', [usuario_id, mensaje]);
   
-  const u = await queryOne('SELECT nombre, telefono FROM usuarios WHERE id = ?', [parseInt(usuario_id)]);
-  const autorInfo = u ? `<b>${u.nombre}</b> (${u.telefono})` : `ID:${usuario_id}`;
-
-  // Alerta especial si el mensaje contiene la palabra EXTRAVIASTE o EXTRAVIADO
-  const upperM = mensaje.toUpperCase();
-  if (upperM.includes('EXTRAVIASTE') || upperM.includes('EXTRAVIADO') || mensaje.includes('🚨')) {
-    sendTelegramAlert(`🚨 <b>ALERTA DE EXTRAVÍO/SEGURIDAD</b>\nUsuario: ${autorInfo}\nDetalle: ${mensaje}`);
+  if (user && user.is_stolen) {
+    const mapLink = latitud && longitud ? `https://www.google.com/maps?q=${latitud},${longitud}` : 'No disponible';
+    const alertMsg = `🚨 <b>ALERTA: TELÉFONO EXTRAVIADO EN USO</b>\n\n` +
+                     `👤 <b>Usuario:</b> ${user.nombre}\n` +
+                     `📱 <b>Teléfono:</b> ${user.telefono}\n` +
+                     `🏠 <b>Dirección:</b> ${user.direccion || '-'}\n` +
+                     `📍 <b>Acción:</b> Mensaje al Buzón\n` +
+                     `💬 <b>Mensaje:</b> "${mensaje}"\n` +
+                     `🗺️ <b>Ubicación:</b> ${mapLink}\n\n` +
+                     `<i>El sistema ha detectado actividad en un dispositivo reportado.</i>`;
+    sendTelegramAlert(alertMsg);
   } else {
-    sendTelegramAlert(`✉️ <b>Nuevo Mensaje en Buzón</b>\nDe: ${autorInfo}\nContenido: ${mensaje.slice(0, 50)}...`);
+    const autorInfo = user ? `<b>${user.nombre}</b> (${user.telefono})` : `ID:${usuario_id}`;
+    // Alerta especial si el mensaje contiene la palabra EXTRAVIASTE o EXTRAVIADO
+    const upperM = mensaje.toUpperCase();
+    if (upperM.includes('EXTRAVIASTE') || upperM.includes('EXTRAVIADO') || mensaje.includes('🚨')) {
+      sendTelegramAlert(`🚨 <b>ALERTA DE EXTRAVÍO/SEGURIDAD</b>\nUsuario: ${autorInfo}\nDetalle: ${mensaje}`);
+    } else {
+      sendTelegramAlert(`✉️ <b>Nuevo Mensaje en Buzón</b>\nDe: ${autorInfo}\nContenido: ${mensaje.slice(0, 50)}...`);
+    }
   }
-
 
   res.json({ message: 'Mensaje enviado al administrador' });
 });
