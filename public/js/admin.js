@@ -626,11 +626,11 @@ const Admin = {
  // ===== USUARIOS TAB =====
  async renderUsuariosTab(c) {
  const usuarios = await API.adminGetUsuarios(this.token);
- window._tempUsuarios = usuarios; // Para exportar
+ window._tempUsuariosExport = usuarios.map(u => ({ "Nombre": u.nombre || "No especificado", "Telefono": u.telefono || "No especificado", "Fecha": new Date(u.created_at).toLocaleDateString(), "Estado de Uso (Condicion)": u.is_blocked ? "Bloqueado" : (u.is_verified ? "Activo" : "En Verificación"), "Terminos y Condiciones": u.terms_accepted ? "Aceptados" : "Pendientes" }));
  c.innerHTML = `
  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
  <h3 style="color:var(--primary); margin:0;">👥 Usuarios (${usuarios.length})</h3>
- <button class="btn btn-outline btn-sm" onclick="Admin.downloadCSV(window._tempUsuarios, 'usuarios_barrio.csv')">📥 Descargar CSV</button>
+ <button class="btn btn-outline btn-sm" onclick="Admin.downloadCSV(window._tempUsuariosExport, 'usuarios_barrio.csv')">📥 Descargar CSV</button>
  </div>
  <div id="adminUsuariosList">${usuarios.map(u => `
  <div class="admin-list-item" style="${u.is_blocked ? 'background:#ffebee;' : (u.is_verified ? '' : 'background:#e3f2fd;')} border-left: 5px solid ${u.is_blocked ? '#D32F2F' : (u.is_verified ? '#4CAF50' : '#1976D2')};">
