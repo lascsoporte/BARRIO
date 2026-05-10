@@ -20,6 +20,22 @@ const App = {
       return;
     }
 
+    // Sincronizar el estado de verificación con el servidor antes de bloquear
+    const userStr = localStorage.getItem('barrio_user');
+    if (userStr) {
+      try {
+        const localUser = JSON.parse(userStr);
+        if (localUser && localUser.id) {
+          const serverUser = await API.checkUser(localUser.id);
+          localStorage.setItem('barrio_user', JSON.stringify(serverUser));
+        }
+      } catch(e) {
+        if (e.message && e.message.includes('404')) {
+          localStorage.removeItem('barrio_user');
+        }
+      }
+    }
+
     this.requireAuth((user) => {
       this.continueInit(user);
     }, true);
@@ -908,7 +924,7 @@ const App = {
         <p style="font-size:0.85rem; color:#666; background:#F5F5F5; padding:15px; border-radius:8px; text-align:center;">
           Por seguridad de todos los Vecinos, un administrador debe aceptar tu cuenta para que utilices la aplicación.
         </p>
-        <button onclick="this.parentElement.parentElement.remove()" class="btn btn-primary" style="margin-top:20px; width:100%; justify-content:center;">Entendido</button>
+        <button onclick="location.reload()" class="btn btn-primary" style="margin-top:20px; width:100%; justify-content:center;">Recargar y Verificar Estado</button>
       </div>
     `;
     document.body.appendChild(modal);
