@@ -703,9 +703,9 @@ const Admin = {
  </div>
  </div>
  <div class="admin-actions" style="flex-direction:column; gap:5px;">
- ${!u.is_verified ? `<button class="btn-sm" style="background:#4CAF50; color:white;" onclick="Admin.toggleVerifyUsuario(${u.id}, 1)">Aceptar Usuario</button>` : `<button class="btn-sm" style="background:#9E9E9E; color:white;" onclick="Admin.toggleVerifyUsuario(${u.id}, 0)">Quitar Verificación</button>`}
- <button class="btn-sm ${u.is_blocked ? 'btn-primary' : 'btn-delete'}" onclick="Admin.toggleBlockUsuario(${u.id}, ${u.is_blocked ? 0 : 1})">
- ${u.is_blocked ? 'Desbloquear' : 'Bloquear'}
+ ${!Number(u.is_verified) ? `<button class="btn-sm" style="background:#4CAF50; color:white;" onclick="Admin.toggleVerifyUsuario(${u.id}, 1)">Aceptar Usuario</button>` : `<button class="btn-sm" style="background:#9E9E9E; color:white;" onclick="Admin.toggleVerifyUsuario(${u.id}, 0)">Quitar Verificación</button>`}
+ <button class="btn-sm ${Number(u.is_blocked) ? 'btn-primary' : 'btn-delete'}" onclick="Admin.toggleBlockUsuario(${u.id}, ${Number(u.is_blocked) ? 0 : 1})">
+ ${Number(u.is_blocked) ? 'Desbloquear' : 'Bloquear'}
  </button>
  <button class="btn-sm" style="background:${Number(u.is_stolen) ? '#2E7D32' : '#F57C00'}; color:white;" onclick="Admin.toggleStolenUsuario(${u.id}, ${Number(u.is_stolen) ? 0 : 1})">
  ${Number(u.is_stolen) ? 'No está extraviado' : 'Marcar Extraviado'}

@@ -572,7 +572,7 @@ app.get('/api/admin/usuarios', authMw, async (req, res) => {
 
 app.put('/api/admin/usuarios/:id/bloquear', authMw, async (req, res) => {
   const { is_blocked } = req.body;
-  await runSql('UPDATE usuarios SET is_blocked = ? WHERE id = ?', [is_blocked?1:0, req.params.id]);
+  await runSql('UPDATE usuarios SET is_blocked = ? WHERE id = ?', [Number(is_blocked) ? 1 : 0, req.params.id]);
   res.json({ message: 'Estado actualizado' });
 });
 
@@ -681,7 +681,7 @@ app.post('/api/emergency-reset', (req, res) => {
 // Admin User Management
 app.put('/api/admin/usuarios/:id/verificar', authMw, async (req, res) => {
   const { is_verified } = req.body;
-  await runSql('UPDATE usuarios SET is_verified = ? WHERE id = ?', [is_verified ? 1 : 0, req.params.id]);
+  await runSql('UPDATE usuarios SET is_verified = ? WHERE id = ?', [Number(is_verified) ? 1 : 0, req.params.id]);
   res.json({ message: 'Estado de verificación actualizado' });
 });
 
