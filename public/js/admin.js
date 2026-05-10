@@ -405,7 +405,7 @@ const Admin = {
  <div class="item-detail">
  <strong>Contacto:</strong> ${m.nombre_contacto} | <strong>Tel:</strong> ${m.telefono}<br>
  <strong>Tipo:</strong> ${m.tipo_animal} | <strong>Características:</strong> ${m.caracteristicas || '-'}<br>
- <small>${new Date(m.created_at).toLocaleDateString()}</small>
+ <small>${new Date(m.created_at).toLocaleString()}</small>
  </div>
  </div>
  <div class="admin-actions">
@@ -630,7 +630,7 @@ const Admin = {
  // ===== USUARIOS TAB =====
  async renderUsuariosTab(c) {
  const usuarios = await API.adminGetUsuarios(this.token);
- window._tempUsuariosExport = usuarios.map(u => ({ "Nombre": u.nombre || "No especificado", "Telefono": u.telefono || "No especificado", "Fecha": new Date(u.created_at).toLocaleDateString(), "Hora de Aceptación": u.terms_accepted ? new Date(u.created_at).toLocaleTimeString() : "No registrada", "Estado de Uso (Condicion)": u.is_blocked ? "Bloqueado" : (u.is_verified ? "Activo" : "En Verificación"), "Terminos y Condiciones": u.terms_accepted ? "Aceptados" : "Pendientes" }));
+ window._tempUsuariosExport = usuarios.map(u => ({ "Nombre": u.nombre || "No especificado", "Telefono": u.telefono || "No especificado", "Fecha": new Date(u.created_at).toLocaleDateString(), "Ubicacion": u.direccion || "No especificada", "Hora de Aceptación": u.terms_accepted ? new Date(u.created_at).toLocaleTimeString() : "No registrada", "Estado de Uso (Condicion)": u.is_blocked ? "Bloqueado" : (u.is_verified ? "Activo" : "En Verificación"), "Terminos y Condiciones": u.terms_accepted ? "Aceptados" : "Pendientes" }));
  c.innerHTML = `
  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
  <h3 style="color:var(--primary); margin:0;">👥 Usuarios (${usuarios.length})</h3>
@@ -641,9 +641,9 @@ const Admin = {
  <div class="item-info">
  <div class="item-name">${u.nombre} ${u.is_verified ? '✅' : '⏳'}</div>
  <div class="item-detail">
- <strong>Tel:</strong> ${u.telefono} | <strong>Dir:</strong> ${u.direccion || '-'}<br>
+ <strong>Tel:</strong> ${u.telefono} | <strong>Ubicación:</strong> ${u.direccion || "-"}<br>
  <strong>Términos:</strong> ${u.terms_accepted ? '✅ Aceptados' : '❌ Pendiente'}<br>
- <small>Registro: ${new Date(u.created_at).toLocaleDateString()}</small>
+ <small>Registro: ${new Date(u.created_at).toLocaleString()}</small>
  </div>
  </div>
  <div class="admin-actions" style="flex-direction:column; gap:5px;">
