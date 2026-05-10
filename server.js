@@ -249,9 +249,6 @@ app.post('/api/muro', async (req, res) => {
                      `🗺️ <b>Ubicación:</b> ${mapLink}\n\n` +
                      `<i>El sistema ha detectado actividad en un dispositivo reportado.</i>`;
     sendTelegramAlert(alertMsg);
-  } else {
-    const userInfo = user ? `${user.nombre} (${user.telefono || 'Sin Tel'})\n📍 Dir: ${user.direccion || 'No especificada'}` : 'Desconocido';
-    sendTelegramAlert(`📝 <b>Nueva Publicación en el Muro</b>\n👤 Vecino: ${userInfo}\n💬 Dice: "${contenido}"`);
   }
   
   res.json({ message: 'Publicado en el muro' });
@@ -278,15 +275,6 @@ app.post('/api/admin/mensaje', async (req, res) => {
                      `🗺️ <b>Ubicación:</b> ${mapLink}\n\n` +
                      `<i>El sistema ha detectado actividad en un dispositivo reportado.</i>`;
     sendTelegramAlert(alertMsg);
-  } else {
-    const autorInfo = user ? `<b>${user.nombre}</b> (${user.telefono})` : `ID:${usuario_id}`;
-    // Alerta especial si el mensaje contiene la palabra EXTRAVIASTE o EXTRAVIADO
-    const upperM = mensaje.toUpperCase();
-    if (upperM.includes('EXTRAVIASTE') || upperM.includes('EXTRAVIADO') || mensaje.includes('🚨')) {
-      sendTelegramAlert(`🚨 <b>ALERTA DE EXTRAVÍO/SEGURIDAD</b>\nUsuario: ${autorInfo}\nDetalle: ${mensaje}`);
-    } else {
-      sendTelegramAlert(`✉️ <b>Nuevo Mensaje en Buzón</b>\nDe: ${autorInfo}\nContenido: ${mensaje.slice(0, 50)}...`);
-    }
   }
 
   res.json({ message: 'Mensaje enviado al administrador' });
