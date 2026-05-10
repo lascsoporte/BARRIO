@@ -3,7 +3,7 @@ const Geo = {
   userLat: null,
   userLng: null,
 
-  async getUserLocation() {
+  async getUserLocation(forceFresh = false) {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error('Geolocalización no soportada'));
@@ -16,7 +16,7 @@ const Geo = {
           resolve({ lat: Geo.userLat, lng: Geo.userLng });
         },
         (err) => reject(err),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: forceFresh ? 0 : 300000 }
       );
     });
   },

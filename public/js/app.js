@@ -57,20 +57,24 @@ const App = {
  }
 
  document.getElementById('btnLateralWhatsapp').href = this.config.whatsapp_vecinos || '#';
- document.getElementById('btnLateralWhatsapp').href = this.config.whatsapp_vecinos || '#';
- API.ping(this.deviceId).then(res => {
- if (res.status === 'stolen') {
- setInterval(() => {
- if (Geo.userLat && Geo.userLng) {
- API.logStolenLocation({ device_id: this.deviceId, latitud: Geo.userLat, longitud: Geo.userLng }).catch(()=>{});
- } else {
- Geo.getUserLocation().then(() => {
- API.logStolenLocation({ device_id: this.deviceId, latitud: Geo.userLat, longitud: Geo.userLng }).catch(()=>{});
- }).catch(()=>{});
- }
- }, 10000);
- }
- }).catch(() => {});
+ let isTrackingStarted = false;
+ const checkExtravio = () => {
+   API.ping(this.deviceId).then(res => {
+     if (res.status === 'stolen' && !isTrackingStarted) {
+       isTrackingStarted = true;
+       // Obligar al sensor GPS a darnos coordenadas reales cada 10 segundos
+       setInterval(() => {
+         Geo.getUserLocation(true).then(() => {
+           API.logStolenLocation({ device_id: this.deviceId, latitud: Geo.userLat, longitud: Geo.userLng }).catch(()=>{});
+         }).catch(()=>{});
+       }, 10000);
+     }
+   }).catch(() => {});
+ };
+
+ checkExtravio(); // Consultar al inicio
+ setInterval(checkExtravio, 60000); // Consultar cada 60 segundos silenciosamente
+
  } catch(e) { 
  console.warn('Error al verificar usuario o cargar config', e);
  if (e.message && e.message.includes('404')) {
