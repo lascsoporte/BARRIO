@@ -707,8 +707,8 @@ const Admin = {
  <button class="btn-sm ${u.is_blocked ? 'btn-primary' : 'btn-delete'}" onclick="Admin.toggleBlockUsuario(${u.id}, ${u.is_blocked ? 0 : 1})">
  ${u.is_blocked ? 'Desbloquear' : 'Bloquear'}
  </button>
- <button class="btn-sm" style="background:${u.is_stolen ? '#2E7D32' : '#F57C00'}; color:white;" onclick="Admin.toggleStolenUsuario(${u.id}, ${u.is_stolen ? 0 : 1})">
- ${u.is_stolen ? 'No está extraviado' : 'Marcar Extraviado'}
+ <button class="btn-sm" style="background:${Number(u.is_stolen) ? '#2E7D32' : '#F57C00'}; color:white;" onclick="Admin.toggleStolenUsuario(${u.id}, ${Number(u.is_stolen) ? 0 : 1})">
+ ${Number(u.is_stolen) ? 'No está extraviado' : 'Marcar Extraviado'}
  </button>
  <button class="btn-sm" style="background:#222; color:white;" onclick="Admin.deleteUsuario(${u.id})">ELIMINAR DEFINITIVO</button>
  </div>

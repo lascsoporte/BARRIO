@@ -578,7 +578,7 @@ app.put('/api/admin/usuarios/:id/bloquear', authMw, async (req, res) => {
 
 app.put('/api/admin/usuarios/:id/robado', authMw, async (req, res) => {
   const { is_stolen } = req.body;
-  await runSql('UPDATE usuarios SET is_stolen=? WHERE id=?', [is_stolen ? 1 : 0, req.params.id]);
+  await runSql('UPDATE usuarios SET is_stolen=? WHERE id=?', [Number(is_stolen) ? 1 : 0, req.params.id]);
   res.json({ message: 'Estado de extravío actualizado' });
 });
 
