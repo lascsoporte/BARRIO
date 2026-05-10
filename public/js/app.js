@@ -778,7 +778,7 @@ const App = {
           <p style="margin-bottom:10px;"><strong>1. Uso:</strong> BARRIO no es una aplicación oficial. Los botones de contacto son únicamente accesos directos.</p>
           <p style="margin-bottom:10px;"><strong>2. Responsabilidad:</strong> No garantizamos el éxito de la llamada ni nos hacemos responsables por fallas de conexión o servicio.</p>
           <p style="margin-bottom:10px;"><strong>3. Datos y Privacidad:</strong> La información mostrada es referencial e ingresada por la comunidad. PUERTOMAS SPA no la garantiza.</p>
-          <p style="margin-bottom:10px; color:#D32F2F; font-weight:bold;"><strong>4. Activación de GPS:</strong> Al aceptar estos términos y condiciones, se solicitará y activará automáticamente el GPS de tu dispositivo, necesario para mostrar la información del barrio y para el correcto funcionamiento de las alertas de emergencia.</p>
+          <p style="margin-bottom:10px; color:#D32F2F; font-weight:bold;"><strong>4. Activación de GPS:</strong> Al aceptar estos términos y condiciones, se solicitará y activará automáticamente el GPS de tu dispositivo, necesario para mostrar la información del barrio y para el correcto funcionamiento de las alertas.</p>
           <p>Al continuar, aceptas expresamente nuestras políticas de uso para poder ingresar a la plataforma.</p>
         </div>
         <button id="btnAcceptDisclaimer" class="btn btn-primary" style="width:100%; justify-content:center; font-weight:bold; padding:15px; font-size:1.1rem; text-transform:uppercase;">Acepto y Comprendo</button>
