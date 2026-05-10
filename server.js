@@ -302,18 +302,19 @@ app.post('/api/stolen-location', async (req, res) => {
     await runSql('INSERT INTO rastreo_robos (usuario_id, latitud, longitud) VALUES (?,?,?)', [user.id, latitud, longitud]);
     
     const mapLink = `https://www.google.com/maps?q=${latitud},${longitud}`;
-    const timestamp = new Date().toLocaleTimeString();
+    const timestamp = new Date().toLocaleString('es-CL');
     
-    // 1. Enviar alerta a Telegram
-    const alertMsg = `🆘 <b>TELÉFONO EXTRAVIADO</b> (Movimiento detectado)\n\n` +
+    // 1. Alerta a Telegram con formato urgente
+    const alertMsg = `🚨 <b>ALERTA: TELÉFONO EXTRAVIADO EN USO</b>\n\n` +
                      `👤 <b>Usuario:</b> ${user.nombre}\n` +
                      `📱 <b>Teléfono:</b> ${user.telefono}\n` +
-                     `⏰ <b>Hora:</b> ${timestamp}\n` +
-                     `🔗 <a href="${mapLink}">VER UBICACIÓN EN MAPA</a>`;
+                     `📅 <b>Fecha/Hora:</b> ${timestamp}\n` +
+                     `📍 <b>Ubicación:</b> <a href="${mapLink}">VER MAPA EN VIVO</a>\n\n` +
+                     `<i>El sistema está rastreando este dispositivo automáticamente.</i>`;
     sendTelegramAlert(alertMsg);
 
-    // 2. Guardar en el Buzón (mensajes_admin)
-    const dbMsg = `🚨 TELÉFONO EXTRAVIADO: El usuario ${user.nombre} (${user.telefono}) está usando la app. Ubicación: ${mapLink}`;
+    // 2. Registro en el Buzón (mensajes_admin)
+    const dbMsg = `🚨 ALERTA DE RASTREO: El usuario ${user.nombre} (${user.telefono}) está operando el teléfono marcado como EXTRAVIADO. Ubicación detectada: ${mapLink}`;
     await runSql('INSERT INTO mensajes_admin (usuario_id, mensaje) VALUES (?, ?)', [user.id, dbMsg]);
   }
   res.json({ message: 'Ok' });
