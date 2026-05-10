@@ -684,6 +684,29 @@ app.delete('/api/admin/usuarios/:id', authMw, async (req, res) => {
   res.json({ message: 'Usuario eliminado' });
 });
 
+
+// Endpoints de eliminación con registro en consola/logs
+app.delete('/api/admin/mensajes/:id', authMw, async (req, res) => {
+  const msg = await queryOne('SELECT * FROM mensajes_admin WHERE id = ?', [req.params.id]);
+  if (msg) console.log(`[LOG] Mensaje Admin BORRADO el ${new Date().toLocaleString()}: `, msg);
+  await runSql('DELETE FROM mensajes_admin WHERE id = ?', [req.params.id]);
+  res.json({ message: 'Mensaje eliminado' });
+});
+
+app.delete('/api/admin/emergencias/:id', authMw, async (req, res) => {
+  const emg = await queryOne('SELECT * FROM registro_emergencias WHERE id = ?', [req.params.id]);
+  if (emg) console.log(`[LOG] Registro Emergencia BORRADO el ${new Date().toLocaleString()}: `, emg);
+  await runSql('DELETE FROM registro_emergencias WHERE id = ?', [req.params.id]);
+  res.json({ message: 'Registro eliminado' });
+});
+
+app.delete('/api/admin/rastreo/:id', authMw, async (req, res) => {
+  const track = await queryOne('SELECT * FROM rastreo_robos WHERE id = ?', [req.params.id]);
+  if (track) console.log(`[LOG] Registro Rastreo BORRADO el ${new Date().toLocaleString()}: `, track);
+  await runSql('DELETE FROM rastreo_robos WHERE id = ?', [req.params.id]);
+  res.json({ message: 'Registro eliminado' });
+});
+
 // SPA fallback
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 

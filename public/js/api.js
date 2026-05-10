@@ -101,6 +101,9 @@ const API = {
   adminDeleteServicio(id, token) { return this.del(`/api/admin/servicios/${id}`, token); },
 
   adminDeleteMascota(id, token) { return this.del(`/api/admin/mascotas/${id}`, token); },
+  adminDeleteMensaje(id, token) { return this.del(`/api/admin/mensajes/${id}`, token); },
+  adminDeleteEmergencia(id, token) { return this.del(`/api/admin/emergencias/${id}`, token); },
+  adminDeleteRastreo(id, token) { return this.del(`/api/admin/rastreo/${id}`, token); },
   adminUpdateConfig(data, token) { return this.put('/api/admin/config', data, token); },
   adminChangePasswords(data, token) { return this.put('/api/admin/passwords', data, token); },
   adminGetStats(token) {

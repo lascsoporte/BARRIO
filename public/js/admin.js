@@ -102,14 +102,22 @@ const Admin = {
  if (e.message.includes('401') || e.message.includes('No autorizado')) {
  this.token = null; localStorage.removeItem('barrio_admin_token');
  App.toast('Sesión expirada'); location.hash = '#/admin';
- } else { c.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`; }
+ } else { setTimeout(() => {
+     const btn = document.getElementById('dlMascotas');
+     if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
+   }, 100);
+   c.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`; }
  }
  },
 
  // ===== LOCALES TAB =====
  async renderLocalesTab(c) {
  const locales = await API.adminGetLocales(this.token);
- c.innerHTML = `
+ setTimeout(() => {
+     const btn = document.getElementById('dlMascotas');
+     if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
+   }, 100);
+   c.innerHTML = `
  <button class="btn btn-primary btn-sm" id="addLocalBtn" style="margin-bottom:16px;">➕ Agregar Local</button>
  <div id="localForm" style="display:none;"></div>
  <div id="localesList">${locales.map(l => `
@@ -215,7 +223,11 @@ const Admin = {
  // ===== PRODUCTOS TAB =====
  async renderProductosTab(c) {
  const [productos, locales] = await Promise.all([API.adminGetProductos(this.token), API.adminGetLocales(this.token)]);
- c.innerHTML = `
+ setTimeout(() => {
+     const btn = document.getElementById('dlMascotas');
+     if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
+   }, 100);
+   c.innerHTML = `
  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
  <button class="btn btn-primary btn-sm" id="addProdBtn">➕ Agregar Producto</button>
  <button class="btn btn-secondary btn-sm" id="bulkProdBtn">📁 Carga Masiva (CSV)</button>
@@ -342,7 +354,11 @@ const Admin = {
  // ===== SERVICIOS TAB =====
  async renderServiciosTab(c) {
  const servicios = await API.adminGetServicios(this.token);
- c.innerHTML = `
+ setTimeout(() => {
+     const btn = document.getElementById('dlMascotas');
+     if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
+   }, 100);
+   c.innerHTML = `
  <button class="btn btn-primary btn-sm" id="addServBtn" style="margin-bottom:16px;">➕ Agregar Servicio</button>
  <div id="servForm" style="display:none;"></div>
  <div>${servicios.map(s => `
@@ -395,8 +411,23 @@ const Admin = {
  // ===== MASCOTAS TAB =====
  async renderMascotasTab(c) {
  const mascotas = await API.getMascotas();
- c.innerHTML = `
- <h3 style="margin-bottom:15px; color:var(--primary);">Avisos de Mascotas</h3>
+   window._tempMascotas = mascotas.map(m => ({ 
+     "Nombre Mascota": m.nombre_mascota || m.tipo_animal,
+     "Contacto": m.nombre_contacto,
+     "Teléfono": m.telefono,
+     "Ubicación": m.ubicacion_extravio,
+     "Características": m.caracteristicas,
+     "Fecha Registro": new Date(m.created_at).toLocaleString()
+   }));
+ setTimeout(() => {
+     const btn = document.getElementById('dlMascotas');
+     if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
+   }, 100);
+   c.innerHTML = `
+ <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+     <h3 style="color:var(--primary); margin:0;">Avisos de Mascotas</h3>
+     <button class="btn btn-outline btn-sm" id="dlMascotas">📥 Descargar Planilla</button>
+   </div>
  <div id="adminMascotasList">${mascotas.map(m => `
  <div class="admin-list-item" style="flex-direction:column; align-items:flex-start; gap:10px;">
  ${m.foto_base64 ? `<img src="${m.foto_base64}" style="width:100px; height:100px; object-fit:cover; border-radius:8px;">` : '<div style="width:100px; height:100px; background:#EEE; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; color:#999;">Sin Foto</div>'}
@@ -423,7 +454,11 @@ const Admin = {
  // ===== CONFIG TAB =====
  async renderConfigTab(c) {
  const config = await API.getConfig();
- c.innerHTML = `
+ setTimeout(() => {
+     const btn = document.getElementById('dlMascotas');
+     if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
+   }, 100);
+   c.innerHTML = `
  <div class="admin-form">
  <h3 style="margin-bottom:15px; color:var(--primary);">Configuración de Emergencias</h3>
  <p style="font-size:0.85rem; color:#666; margin-bottom:20px;">Edita los números que aparecerán en la sección de Emergencias de la App.</p>
@@ -477,7 +512,11 @@ const Admin = {
 
  // ===== SEGURIDAD TAB =====
  async renderSeguridadTab(c) {
- c.innerHTML = `
+ setTimeout(() => {
+     const btn = document.getElementById('dlMascotas');
+     if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
+   }, 100);
+   c.innerHTML = `
  <div class="admin-form">
  <h3 style="margin-bottom:15px; color:var(--primary);">🔐 Cambiar Claves de Acceso</h3>
  <p style="font-size:0.85rem; color:var(--text-light); margin-bottom:15px;">Ingresa las 3 claves actuales y las 3 nuevas claves para actualizar el acceso al panel.</p>
@@ -520,7 +559,11 @@ const Admin = {
  // ===== STATS TAB =====
  async renderStatsTab(c) {
  const stats = await API.adminGetStats(this.token);
- c.innerHTML = `
+ setTimeout(() => {
+     const btn = document.getElementById('dlMascotas');
+     if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
+   }, 100);
+   c.innerHTML = `
  <div class="fade-in">
  <h3 style="margin-bottom:20px; color:var(--primary);">📊 Estadísticas de Uso</h3>
  
@@ -565,7 +608,11 @@ const Admin = {
  // ===== MENSAJES (BUZÓN) TAB =====
  async renderMensajesTab(c) {
  const mensajes = await API.adminGetMensajes(this.token);
- c.innerHTML = `
+ setTimeout(() => {
+     const btn = document.getElementById('dlMascotas');
+     if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
+   }, 100);
+   c.innerHTML = `
  <h3 style="margin-bottom:15px; color:var(--primary);">✉️ Buzón de Mensajes</h3>
  <div id="adminMensajesList">${mensajes.map(m => {
   let displayMessage = m.mensaje;
@@ -587,6 +634,7 @@ const Admin = {
  </div>
  <div class="admin-actions">
  ${!m.leido ? `<button class="btn btn-outline btn-sm" onclick="Admin.markLeido(${m.id})">Marcar Leído</button>` : ''}
+   <button class="btn-delete" style="padding:5px 10px; font-size:0.75rem;" onclick="if(confirm('¿Borrar mensaje del buzón?')) Admin.deleteMensaje(${m.id})">Borrar</button>
  </div>
  </div>
  `}).join('') || '<p style="text-align:center;color:var(--text-light);">Buzón vacío.</p>'}</div>
@@ -600,7 +648,11 @@ const Admin = {
  // ===== MURO TAB =====
  async renderMuroTab(c) {
  const posts = await API.getMuro();
- c.innerHTML = `
+ setTimeout(() => {
+     const btn = document.getElementById('dlMascotas');
+     if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
+   }, 100);
+   c.innerHTML = `
  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
  <h3 style="color:var(--primary); margin:0;">💬 Muro Comunitario</h3>
  <button class="btn btn-sm" style="background:#D32F2F; color:white;" onclick="Admin.clearMuro()">🗑️ Limpiar Muro</button>
@@ -631,7 +683,11 @@ const Admin = {
  async renderUsuariosTab(c) {
  const usuarios = await API.adminGetUsuarios(this.token);
  window._tempUsuariosExport = usuarios.map(u => ({ "Nombre": u.nombre || "No especificado", "Telefono": u.telefono || "No especificado", "Fecha": new Date(u.created_at).toLocaleDateString(), "Ubicacion": u.direccion || "No especificada", "Hora de Aceptación": u.terms_accepted ? new Date(u.created_at).toLocaleTimeString() : "No registrada", "Estado de Uso (Condicion)": u.is_blocked ? "Bloqueado" : (u.is_verified ? "Activo" : "En Verificación"), "Terminos y Condiciones": u.terms_accepted ? "Aceptados" : "Pendientes" }));
- c.innerHTML = `
+ setTimeout(() => {
+     const btn = document.getElementById('dlMascotas');
+     if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
+   }, 100);
+   c.innerHTML = `
  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
  <h3 style="color:var(--primary); margin:0;">👥 Usuarios (${usuarios.length})</h3>
  <button class="btn btn-outline btn-sm" onclick="Admin.downloadCSV(window._tempUsuariosExport, 'usuarios_barrio.csv')">📥 Descargar CSV</button>
@@ -693,7 +749,11 @@ const Admin = {
  async renderEmergenciasTab(c) {
  const emergencias = await API.adminGetEmergencias(this.token);
  window._tempEmergencias = emergencias.map(e => ({ ...e, "Fecha": new Date(e.created_at).toLocaleDateString(), "Hora": new Date(e.created_at).toLocaleTimeString() }));
- c.innerHTML = `
+ setTimeout(() => {
+     const btn = document.getElementById('dlMascotas');
+     if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
+   }, 100);
+   c.innerHTML = `
  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
  <h3 style="color:var(--primary); margin:0;">Llamadas de Emergencia</h3>
  <button class="btn btn-outline btn-sm" onclick="Admin.downloadCSV(window._tempEmergencias, 'emergencias_barrio.csv')">Descargar CSV</button>
@@ -705,6 +765,7 @@ const Admin = {
  <div class="item-detail">
  Llamó: <strong>${e.nombre}</strong> (${e.telefono})<br>
  ${e.latitud ? `Ubicación: <a href="https://maps.google.com/?q=${e.latitud},${e.longitud}" target="_blank" style="color:var(--primary);">Ver en Mapa</a>` : 'Sin ubicación GPS'}
+   <div style="margin-top:10px;"><button class="btn-delete" style="padding:5px 10px; font-size:0.75rem;" onclick="if(confirm('¿Borrar registro de emergencia?')) Admin.deleteEmergencia(${e.id})">Borrar</button></div>
  </div>
  </div>
  </div>
@@ -716,7 +777,11 @@ const Admin = {
  async renderRastreoTab(c) {
  const rastreos = await API.adminGetRastreo(this.token);
  window._tempRastreos = rastreos.map(r => ({ ...r, "Fecha": new Date(r.created_at).toLocaleDateString(), "Hora": new Date(r.created_at).toLocaleTimeString() }));
- c.innerHTML = `
+ setTimeout(() => {
+     const btn = document.getElementById('dlMascotas');
+     if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
+   }, 100);
+   c.innerHTML = `
  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
  <h3 style="color:var(--primary); margin:0;">Rastreo de Extravíos</h3>
  <button class="btn btn-outline btn-sm" onclick="Admin.downloadCSV(window._tempRastreos, 'rastreo_extravios.csv')">Descargar CSV</button>
@@ -731,6 +796,7 @@ const Admin = {
  <div class="item-detail">
  Teléfono: <strong>${r.telefono}</strong><br>
  <a href="https://maps.google.com/?q=${r.latitud},${r.longitud}" target="_blank" style="color:var(--primary); display:inline-flex; align-items:center; margin-top:5px; font-weight:bold;">Ver Ubicación Exacta en Mapa</a>
+   <div style="margin-top:10px;"><button class="btn-delete" style="padding:5px 10px; font-size:0.75rem;" onclick="if(confirm('¿Borrar registro de rastreo?')) Admin.deleteRastreo(${r.id})">Borrar</button></div>
  </div>
  </div>
  </div>
@@ -740,7 +806,18 @@ const Admin = {
  },
 
  // CSV Helper
- downloadCSV(data, filename) {
+ 
+  async deleteMensaje(id) {
+    try { await API.adminDeleteMensaje(id, this.token); this.loadTab(); } catch(e) { App.toast('Error al borrar'); }
+  },
+  async deleteEmergencia(id) {
+    try { await API.adminDeleteEmergencia(id, this.token); this.loadTab(); } catch(e) { App.toast('Error al borrar'); }
+  },
+  async deleteRastreo(id) {
+    try { await API.adminDeleteRastreo(id, this.token); this.loadTab(); } catch(e) { App.toast('Error al borrar'); }
+  },
+
+  downloadCSV(data, filename) {
  if(!data || !data.length) return App.toast("No hay datos para exportar");
 
  if (typeof XLSX !== 'undefined') {
