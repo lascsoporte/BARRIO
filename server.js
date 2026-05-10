@@ -150,13 +150,14 @@ app.post('/api/locales/:id/calificaciones', async (req, res) => {
   if (!estrellas || estrellas < 1 || estrellas > 5) return res.status(400).json({ error: 'Calificación 1-5' });
   if (!device_id) return res.status(400).json({ error: 'device_id requerido' });
 
-  const existing = await queryOne('SELECT id FROM calificaciones WHERE local_id = ? AND device_id = ?', [req.params.id, device_id]);
   if (existing) {
     await runSql('UPDATE calificaciones SET estrellas=?, comentario=?, created_at=datetime("now") WHERE id=?', [estrellas, comentario || '', existing.id]);
+    sendTelegramAlert(`⭐ <b>Calificación Actualizada</b>\nLocal ID: ${req.params.id}\nEstrellas: ${estrellas}\nComentario: ${comentario || '-'}\nDevice: ${device_id}`);
     return res.json({ message: 'Calificación actualizada', id: existing.id });
   }
   await runSql('INSERT INTO calificaciones (local_id,estrellas,comentario,device_id) VALUES (?,?,?,?)', [req.params.id, estrellas, comentario || '', device_id]);
   const last = await queryOne('SELECT last_insert_rowid() as id');
+  sendTelegramAlert(`⭐ <b>Nueva Calificación</b>\nLocal ID: ${req.params.id}\nEstrellas: ${estrellas}\nComentario: ${comentario || '-'}\nDevice: ${device_id}`);
   res.json({ message: 'Calificación enviada', id: last?.id });
 });
 
@@ -215,6 +216,8 @@ app.post('/api/registro', async (req, res) => {
 
 app.put('/api/usuarios/:id/accept-terms', async (req, res) => {
   await runSql('UPDATE usuarios SET terms_accepted = 1 WHERE id = ?', [req.params.id]);
+  const u = await queryOne('SELECT nombre FROM usuarios WHERE id = ?', [req.params.id]);
+  sendTelegramAlert(`📜 <b>Términos Aceptados</b>\nUsuario: ${u ? u.nombre : 'ID:'+req.params.id}`);
   res.json({ message: 'Términos aceptados' });
 });
 
@@ -512,18 +515,22 @@ app.post('/api/admin/locales', authMw, async (req, res) => {
   const { nombre, direccion, horario_apertura, horario_cierre, dias_atencion, acepta_efectivo, acepta_tarjeta, latitud, longitud } = req.body;
   await runSql('INSERT INTO locales (nombre,direccion,horario_apertura,horario_cierre,dias_atencion,acepta_efectivo,acepta_tarjeta,latitud,longitud) VALUES (?,?,?,?,?,?,?,?,?)',
     [nombre, direccion||'', horario_apertura||'08:00', horario_cierre||'20:00', dias_atencion||'lun-sab', acepta_efectivo?1:0, acepta_tarjeta?1:0, parseFloat(latitud), parseFloat(longitud)]);
+  sendTelegramAlert(`🏪 <b>Local Creado</b>\nNombre: ${nombre}\nDir: ${direccion}`);
   res.json({ message: 'Local creado' });
 });
 app.put('/api/admin/locales/:id', authMw, async (req, res) => {
   const { nombre, direccion, horario_apertura, horario_cierre, dias_atencion, acepta_efectivo, acepta_tarjeta, latitud, longitud } = req.body;
   await runSql('UPDATE locales SET nombre=?,direccion=?,horario_apertura=?,horario_cierre=?,dias_atencion=?,acepta_efectivo=?,acepta_tarjeta=?,latitud=?,longitud=? WHERE id=?',
     [nombre, direccion, horario_apertura, horario_cierre, dias_atencion, acepta_efectivo?1:0, acepta_tarjeta?1:0, parseFloat(latitud), parseFloat(longitud), req.params.id]);
+  sendTelegramAlert(`🏪 <b>Local Actualizado</b>\nNombre: ${nombre}`);
   res.json({ message: 'Local actualizado' });
 });
 app.delete('/api/admin/locales/:id', authMw, async (req, res) => {
+  const l = await queryOne('SELECT nombre FROM locales WHERE id = ?', [req.params.id]);
   await runSql('DELETE FROM productos WHERE local_id = ?', [req.params.id]);
   await runSql('DELETE FROM calificaciones WHERE local_id = ?', [req.params.id]);
   await runSql('DELETE FROM locales WHERE id = ?', [req.params.id]);
+  sendTelegramAlert(`🏪 <b>Local Eliminado</b>\nNombre: ${l ? l.nombre : 'ID:'+req.params.id}`);
   res.json({ message: 'Local eliminado' });
 });
 
@@ -532,11 +539,13 @@ app.get('/api/admin/productos', authMw, async (req, res) => res.json(await query
 app.post('/api/admin/productos', authMw, async (req, res) => {
   const { local_id, nombre, marca, precio, en_stock, unidad } = req.body;
   await runSql('INSERT INTO productos (local_id,nombre,marca,precio,en_stock,unidad) VALUES (?,?,?,?,?,?)', [local_id, nombre, marca||'', parseFloat(precio), en_stock?1:0, unidad||'kg']);
+  sendTelegramAlert(`🛒 <b>Producto Creado</b>\nNombre: ${nombre}\nPrecio: $${precio}`);
   res.json({ message: 'Producto creado' });
 });
 app.put('/api/admin/productos/:id', authMw, async (req, res) => {
   const { local_id, nombre, marca, precio, en_stock, unidad } = req.body;
   await runSql('UPDATE productos SET local_id=?,nombre=?,marca=?,precio=?,en_stock=?,unidad=? WHERE id=?', [local_id, nombre, marca||'', parseFloat(precio), en_stock?1:0, unidad||'kg', req.params.id]);
+  sendTelegramAlert(`🛒 <b>Producto Actualizado</b>\nNombre: ${nombre}`);
   res.json({ message: 'Producto actualizado' });
 });
 app.post('/api/admin/productos/masivo', authMw, (req, res) => {
@@ -545,41 +554,52 @@ app.post('/api/admin/productos/masivo', authMw, (req, res) => {
   const db = getDb();
   
   try {
-    // Primero, eliminar todos los productos actuales de este local
     db.run('DELETE FROM productos WHERE local_id = ?', [local_id]);
-    
-    // Luego, insertar el nuevo listado completo
     const stmt = db.prepare('INSERT INTO productos (local_id,nombre,marca,precio,en_stock,unidad) VALUES (?,?,?,?,?,?)');
     for (const p of productos) {
       stmt.run([local_id, p.nombre, p.marca || '', parseFloat(p.precio), p.en_stock ? 1 : 0, p.unidad || 'kg']);
     }
     stmt.free();
-    
     saveDb();
+    sendTelegramAlert(`📦 <b>Carga Masiva</b>\nLocal ID: ${local_id}\nTotal productos: ${productos.length}`);
     res.json({ message: `Inventario actualizado: ${productos.length} productos` });
   } catch (err) {
     res.status(500).json({ error: 'Error procesando el listado' });
   }
 });
-app.delete('/api/admin/productos/:id', authMw, (req, res) => { runSql('DELETE FROM productos WHERE id=?', [req.params.id]); res.json({ message: 'Eliminado' }); });
+app.delete('/api/admin/productos/:id', authMw, async (req, res) => { 
+  const p = await queryOne('SELECT nombre FROM productos WHERE id = ?', [req.params.id]);
+  await runSql('DELETE FROM productos WHERE id=?', [req.params.id]); 
+  sendTelegramAlert(`🛒 <b>Producto Eliminado</b>\nNombre: ${p ? p.nombre : 'ID:'+req.params.id}`);
+  res.json({ message: 'Eliminado' }); 
+});
 
 // Servicios
 app.get('/api/admin/servicios', authMw, async (req, res) => res.json(await queryAll('SELECT * FROM servicios ORDER BY tipo, nombre_prestador')));
 app.post('/api/admin/servicios', authMw, async (req, res) => {
   const { tipo, nombre_prestador, telefono } = req.body;
   await runSql('INSERT INTO servicios (tipo,nombre_prestador,telefono) VALUES (?,?,?)', [tipo, nombre_prestador, telefono||'']);
+  sendTelegramAlert(`🔧 <b>Servicio Creado</b>\nTipo: ${tipo}\nPrestador: ${nombre_prestador}`);
   res.json({ message: 'Servicio creado' });
 });
 app.put('/api/admin/servicios/:id', authMw, async (req, res) => {
   const { tipo, nombre_prestador, telefono } = req.body;
   await runSql('UPDATE servicios SET tipo=?,nombre_prestador=?,telefono=? WHERE id=?', [tipo, nombre_prestador, telefono||'', req.params.id]);
+  sendTelegramAlert(`🔧 <b>Servicio Actualizado</b>\nPrestador: ${nombre_prestador}`);
   res.json({ message: 'Servicio actualizado' });
 });
-app.delete('/api/admin/servicios/:id', authMw, async (req, res) => { await runSql('DELETE FROM servicios WHERE id=?', [req.params.id]); res.json({ message: 'Eliminado' }); });
+app.delete('/api/admin/servicios/:id', authMw, async (req, res) => { 
+  const s = await queryOne('SELECT nombre_prestador FROM servicios WHERE id = ?', [req.params.id]);
+  await runSql('DELETE FROM servicios WHERE id=?', [req.params.id]); 
+  sendTelegramAlert(`🔧 <b>Servicio Eliminado</b>\nPrestador: ${s ? s.nombre_prestador : 'ID:'+req.params.id}`);
+  res.json({ message: 'Eliminado' }); 
+});
 
 // Mascotas
 app.delete('/api/admin/mascotas/:id', authMw, async (req, res) => {
+  const m = await queryOne('SELECT nombre_mascota, tipo_animal FROM mascotas_perdidas WHERE id = ?', [req.params.id]);
   await runSql('DELETE FROM mascotas_perdidas WHERE id=?', [req.params.id]);
+  sendTelegramAlert(`🐶 <b>Aviso de Mascota Borrado</b>\n${m ? m.tipo_animal + ': ' + m.nombre_mascota : 'ID:'+req.params.id}`);
   res.json({ message: 'Aviso eliminado' });
 });
 
@@ -594,6 +614,7 @@ app.put('/api/admin/config', authMw, async (req, res) => {
   if (tel_pdi) await runSql('UPDATE configuracion SET valor=? WHERE clave=?', [tel_pdi, 'tel_pdi']);
   if (tel_ambulancia) await runSql('UPDATE configuracion SET valor=? WHERE clave=?', [tel_ambulancia, 'tel_ambulancia']);
   if (tel_seguridad) await runSql('UPDATE configuracion SET valor=? WHERE clave=?', [tel_seguridad, 'tel_seguridad']);
+  sendTelegramAlert(`⚙️ <b>Configuración Actualizada</b>\nSe han modificado los parámetros del sistema.`);
   res.json({ message: 'Configuración actualizada' });
 });
 // ===== USUARIOS =====
@@ -606,6 +627,8 @@ app.put('/api/admin/usuarios/:id/bloquear', authMw, async (req, res) => {
     const { is_blocked } = req.body;
     const userId = parseInt(req.params.id);
     await runSql('UPDATE usuarios SET is_blocked = ? WHERE id = ?', [Number(is_blocked) ? 1 : 0, userId]);
+    const u = await queryOne('SELECT nombre FROM usuarios WHERE id = ?', [userId]);
+    sendTelegramAlert(`🚫 <b>Usuario ${is_blocked ? 'Bloqueado' : 'Desbloqueado'}</b>\nNombre: ${u ? u.nombre : 'ID:'+userId}`);
     res.json({ message: 'Estado actualizado' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -616,6 +639,8 @@ app.put('/api/admin/usuarios/:id/robado', authMw, async (req, res) => {
     const userId = parseInt(req.params.id);
     const newState = Number(is_stolen) ? 1 : 0;
     await runSql('UPDATE usuarios SET is_stolen=? WHERE id=?', [newState, userId]);
+    const u = await queryOne('SELECT nombre FROM usuarios WHERE id = ?', [userId]);
+    sendTelegramAlert(`📢 <b>Estado Extravío</b>\nUsuario: ${u ? u.nombre : 'ID:'+userId}\nEstado: ${is_stolen ? 'EXTRAVIADO' : 'RECUPERADO'}`);
     res.json({ success: true, message: 'Estado de extravío actualizado' });
   } catch (e) {
     console.error('Error en robado:', e);
@@ -637,6 +662,7 @@ app.get('/api/admin/emergencias', authMw, async (req, res) => {
 // ===== MURO ADMIN =====
 app.delete('/api/admin/muro', authMw, async (req, res) => {
   await runSql('DELETE FROM muro_comunitario');
+  sendTelegramAlert(`🧹 <b>Muro Limpiado</b>\nSe han borrado todos los mensajes del muro.`);
   res.json({ message: 'Muro limpiado' });
 });
 
@@ -703,8 +729,8 @@ app.put('/api/admin/passwords', authMw, (req, res) => {
   const isValid = old_passwords.every((p, i) => p === ADMIN_PASSWORDS[i]);
   if (!isValid) return res.status(401).json({ error: 'Las claves actuales son incorrectas' });
   ADMIN_PASSWORDS = [...new_passwords];
-  // Invalidate all tokens
   adminTokens.clear();
+  sendTelegramAlert(`🔑 <b>Claves Cambiadas</b>\nSe han actualizado las contraseñas del Panel Admin.`);
   res.json({ message: 'Claves actualizadas' });
 });
 // Reset de emergencia (sin necesidad de estar logueado)
@@ -725,6 +751,8 @@ app.put('/api/admin/usuarios/:id/verificar', authMw, async (req, res) => {
     const { is_verified } = req.body;
     const userId = parseInt(req.params.id);
     await runSql('UPDATE usuarios SET is_verified = ? WHERE id = ?', [Number(is_verified) ? 1 : 0, userId]);
+    const u = await queryOne('SELECT nombre FROM usuarios WHERE id = ?', [userId]);
+    sendTelegramAlert(`✅ <b>Usuario ${is_verified ? 'Verificado' : 'Pendiente'}</b>\nNombre: ${u ? u.nombre : 'ID:'+userId}`);
     res.json({ message: 'Estado de verificación actualizado' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -732,7 +760,9 @@ app.put('/api/admin/usuarios/:id/verificar', authMw, async (req, res) => {
 app.delete('/api/admin/usuarios/:id', authMw, async (req, res) => {
   try {
     const userId = parseInt(req.params.id);
+    const u = await queryOne('SELECT nombre FROM usuarios WHERE id = ?', [userId]);
     await runSql('DELETE FROM usuarios WHERE id = ?', [userId]);
+    sendTelegramAlert(`🗑️ <b>Usuario Eliminado</b>\nNombre: ${u ? u.nombre : 'ID:'+userId}`);
     res.json({ success: true, message: 'Usuario eliminado' });
   } catch (e) {
     console.error('Error en delete usuario:', e);
@@ -743,22 +773,22 @@ app.delete('/api/admin/usuarios/:id', authMw, async (req, res) => {
 
 // Endpoints de eliminación con registro en consola/logs
 app.delete('/api/admin/mensajes/:id', authMw, async (req, res) => {
-  const msg = await queryOne('SELECT * FROM mensajes_admin WHERE id = ?', [req.params.id]);
-  if (msg) console.log(`[LOG] Mensaje Admin BORRADO el ${new Date().toLocaleString()}: `, msg);
+  const msg = await queryOne('SELECT m.*, u.nombre FROM mensajes_admin m JOIN usuarios u ON m.usuario_id = u.id WHERE m.id = ?', [req.params.id]);
+  if (msg) sendTelegramAlert(`🗑️ <b>Mensaje Buzón Borrado</b>\nDe: ${msg.nombre}\nTexto: ${msg.mensaje.slice(0,30)}...`);
   await runSql('DELETE FROM mensajes_admin WHERE id = ?', [req.params.id]);
   res.json({ message: 'Mensaje eliminado' });
 });
 
 app.delete('/api/admin/emergencias/:id', authMw, async (req, res) => {
-  const emg = await queryOne('SELECT * FROM registro_emergencias WHERE id = ?', [req.params.id]);
-  if (emg) console.log(`[LOG] Registro Emergencia BORRADO el ${new Date().toLocaleString()}: `, emg);
+  const emg = await queryOne('SELECT e.*, u.nombre FROM registro_emergencias e JOIN usuarios u ON e.usuario_id = u.id WHERE e.id = ?', [req.params.id]);
+  if (emg) sendTelegramAlert(`🗑️ <b>Registro Emergencia Borrado</b>\nVecino: ${emg.nombre}\nInstitución: ${emg.institucion}`);
   await runSql('DELETE FROM registro_emergencias WHERE id = ?', [req.params.id]);
   res.json({ message: 'Registro eliminado' });
 });
 
 app.delete('/api/admin/rastreo/:id', authMw, async (req, res) => {
-  const track = await queryOne('SELECT * FROM rastreo_robos WHERE id = ?', [req.params.id]);
-  if (track) console.log(`[LOG] Registro Rastreo BORRADO el ${new Date().toLocaleString()}: `, track);
+  const track = await queryOne('SELECT r.*, u.nombre FROM rastreo_robos r JOIN usuarios u ON r.usuario_id = u.id WHERE r.id = ?', [req.params.id]);
+  if (track) sendTelegramAlert(`🗑️ <b>Registro Rastreo Borrado</b>\nVecino: ${track.nombre}`);
   await runSql('DELETE FROM rastreo_robos WHERE id = ?', [req.params.id]);
   res.json({ message: 'Registro eliminado' });
 });
