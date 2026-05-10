@@ -569,10 +569,14 @@ const Admin = {
  <h3 style="margin-bottom:15px; color:var(--primary);">✉️ Buzón de Mensajes</h3>
  <div id="adminMensajesList">${mensajes.map(m => {
   let displayMessage = m.mensaje;
-  const mapRegex = /https:\/\/maps\.google\.com\/\?q=([\d.-]+),([\d.-]+)/;
+  const mapRegex = /https:\/\/www\.google\.com\/maps\?q=([\d.-]+),([\d.-]+)|https:\/\/maps\.google\.com\/\?q=([\d.-]+),([\d.-]+)/;
   const match = displayMessage.match(mapRegex);
+  
   if (match) {
-    displayMessage = displayMessage.replace(mapRegex, `<a href="https://maps.google.com/?q=${match[1]},${match[2]}" target="_blank" style="color:var(--primary); font-weight:bold; text-decoration:underline;">Ver en Mapa</a>`);
+    const lat = match[1] || match[3];
+    const lng = match[2] || match[4];
+    const btnHtml = `<br><a href="https://maps.google.com/?q=${lat},${lng}" target="_blank" class="btn btn-primary btn-sm" style="display:inline-flex; margin-top:10px; width:auto; padding:8px 15px;">📍 VER EN MAPA</a>`;
+    displayMessage = displayMessage.replace(match[0], btnHtml);
   }
   return `
  <div class="admin-list-item" style="${m.leido ? 'opacity:0.6;' : 'border-left: 4px solid var(--primary);'}">

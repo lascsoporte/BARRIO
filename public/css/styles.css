@@ -25,20 +25,16 @@ body {
   font-family: 'Nunito', sans-serif;
   background: linear-gradient(to bottom, #F9F1E7, #F2E8DA);
   color: var(--text);
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
-}
-body.scrollable {
-  height: auto;
-  min-height: 100vh;
-  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-#app { max-width: 480px; margin: 0 auto; padding: 0 16px 20px; }
+
+#app { max-width: 480px; margin: 0 auto; padding: 0 16px 20px; min-height: 100vh; }
 
 /* ===== Splash Screen (Premium) ===== */
 .loading-screen {

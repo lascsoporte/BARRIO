@@ -114,14 +114,6 @@ const App = {
  const hash = location.hash || '#/';
  const app = document.getElementById('app');
 
- // Manejo de scroll según pantalla
- const isScrollable = hash.startsWith('#/muro') || hash.startsWith('#/legal') || hash.startsWith('#/mascotas');
- if (isScrollable) {
- document.body.classList.add('scrollable');
- } else {
- document.body.classList.remove('scrollable');
- }
-
  // Show lateral buttons only on home page
  const lateralBtns = document.querySelectorAll('.lateral-btn');
  const isHome = (hash === '#/' || hash === '');
