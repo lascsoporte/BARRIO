@@ -30,8 +30,9 @@ const App = {
       localStorage.setItem('barrio_user', JSON.stringify(serverUser));
     }
   } catch(e) {
-    // Si el usuario no existe en la DB (404), borramos caché para forzar registro
+    // Si el usuario no existe en la DB (404), borramos caché y TÉRMINOS para forzar re-registro completo
     localStorage.removeItem('barrio_user');
+    localStorage.removeItem('barrio_disclaimer_v2');
     location.reload();
   }
  }
