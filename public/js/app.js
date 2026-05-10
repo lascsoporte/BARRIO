@@ -905,7 +905,7 @@ const App = {
  <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="tel" id="authTelefono" placeholder="Ej: +56912345678">
  </div>
  <div class="form-group" style="text-align:left;">
- <label>Dirección / Sector (Opcional)</label>
+ <label>Poblacion, Sector , Ciudad</label>
  <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="text" id="authDireccion" placeholder="Ej: Mirasol, Puerto Montt">
  </div>
  <button id="authSubmit" class="btn btn-primary" style="margin-top:10px; width:100%; font-weight:900;">REGISTRARME AHORA</button>
@@ -919,7 +919,7 @@ const App = {
  const telefono = document.getElementById('authTelefono').value.trim();
  const direccion = document.getElementById('authDireccion').value.trim();
 
- if (!nombre || !telefono) return this.toast('Nombre y teléfono son obligatorios');
+ if (!nombre || !telefono || !direccion) return this.toast('Todos los campos son obligatorios');
 
  const btn = document.getElementById('authSubmit');
  btn.disabled = true;
