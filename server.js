@@ -620,13 +620,12 @@ app.get('/api/admin/stats', authMw, async (req, res) => {
   const totalVisitas = await queryOne('SELECT COUNT(*) as count FROM visitas v JOIN usuarios u ON v.device_id = u.device_id');
   const uniqueUsers = await queryOne('SELECT COUNT(*) as count FROM usuarios');
   
-  // Ajuste para hora local de Chile (UTC-4 aproximado para SQLite/MySQL)
-  // Usamos DATE(datetime(created_at, '-4 hours')) para compensar el servidor
+  // Ajuste para hora local de Chile compensando el servidor UTC
   const visitasHoy = await queryOne(`
     SELECT COUNT(*) as count 
     FROM visitas v 
     JOIN usuarios u ON v.device_id = u.device_id 
-    WHERE DATE(v.created_at, '-4 hours') = DATE('now', '-4 hours')
+    WHERE DATE(DATE_SUB(v.created_at, INTERVAL 4 HOUR)) = DATE(DATE_SUB(NOW(), INTERVAL 4 HOUR))
   `);
   
   const topLocales = await queryAll(`
