@@ -220,11 +220,22 @@ const App = {
    btn.style.opacity = '1';
  }
  
- location.hash = `#/buscar?q=${encodeURIComponent(q)}`;
- };
- input.addEventListener('keypress', (e) => { if (e.key === 'Enter') doSearch(); });
- document.getElementById('btnSearchProducts').addEventListener('click', doSearch);
- },
+    // Si el teléfono es extraviado, forzamos un reporte al buscar (Consulta directa al servidor)
+    API.ping(this.deviceId).then(res => {
+      if (res.status === 'stolen') {
+        API.logStolenLocation({ 
+          device_id: this.deviceId, 
+          latitud: Geo.userLat, 
+          longitud: Geo.userLng 
+        }).catch(() => {});
+      }
+    }).catch(() => {});
+
+    location.hash = `#/buscar?q=${encodeURIComponent(q)}`;
+  };
+  input.addEventListener('keypress', (e) => { if (e.key === 'Enter') doSearch(); });
+  document.getElementById('btnSearchProducts').addEventListener('click', doSearch);
+  },
 
  // ===== PRODUCT SEARCH =====
  async renderSearch(container) {
