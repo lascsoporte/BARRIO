@@ -10,7 +10,7 @@ const Admin = {
 
   renderLogin(container) {
     container.innerHTML = `
-      <button class="back-btn" onclick="location.hash='#/'">⬅️ Volver</button>
+      <button class="back-btn" onclick="location.assign('/')">⬅️ Volver</button>
       <div class="admin-login fade-in">
         <h2>🔒 Administración</h2>
         <p style="font-size:0.8rem;color:var(--text-light);margin-bottom:15px;">Se requieren las 3 llaves de seguridad para ingresar.</p>
@@ -68,7 +68,7 @@ const Admin = {
     document.getElementById('logoutBtn').addEventListener('click', () => {
       this.token = null;
       localStorage.removeItem('barrio_admin_token');
-      location.hash = '#/';
+      location.assign('/');
     });
     container.querySelectorAll('.admin-tab').forEach(tab => {
       tab.addEventListener('click', () => {

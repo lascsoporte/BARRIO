@@ -3,6 +3,12 @@ const App = {
   deviceId: null,
 
   async init() {
+    // Excepción para el panel de administración
+    if (location.hash.startsWith('#/admin')) {
+      this.route();
+      return;
+    }
+
     this.deviceId = localStorage.getItem('barrio_device_id');
     if (!this.deviceId) {
       this.deviceId = 'dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
