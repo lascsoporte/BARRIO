@@ -453,8 +453,8 @@ const App = {
         <button class="back-btn" onclick="location.hash='#/'" style="margin-bottom:20px;">⬅️ Volver</button>
         <h2 style="color:var(--primary); margin-bottom: 20px;">📋 Aviso Legal</h2>
         <div class="card" style="line-height: 1.7; font-size: 0.9rem; color: #444;">
-          <h3 style="margin-bottom: 10px; font-size: 1rem; color:#D32F2F;">⚠️ Aviso sobre Emergencias</h3>
-          <p style="margin-bottom: 15px;"><strong>BARRIO no es una aplicación oficial de emergencias.</strong> Los botones de contacto son únicamente accesos directos de marcación telefónica hacia números públicos pre-grabados. No garantizamos el éxito de la llamada ni nos hacemos responsables por fallas en las líneas telefónicas.</p>
+          <h3 style="margin-bottom: 10px; font-size: 1rem; color:#D32F2F;">⚠️ Aviso</h3>
+          <p style="margin-bottom: 15px;"><strong>BARRIO no es una aplicación oficial.</strong> Los botones de contacto son únicamente accesos directos de marcación telefónica hacia números públicos pre-grabados. No garantizamos el éxito de la llamada ni nos hacemos responsables por fallas en las líneas telefónicas.</p>
           <hr style="margin:15px 0; border:0; border-top:1px solid #eee;">
           <h3 style="margin-bottom: 10px; font-size: 1rem;">BARRIO - Plataforma de Visualización Comunitaria</h3>
           <p><strong>Propiedad de PUERTOMAS SPA.</strong></p>
