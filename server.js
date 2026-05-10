@@ -617,9 +617,9 @@ app.get('/api/stats', async (req, res) => {
 });
 
 app.get('/api/admin/stats', authMw, async (req, res) => {
-  const totalVisitas = await queryOne('SELECT COUNT(*) as count FROM visitas');
-  const uniqueUsers = await queryOne('SELECT COUNT(DISTINCT device_id) as count FROM visitas');
-  const visitasHoy = await queryOne("SELECT COUNT(*) as count FROM visitas WHERE date(created_at) = date('now')");
+  const totalVisitas = await queryOne('SELECT COUNT(*) as count FROM visitas v JOIN usuarios u ON v.device_id = u.device_id');
+  const uniqueUsers = await queryOne('SELECT COUNT(*) as count FROM usuarios');
+  const visitasHoy = await queryOne("SELECT COUNT(*) as count FROM visitas v JOIN usuarios u ON v.device_id = u.device_id WHERE date(v.created_at) = date('now')");
   
   const topLocales = await queryAll(`
     SELECT l.nombre, COUNT(c.id) as calif_count, AVG(c.estrellas) as avg_estrellas

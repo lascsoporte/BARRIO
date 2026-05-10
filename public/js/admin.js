@@ -526,11 +526,11 @@ const Admin = {
  
  <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:24px;">
  <div class="card" style="text-align:center; padding:15px;">
- <div style="font-size:0.8rem; color:var(--text-light);">Total Visitas</div>
+ <div style="font-size:0.8rem; color:var(--text-light);">Visitas Registradas</div>
  <div style="font-size:1.5rem; font-weight:900; color:var(--primary);">${stats.totalVisitas}</div>
  </div>
  <div class="card" style="text-align:center; padding:15px;">
- <div style="font-size:0.8rem; color:var(--text-light);">Usuarios Únicos</div>
+ <div style="font-size:0.8rem; color:var(--text-light);">Usuarios Registrados</div>
  <div style="font-size:1.5rem; font-weight:900; color:var(--success);">${stats.uniqueUsers}</div>
  </div>
  <div class="card" style="text-align:center; padding:15px;">
@@ -692,7 +692,7 @@ const Admin = {
  // ===== EMERGENCIAS TAB =====
  async renderEmergenciasTab(c) {
  const emergencias = await API.adminGetEmergencias(this.token);
- window._tempEmergencias = emergencias;
+ window._tempEmergencias = emergencias.map(e => ({ ...e, "Fecha": new Date(e.created_at).toLocaleDateString(), "Hora": new Date(e.created_at).toLocaleTimeString() }));
  c.innerHTML = `
  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
  <h3 style="color:var(--primary); margin:0;">Llamadas de Emergencia</h3>
@@ -715,7 +715,7 @@ const Admin = {
  // ===== RASTREO ROBOS TAB =====
  async renderRastreoTab(c) {
  const rastreos = await API.adminGetRastreo(this.token);
- window._tempRastreos = rastreos;
+ window._tempRastreos = rastreos.map(r => ({ ...r, "Fecha": new Date(r.created_at).toLocaleDateString(), "Hora": new Date(r.created_at).toLocaleTimeString() }));
  c.innerHTML = `
  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
  <h3 style="color:var(--primary); margin:0;">Rastreo de Extravíos</h3>
