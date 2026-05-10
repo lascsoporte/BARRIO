@@ -626,7 +626,7 @@ const Admin = {
  // ===== USUARIOS TAB =====
  async renderUsuariosTab(c) {
  const usuarios = await API.adminGetUsuarios(this.token);
- window._tempUsuariosExport = usuarios.map(u => ({ "Nombre": u.nombre || "No especificado", "Telefono": u.telefono || "No especificado", "Fecha": new Date(u.created_at).toLocaleDateString(), "Estado de Uso (Condicion)": u.is_blocked ? "Bloqueado" : (u.is_verified ? "Activo" : "En Verificación"), "Terminos y Condiciones": u.terms_accepted ? "Aceptados" : "Pendientes" }));
+ window._tempUsuariosExport = usuarios.map(u => ({ "Nombre": u.nombre || "No especificado", "Telefono": u.telefono || "No especificado", "Fecha": new Date(u.created_at).toLocaleDateString(), "Hora de Aceptación": u.terms_accepted ? new Date(u.created_at).toLocaleTimeString() : "No registrada", "Estado de Uso (Condicion)": u.is_blocked ? "Bloqueado" : (u.is_verified ? "Activo" : "En Verificación"), "Terminos y Condiciones": u.terms_accepted ? "Aceptados" : "Pendientes" }));
  c.innerHTML = `
  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
  <h3 style="color:var(--primary); margin:0;">👥 Usuarios (${usuarios.length})</h3>
@@ -738,6 +738,20 @@ const Admin = {
  // CSV Helper
  downloadCSV(data, filename) {
  if(!data || !data.length) return App.toast("No hay datos para exportar");
+
+ if (typeof XLSX !== 'undefined') {
+   const ws = XLSX.utils.json_to_sheet(data);
+   // Auto-size columns based on header length and content
+   const cols = Object.keys(data[0]).map(key => ({
+     wch: Math.max(key.length, ...data.map(row => String(row[key] || '').length)) + 2
+   }));
+   ws['!cols'] = cols;
+   const wb = XLSX.utils.book_new();
+   XLSX.utils.book_append_sheet(wb, ws, "Datos");
+   XLSX.writeFile(wb, filename.replace('.csv', '.xlsx'));
+   return;
+ }
+
  const replacer = (key, value) => value === null ? '' : value; 
  const header = Object.keys(data[0]);
  const csv = [
