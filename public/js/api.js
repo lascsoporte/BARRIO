@@ -121,6 +121,9 @@ const API = {
   adminToggleStolenUsuario(id, is_stolen, token) {
     return this.put(`/api/admin/usuarios/${id}/robado`, { is_stolen }, token);
   },
+  adminToggleBlockUsuario(id, is_blocked, token) {
+    return this.put(`/api/admin/usuarios/${id}/bloquear`, { is_blocked }, token);
+  },
   adminVerifyUsuario(id, is_verified, token) {
     return this.put(`/api/admin/usuarios/${id}/verificar`, { is_verified }, token);
   },
