@@ -571,15 +571,25 @@ app.get('/api/admin/usuarios', authMw, async (req, res) => {
 });
 
 app.put('/api/admin/usuarios/:id/bloquear', authMw, async (req, res) => {
-  const { is_blocked } = req.body;
-  await runSql('UPDATE usuarios SET is_blocked = ? WHERE id = ?', [Number(is_blocked) ? 1 : 0, req.params.id]);
-  res.json({ message: 'Estado actualizado' });
+  try {
+    const { is_blocked } = req.body;
+    const userId = parseInt(req.params.id);
+    await runSql('UPDATE usuarios SET is_blocked = ? WHERE id = ?', [Number(is_blocked) ? 1 : 0, userId]);
+    res.json({ message: 'Estado actualizado' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.put('/api/admin/usuarios/:id/robado', authMw, async (req, res) => {
-  const { is_stolen } = req.body;
-  await runSql('UPDATE usuarios SET is_stolen=? WHERE id=?', [Number(is_stolen) ? 1 : 0, req.params.id]);
-  res.json({ message: 'Estado de extravío actualizado' });
+  try {
+    const { is_stolen } = req.body;
+    const userId = parseInt(req.params.id);
+    const newState = Number(is_stolen) ? 1 : 0;
+    await runSql('UPDATE usuarios SET is_stolen=? WHERE id=?', [newState, userId]);
+    res.json({ success: true, message: 'Estado de extravío actualizado' });
+  } catch (e) {
+    console.error('Error en robado:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ===== EMERGENCIAS =====
@@ -680,14 +690,23 @@ app.post('/api/emergency-reset', (req, res) => {
 
 // Admin User Management
 app.put('/api/admin/usuarios/:id/verificar', authMw, async (req, res) => {
-  const { is_verified } = req.body;
-  await runSql('UPDATE usuarios SET is_verified = ? WHERE id = ?', [Number(is_verified) ? 1 : 0, req.params.id]);
-  res.json({ message: 'Estado de verificación actualizado' });
+  try {
+    const { is_verified } = req.body;
+    const userId = parseInt(req.params.id);
+    await runSql('UPDATE usuarios SET is_verified = ? WHERE id = ?', [Number(is_verified) ? 1 : 0, userId]);
+    res.json({ message: 'Estado de verificación actualizado' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.delete('/api/admin/usuarios/:id', authMw, async (req, res) => {
-  await runSql('DELETE FROM usuarios WHERE id = ?', [req.params.id]);
-  res.json({ message: 'Usuario eliminado' });
+  try {
+    const userId = parseInt(req.params.id);
+    await runSql('DELETE FROM usuarios WHERE id = ?', [userId]);
+    res.json({ success: true, message: 'Usuario eliminado' });
+  } catch (e) {
+    console.error('Error en delete usuario:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 
