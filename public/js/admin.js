@@ -741,10 +741,10 @@ const Admin = {
  const replacer = (key, value) => value === null ? '' : value; 
  const header = Object.keys(data[0]);
  const csv = [
- header.join(','),
- ...data.map(row => header.map(fieldName => JSON.stringify(row[fieldName], replacer)).join(','))
+ header.join(';'),
+ ...data.map(row => header.map(fieldName => JSON.stringify(row[fieldName], replacer)).join(';'))
  ].join('\r\n');
- const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+ const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
  const url = window.URL.createObjectURL(blob);
  const a = document.createElement('a');
  a.setAttribute('href', url);
@@ -752,3 +752,4 @@ const Admin = {
  a.click();
  }
 };
+
