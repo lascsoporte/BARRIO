@@ -225,10 +225,13 @@ app.post('/api/muro', async (req, res) => {
   const { usuario_id, contenido } = req.body;
   if (!usuario_id || !contenido) return res.status(400).json({ error: 'Faltan datos' });
 
-  const user = await queryOne('SELECT is_blocked FROM usuarios WHERE id = ?', [usuario_id]);
+  const user = await queryOne('SELECT nombre, is_blocked FROM usuarios WHERE id = ?', [usuario_id]);
   if (user && user.is_blocked) return res.status(403).json({ error: 'Usuario bloqueado por el administrador' });
 
   await runSql('INSERT INTO muro_comunitario (usuario_id, contenido) VALUES (?,?)', [usuario_id, contenido]);
+  
+  sendTelegramAlert(`📝 <b>Nueva Publicación en el Muro</b>\nVecino: ${user ? user.nombre : 'Desconocido'}\nDice: "${contenido}"`);
+  
   res.json({ message: 'Publicado en el muro' });
 });
 
