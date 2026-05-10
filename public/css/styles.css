@@ -23,17 +23,22 @@ html { font-size: 18px; }
 
 body {
   font-family: 'Nunito', sans-serif;
-  background: linear-gradient(to bottom, #F9F1E7, #F2E8DA); /* Mantengo el fondo arena que pediste */
+  background: linear-gradient(to bottom, #F9F1E7, #F2E8DA);
   color: var(--text);
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   -webkit-tap-highlight-color: transparent;
-  overflow-x: hidden;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+body.scrollable {
+  height: auto;
+  min-height: 100vh;
+  overflow-y: auto;
+}
 
-#app { max-width: 480px; margin: 0 auto; padding: 0 16px 100px; min-height: 100vh; }
+#app { max-width: 480px; margin: 0 auto; padding: 0 16px 20px; }
 
 /* ===== Splash Screen (Premium) ===== */
 .loading-screen {
@@ -99,12 +104,12 @@ body {
 /* ===== Header ===== */
 .app-header {
   text-align: center;
-  padding: 32px 0 16px;
+  padding: 10px 0 5px;
   position: relative;
 }
 
 .app-header h1 {
-  font-size: 3.2rem;
+  font-size: 2.8rem;
   font-weight: 900;
   background: linear-gradient(135deg, var(--primary), #FF2E00);
   -webkit-background-clip: text;
@@ -113,16 +118,16 @@ body {
   letter-spacing: 2px;
   text-transform: uppercase;
   filter: drop-shadow(0 4px 8px rgba(255,107,53,0.2));
-  margin-top: 10px;
+  margin-top: 5px;
 }
 
 .app-header .city-subtitle {
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   font-weight: 800;
   color: var(--text);
   letter-spacing: 3px;
   text-transform: uppercase;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   display: block;
 }
 
@@ -137,15 +142,15 @@ body {
 /* ===== Search Bar ===== */
 .search-container {
   position: relative;
-  margin: 20px 0;
+  margin: 10px 0;
 }
 
 .search-container input {
   width: 100%;
-  padding: 20px 20px 20px 60px;
-  font-size: 1.15rem;
+  padding: 14px 20px 14px 60px;
+  font-size: 1rem;
   font-family: 'Nunito', sans-serif;
-  border: 2px solid rgba(0,0,0,0.05); /* Un borde sutil pero siempre visible */
+  border: 2px solid rgba(0,0,0,0.05);
   border-radius: var(--radius);
   background: white;
   color: var(--text);
@@ -174,10 +179,10 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  padding: 18px 24px;
-  font-size: 1.1rem;
+  padding: 14px 20px;
+  font-size: 1rem;
   font-weight: 800;
   font-family: 'Nunito', sans-serif;
   border: none;
@@ -216,9 +221,9 @@ body {
 
 .btn-danger { background: var(--danger); }
 
-.btn-icon { font-size: 1.4rem; }
+.btn-icon { font-size: 1.2rem; }
 
-.btn-group { display: flex; flex-direction: column; gap: 14px; margin: 16px 0; }
+.btn-group { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
 
 /* ===== Cards ===== */
 .card {
@@ -747,8 +752,8 @@ body {
 .qa-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-top: 15px;
+  gap: 6px;
+  margin-top: 10px;
   padding: 0;
   width: 100%;
   box-sizing: border-box;
@@ -760,8 +765,8 @@ body {
   align-items: center;
   justify-content: center;
   background: white;
-  border-radius: 16px;
-  padding: 12px 4px;
+  border-radius: 12px;
+  padding: 8px 4px;
   text-decoration: none;
   color: var(--text);
   box-shadow: 0 2px 10px rgba(0,0,0,0.05);

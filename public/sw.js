@@ -1,4 +1,4 @@
-const CACHE_NAME = 'barrio-v3';
+const CACHE_NAME = 'barrio-v4';
 const ASSETS = ['/', '/css/styles.css', '/js/geo.js', '/js/api.js', '/js/admin.js', '/js/app.js'];
 
 self.addEventListener('install', (e) => {
