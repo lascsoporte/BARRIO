@@ -442,20 +442,20 @@ const App = {
         
         <div style="display:flex; flex-direction:column; gap:16px;">
           <a href="tel:${this.config.tel_carabineros || '133'}" onclick="App.logLlamada('133 - Carabineros')" class="btn" style="background:#006633; color:white; justify-content:center; padding:20px; font-size:1.2rem; font-weight:bold; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-            CARABINEROS
+            CARABINEROS ${this.config.tel_carabineros || '133'}
           </a>
           <a href="tel:${this.config.tel_bomberos || '132'}" onclick="App.logLlamada('132 - Bomberos')" class="btn" style="background:#D32F2F; color:white; justify-content:center; padding:20px; font-size:1.2rem; font-weight:bold; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-            BOMBEROS
+            BOMBEROS ${this.config.tel_bomberos || '132'}
           </a>
           <a href="tel:${this.config.tel_ambulancia || '131'}" onclick="App.logLlamada('131 - Ambulancia')" class="btn" style="background:#1976D2; color:white; justify-content:center; padding:20px; font-size:1.2rem; font-weight:bold; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-            AMBULANCIA
+            AMBULANCIA ${this.config.tel_ambulancia || '131'}
           </a>
           <a href="tel:${this.config.tel_pdi || '134'}" onclick="App.logLlamada('134 - PDI')" class="btn" style="background:#0D47A1; color:white; justify-content:center; padding:20px; font-size:1.2rem; font-weight:bold; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-            PDI
+            PDI ${this.config.tel_pdi || '134'}
           </a>
           <a href="tel:${this.config.tel_seguridad || '1529'}" onclick="App.logLlamada('1529 - Seguridad Ciudadana')" class="btn" style="background:#F57C00; color:white; justify-content:center; padding:15px; text-align:center; flex-direction:column; font-size:1.2rem; font-weight:bold; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1); line-height:1.2;">
-            <span>SEGURIDAD CIUDADANA</span>
-            <span style="font-size:0.9rem; margin-top:4px; opacity:0.9;">PUERTO MONTT</span>
+            <span>SEGURIDAD CIUDADANA ${this.config.tel_seguridad || '1529'}</span>
+            <span style="font-size:0.9rem; font-weight:normal; opacity:0.9;">PUERTO MONTT</span>
           </a>
         </div>
         ${this.footerHtml()}
