@@ -145,9 +145,17 @@ const App = {
  <button onclick="document.getElementById('installBanner').style.display='none'" style="background:transparent; color:white; border:none; margin-left:10px; font-size:1.2rem; cursor:pointer; vertical-align:middle;">&times;</button>
  </div>
  <header class="app-header">
- <div class="formal-flag"></div>
- <h1 style="margin-top:10px;">BARRIO</h1>
+ <h1 style="margin-top:0;">BARRIO</h1>
  <span class="city-subtitle">PUERTO MONTT</span>
+ <div class="formal-flag-container">
+ <div class="chilean-flag">
+ <div class="flag-top">
+ <div class="flag-blue"><div class="flag-star">★</div></div>
+ <div class="flag-white"></div>
+ </div>
+ <div class="flag-red"></div>
+ </div>
+ </div>
  </header>
  <div class="search-container" style="text-align:center;">
  <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="text" id="searchInput" placeholder="¿Qué buscas?"
@@ -462,6 +470,62 @@ const App = {
  // ===== EMERGENCIA =====
  renderEmergencia(container) {
  container.innerHTML = `
+ <style>
+ .app-header .city-subtitle {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.formal-flag-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 5px;
+}
+
+.chilean-flag {
+  width: 45px;
+  height: 30px;
+  position: relative;
+  border: 1px solid rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.flag-top {
+  display: flex;
+  height: 50%;
+}
+
+.flag-blue {
+  background-color: #0039a6;
+  width: 33.33%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.flag-star {
+  color: white;
+  font-size: 12px;
+}
+
+.flag-white {
+  background-color: white;
+  width: 66.67%;
+  height: 100%;
+}
+
+.flag-red {
+  background-color: #d52b1e;
+  height: 50%;
+  width: 100%;
+}
+ </style>
  <div class="fade-in" style="padding: 20px; max-width: 600px; margin: 0 auto; text-align: center;">
  
  <h2 style="color:#222; margin-bottom: 5px; font-size:1.6rem; font-weight:900; text-transform:uppercase; letter-spacing:1px; display:inline-block;">TELÉFONOS DE EMERGENCIA</h2>
