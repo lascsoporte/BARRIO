@@ -608,12 +608,22 @@ const Admin = {
  // ===== MENSAJES (BUZÓN) TAB =====
  async renderMensajesTab(c) {
  const mensajes = await API.adminGetMensajes(this.token);
+ window._tempMensajesExport = mensajes.map(m => ({
+   "Fecha": new Date(m.created_at).toLocaleString(),
+   "Nombre": m.nombre || 'Usuario Desconocido',
+   "Teléfono": m.telefono || 'Sin Tel',
+   "Mensaje": m.mensaje,
+   "Estado": m.leido ? 'Leído' : 'Nuevo'
+ }));
  setTimeout(() => {
      const btn = document.getElementById('dlMascotas');
      if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
    }, 100);
    c.innerHTML = `
- <h3 style="margin-bottom:15px; color:var(--primary);">✉️ Buzón de Mensajes</h3>
+ <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+   <h3 style="color:var(--primary); margin:0;">✉️ Buzón de Mensajes</h3>
+   <button class="btn btn-outline btn-sm" onclick="Admin.downloadCSV(window._tempMensajesExport, 'buzon_barrio.xlsx')">📥 Descargar Planilla</button>
+ </div>
  <div id="adminMensajesList">${mensajes.map(m => {
   let displayMessage = m.mensaje;
   const mapRegex = /https:\/\/www\.google\.com\/maps\?q=([\d.-]+),([\d.-]+)|https:\/\/maps\.google\.com\/\?q=([\d.-]+),([\d.-]+)/;
@@ -638,7 +648,6 @@ const Admin = {
  </div>
  </div>
  `}).join('') || '<p style="text-align:center;color:var(--text-light);">Buzón vacío.</p>'}</div>
-
  `;
  },
  async markLeido(id) {
@@ -648,14 +657,22 @@ const Admin = {
  // ===== MURO TAB =====
  async renderMuroTab(c) {
  const posts = await API.getMuro();
+ window._tempMuroExport = posts.map(p => ({
+   "Fecha": new Date(p.created_at).toLocaleString(),
+   "Autor": p.autor,
+   "Contenido": p.contenido
+ }));
  setTimeout(() => {
      const btn = document.getElementById('dlMascotas');
      if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
    }, 100);
    c.innerHTML = `
  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
- <h3 style="color:var(--primary); margin:0;">💬 Muro Comunitario</h3>
- <button class="btn btn-sm" style="background:#D32F2F; color:white;" onclick="Admin.clearMuro()">🗑️ Limpiar Muro</button>
+   <h3 style="color:var(--primary); margin:0;">💬 Muro Comunitario</h3>
+   <div style="display:flex; gap:8px;">
+     <button class="btn btn-outline btn-sm" onclick="Admin.downloadCSV(window._tempMuroExport, 'muro_barrio.xlsx')">📥 Descargar Planilla</button>
+     <button class="btn btn-sm" style="background:#D32F2F; color:white;" onclick="Admin.clearMuro()">🗑️ Limpiar Muro</button>
+   </div>
  </div>
  <div id="adminMuroList">${posts.map(p => `
  <div class="admin-list-item">
@@ -772,6 +789,9 @@ const Admin = {
  `).join('') || '<p style="text-align:center;color:var(--text-light);">No hay registros de emergencia.</p>'}</div>
  `;
  },
+ async deleteEmergencia(id) {
+   try { await API.adminDeleteEmergencia(id, this.token); this.loadTab(); } catch(e) { App.toast('Error al borrar'); }
+ },
 
  // ===== RASTREO ROBOS TAB =====
  async renderRastreoTab(c) {
@@ -802,19 +822,14 @@ const Admin = {
  </div>
  `).join('') || '<p style="text-align:center;color:var(--text-light);">No hay ubicaciones registradas.</p>'}</div>
  `;
-
+ },
+ async deleteRastreo(id) {
+   try { await API.adminDeleteRastreo(id, this.token); this.loadTab(); } catch(e) { App.toast('Error al borrar'); }
  },
 
  // CSV Helper
- 
   async deleteMensaje(id) {
     try { await API.adminDeleteMensaje(id, this.token); this.loadTab(); } catch(e) { App.toast('Error al borrar'); }
-  },
-  async deleteEmergencia(id) {
-    try { await API.adminDeleteEmergencia(id, this.token); this.loadTab(); } catch(e) { App.toast('Error al borrar'); }
-  },
-  async deleteRastreo(id) {
-    try { await API.adminDeleteRastreo(id, this.token); this.loadTab(); } catch(e) { App.toast('Error al borrar'); }
   },
 
   downloadCSV(data, filename) {
@@ -847,4 +862,3 @@ const Admin = {
  a.click();
  }
 };
-
