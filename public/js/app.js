@@ -115,7 +115,7 @@ const App = {
  const app = document.getElementById('app');
 
  // Manejo de scroll según pantalla
- const isScrollable = hash.startsWith('#/muro') || hash.startsWith('#/legal');
+ const isScrollable = hash.startsWith('#/muro') || hash.startsWith('#/legal') || hash.startsWith('#/mascotas');
  if (isScrollable) {
  document.body.classList.add('scrollable');
  } else {
@@ -231,7 +231,7 @@ const App = {
  const params = new URLSearchParams(location.hash.split('?')[1]);
  const q = params.get('q') || '';
  container.innerHTML = `
- <button class="back-btn" onclick="location.hash='#/'">⬅️ Volver</button>
+ 
  <h2 class="section-title">🔍 Resultados para "${q}"</h2>
  <div class="loading"><div class="spinner"></div><p>Buscando...</p></div>
  `;
@@ -268,7 +268,7 @@ const App = {
  const totalResults = products.length + services.length;
 
  container.innerHTML = `
- <button class="back-btn" onclick="location.hash='#/'">⬅️ Volver</button>
+ 
  <div class="search-container">
  <span class="search-icon">🔍</span>
  <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="text" id="searchAgain" value="${q}" placeholder="¿Qué necesitas? Ej: gasfiter, pan" >
@@ -292,7 +292,7 @@ const App = {
  // ===== MASCOTAS PERDIDAS =====
  async renderMascotas(container) {
  container.innerHTML = `
- <button class="back-btn" onclick="location.hash='#/'">⬅️ Volver</button>
+ 
  <h2 class="section-title">🐶🐱 Mascotas Perdidas</h2>
  
  <div id="mascotasMap" style="height: 350px; width: 100%; border-radius: 12px; margin-bottom: 20px; z-index:1; border:2px solid #E65100;"></div>
@@ -459,7 +459,7 @@ const App = {
  renderEmergencia(container) {
  container.innerHTML = `
  <div class="fade-in" style="padding: 20px; max-width: 600px; margin: 0 auto; text-align: center;">
- <button class="back-btn" onclick="location.hash='#/'" style="margin-bottom:20px;">⬅️ Volver</button>
+ 
  <h2 style="color:#222; margin-bottom: 5px; font-size:1.6rem; font-weight:900; text-transform:uppercase; letter-spacing:1px; display:inline-block;">TELÉFONOS DE EMERGENCIA</h2>
  <div style="font-size:1.8rem; margin-bottom:15px;">🇨🇱</div>
  <div style="border-bottom:3px solid #222; margin-bottom:30px; width:100%; max-width:250px; margin-left:auto; margin-right:auto;"></div>
@@ -490,7 +490,7 @@ const App = {
  renderLegal(container) {
  container.innerHTML = `
  <div class="fade-in" style="padding: 20px; max-width: 600px; margin: 0 auto;">
- <button class="back-btn" onclick="location.hash='#/'" style="margin-bottom:20px;">⬅️ Volver</button>
+ 
  <h2 style="color:var(--primary); margin-bottom: 20px;">📋 Aviso Legal</h2>
  <div class="card" style="line-height: 1.7; font-size: 0.9rem; color: #444;">
  <h3 style="margin-bottom: 10px; font-size: 1rem; color:#D32F2F;">⚠️ Aviso</h3>
@@ -551,26 +551,26 @@ const App = {
  renderShare(container) {
  const shareUrl = "https://www.puertomas.cl";
  const shareText = encodeURIComponent("¡Hola! Te comparto la app de nuestro BARRIO para encontrar productos y servicios cerca: " + shareUrl);
- const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(shareUrl)}`;
+ const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(shareUrl)}`;
 
  container.innerHTML = `
  <div class="fade-in" style="text-align:center; padding:20px;">
- <button class="back-btn" onclick="location.hash='#/'">⬅️ Volver</button>
- <h2 class="section-title">📲 Compartir BARRIO</h2>
- <p style="color:var(--text-light); margin-bottom:24px;">¡Ayuda a que más vecinos conozcan la app!</p>
  
- <div class="card" style="padding:32px; border-radius:var(--radius); background:white; box-shadow:var(--shadow-lg); margin-bottom:24px;">
- <h3 style="margin-bottom:16px; color:var(--primary);">Opción 1: WhatsApp</h3>
- <p style="font-size:0.9rem; color:var(--text-light); margin-bottom:20px;">Envía el link directamente a tus contactos:</p>
- <a href="https://wa.me/?text=${shareText}" class="btn" style="background:#25D366; color:white; width:100%; justify-content:center; padding:18px;">
+ <h2 class="section-title">📲 Compartir BARRIO</h2>
+ <p style="color:var(--text-light); margin-bottom:12px;">¡Ayuda a que más vecinos conozcan la app!</p>
+ 
+ <div class="card" style="padding:16px; border-radius:12px; background:white; box-shadow:var(--shadow); margin-bottom:12px;">
+ <h3 style="margin-bottom:8px; font-size:1.1rem; color:var(--primary);">Opción 1: WhatsApp</h3>
+ <p style="font-size:0.9rem; color:var(--text-light); margin-bottom:10px;">Envía el link directamente a tus contactos:</p>
+ <a href="https://wa.me/?text=${shareText}" class="btn" style="background:#25D366; color:white; width:100%; justify-content:center; padding:12px;">
  <svg viewBox="0 0 24 24" class="whatsapp-logo-large" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
  Enviar por WhatsApp
  </a>
  </div>
 
- <div class="card" style="padding:32px; border-radius:var(--radius); background:white; box-shadow:var(--shadow-lg);">
- <h3 style="margin-bottom:16px; color:var(--primary);">Opción 2: Código QR</h3>
- <p style="font-size:0.9rem; color:var(--text-light); margin-bottom:20px;">Muestra este código para que otro vecino lo escanee:</p>
+ <div class="card" style="padding:16px; border-radius:12px; background:white; box-shadow:var(--shadow);">
+ <h3 style="margin-bottom:8px; font-size:1.1rem; color:var(--primary);">Opción 2: Código QR</h3>
+ <p style="font-size:0.9rem; color:var(--text-light); margin-bottom:10px;">Muestra este código para que otro vecino lo escanee:</p>
  <div style="background:#F9F1E7; padding:20px; border-radius:var(--radius-sm); display:inline-block; margin-bottom:10px;">
  <img src="${qrUrl}" alt="QR Code" style="width:200px; height:200px; display:block; border-radius:10px;">
  </div>
@@ -613,14 +613,14 @@ const App = {
  // ===== STORE DETAIL =====
  async renderStore(container) {
  const id = location.hash.split('/')[2];
- container.innerHTML = `<button class="back-btn" onclick="history.back()">⬅️ Volver</button><div class="loading"><div class="spinner"></div><p>Cargando local...</p></div>`;
+ container.innerHTML = `<div class="loading"><div class="spinner"></div><p>Cargando local...</p></div>`;
  try {
  const store = await API.getStore(id);
  const ratings = await API.getRatings(id);
  const existingRating = ratings.find(r => r.device_id === this.deviceId);
 
  container.innerHTML = `
- <button class="back-btn" onclick="history.back()">⬅️ Volver</button>
+ 
  <div class="fade-in">
  <div class="store-header">
  <span class="badge ${store.abierto ? 'badge-open' : 'badge-closed'}" style="margin-bottom:8px;">${store.abierto ? '🟢 Abierto ahora' : '🔴 Cerrado'}</span>
@@ -725,7 +725,7 @@ const App = {
  // ===== SERVICES HOME =====
  async renderServicesHome(container) {
  container.innerHTML = `
- <button class="back-btn" onclick="location.hash='#/'">⬅️ Volver</button>
+ 
  <h2 class="section-title">🔧 Buscar Servicios</h2>
  <div class="search-container">
  <span class="search-icon">🔍</span>
@@ -757,7 +757,7 @@ const App = {
  const params = new URLSearchParams(location.hash.split('?')[1]);
  const q = params.get('q') || '';
  container.innerHTML = `
- <button class="back-btn" onclick="location.hash='#/servicios'">⬅️ Volver</button>
+ 
  <h2 class="section-title">🔧 ${q ? `Servicios: "${q}"` : 'Todos los servicios'}</h2>
  <div class="loading"><div class="spinner"></div><p>Buscando servicios...</p></div>
  `;
@@ -779,7 +779,7 @@ const App = {
  `).join('');
 
  container.innerHTML = `
- <button class="back-btn" onclick="location.hash='#/servicios'">⬅️ Volver</button>
+ 
  <h2 class="section-title">🔧 ${services.length} servicio${services.length !== 1 ? 's' : ''} encontrado${services.length !== 1 ? 's' : ''}</h2>
  <div class="fade-in">${html}</div>
  `;
@@ -892,7 +892,7 @@ const App = {
  ${!mandatory ? '<button class="auth-close" onclick="this.parentElement.parentElement.remove()">&times;</button>' : ''}
  <div style="font-size:3rem; margin-bottom:10px;">🏘️</div>
  <h2 style="text-transform:uppercase; letter-spacing:1px;">Registro Obligatorio</h2>
- <p style="font-size:0.9rem; color:var(--text-light); margin-bottom:20px;">Por seguridad, debes registrarte para acceder y usar la aplicación BARRIO.</p>
+ <p style="font-size:0.9rem; color:var(--text-light); margin-bottom:10px;">Por seguridad, debes registrarte para acceder y usar la aplicación BARRIO.</p>
  <div class="form-group" style="text-align:left;">
  <label>Nombre Completo</label>
  <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="text" id="authNombre" placeholder="Ej: Juan Pérez">
@@ -957,9 +957,9 @@ const App = {
  // ===== MURO COMUNITARIO =====
  renderMuro(container) {
  container.innerHTML = `
- <button class="back-btn" onclick="location.hash='#/'">⬅️ Volver</button>
+ 
  <h2 class="section-title"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:#25D366;vertical-align:middle;margin-right:8px;" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg> Muro Comunitario</h2>
- <div class="card" style="margin-bottom:20px;">
+ <div class="card" style="margin-bottom:10px;">
  <textarea autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" id="muroInput" placeholder="¿Qué quieres compartir con el barrio?" rows="3" style="width:100%; padding:10px; border-radius:8px; border:1px solid #CCC; margin-bottom:10px; font-family:inherit; resize:vertical;"></textarea>
  <button id="btnPostMuro" class="btn btn-secondary btn-sm" style="width:100%;">Publicar</button>
  </div>
@@ -1011,7 +1011,7 @@ const App = {
  // ===== CONTACTO ADMIN =====
  renderContacto(container) {
  container.innerHTML = `
- <button class="back-btn" onclick="location.hash='#/'">⬅️ Volver</button>
+ 
  <h2 class="section-title"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:#25D366;vertical-align:middle;margin-right:8px;" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg> Contactar al Administrador</h2>
  <div class="card fade-in" style="margin-top:20px;">
  <p style="margin-bottom:15px; font-size:0.9rem; color:var(--text-light);">Envía tu mensaje o sugerencia. Te responderemos lo antes posible.</p>
