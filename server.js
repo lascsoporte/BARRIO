@@ -296,9 +296,19 @@ app.post('/api/ping', async (req, res) => {
 app.post('/api/stolen-location', async (req, res) => {
   const { device_id, latitud, longitud } = req.body;
   if (!device_id || !latitud || !longitud) return res.status(400).json({ error: 'Faltan datos' });
-  const user = await queryOne('SELECT id FROM usuarios WHERE device_id = ?', [device_id]);
+  
+  const user = await queryOne('SELECT id, nombre, telefono FROM usuarios WHERE device_id = ?', [device_id]);
   if (user) {
     await runSql('INSERT INTO rastreo_robos (usuario_id, latitud, longitud) VALUES (?,?,?)', [user.id, latitud, longitud]);
+    
+    // Enviar alerta a Telegram en tiempo real
+    const mapLink = `https://www.google.com/maps?q=${latitud},${longitud}`;
+    const alertMsg = `📍 <b>RASTREO EN TIEMPO REAL</b>\n\n` +
+                     `👤 <b>Usuario:</b> ${user.nombre}\n` +
+                     `📱 <b>Teléfono:</b> ${user.telefono}\n` +
+                     `🔗 <a href="${mapLink}">VER UBICACIÓN EN MAPA</a>\n\n` +
+                     `<i>Este teléfono está enviando su posición cada 10 segundos.</i>`;
+    sendTelegramAlert(alertMsg);
   }
   res.json({ message: 'Ok' });
 });
