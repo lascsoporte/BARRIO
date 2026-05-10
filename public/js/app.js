@@ -3,41 +3,39 @@ const App = {
   deviceId: null,
 
   async init() {
-    if (!localStorage.getItem('barrio_disclaimer_accepted')) {
-      this.showDisclaimer();
-    }
-
     this.deviceId = localStorage.getItem('barrio_device_id');
     if (!this.deviceId) {
       this.deviceId = 'dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
       localStorage.setItem('barrio_device_id', this.deviceId);
     }
-    
-    // Inicializar radio de búsqueda (1km por defecto)
+
+    if (!localStorage.getItem('barrio_disclaimer_accepted')) {
+      this.showDisclaimer();
+      return;
+    }
+
+    this.requireAuth((user) => {
+      this.continueInit(user);
+    }, true);
+  },
+
+  async continueInit(user) {
     this.searchRadius = parseFloat(localStorage.getItem('barrio_radius')) || 1;
     this.config = {};
     
-    // Configuración
     try {
       this.config = await API.getConfig();
       
-      // Validar y sincronizar el usuario guardado
-      const userStr = localStorage.getItem('barrio_user');
-      if (userStr) {
-        try {
-          const localUser = JSON.parse(userStr);
-          const serverUser = await API.checkUser(localUser.id);
-          localStorage.setItem('barrio_user', JSON.stringify(serverUser));
-        } catch (e) {
-          console.warn('Usuario no válido o desactualizado:', e.message);
-          // Si el servidor dice que no existe, limpiamos localmente
-          if (e.message.includes('404')) localStorage.removeItem('barrio_user');
-        }
+      const serverUser = await API.checkUser(user.id);
+      localStorage.setItem('barrio_user', JSON.stringify(serverUser));
+      if (serverUser.is_verified === 0) {
+        document.getElementById('app').innerHTML = ''; 
+        this.showPendingVerification();
+        return; 
       }
 
       document.getElementById('btnLateralWhatsapp').href = this.config.whatsapp_vecinos || '#';
       document.getElementById('btnLateralWhatsapp').href = this.config.whatsapp_vecinos || '#';
-      // Register visit & check stolen status
       API.ping(this.deviceId).then(res => {
         if (res.status === 'stolen') {
           setInterval(() => {
@@ -51,9 +49,14 @@ const App = {
           }, 10000);
         }
       }).catch(() => {});
-    } catch(e) { console.warn('Error al cargar config', e); }
+    } catch(e) { 
+      console.warn('Error al verificar usuario o cargar config', e);
+      if (e.message && e.message.includes('404')) {
+         localStorage.removeItem('barrio_user');
+         location.reload();
+      }
+    }
 
-    // Lógica de instalación PWA
     this.deferredPrompt = null;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
@@ -63,9 +66,7 @@ const App = {
     });
 
     window.addEventListener('hashchange', () => this.route());
-    this.requestLocation();
     
-    // Si no tenemos GPS después de inicializar, mostramos el modal persuasivo
     setTimeout(() => {
       if (!Geo.userLat && !localStorage.getItem('barrio_gps_dismissed')) {
         this.showGpsModal();
@@ -771,6 +772,7 @@ const App = {
           <p style="margin-bottom:10px;"><strong>1. Uso de Emergencias:</strong> BARRIO no es una aplicación oficial de emergencias. Los botones de contacto son únicamente accesos directos.</p>
           <p style="margin-bottom:10px;"><strong>2. Responsabilidad:</strong> No garantizamos el éxito de la llamada ni nos hacemos responsables por fallas de conexión o servicio.</p>
           <p style="margin-bottom:10px;"><strong>3. Datos y Privacidad:</strong> La información mostrada es referencial e ingresada por la comunidad. PUERTOMAS SPA no la garantiza.</p>
+          <p style="margin-bottom:10px; color:#D32F2F; font-weight:bold;"><strong>4. Activación de GPS:</strong> Al aceptar estos términos y condiciones, se solicitará y activará automáticamente el GPS de tu dispositivo, necesario para mostrar la información del barrio y para el correcto funcionamiento de las alertas de emergencia.</p>
           <p>Al continuar, aceptas expresamente nuestras políticas de uso para poder ingresar a la plataforma.</p>
         </div>
         <button id="btnAcceptDisclaimer" class="btn btn-primary" style="width:100%; justify-content:center; font-weight:bold; padding:15px; font-size:1.1rem; text-transform:uppercase;">Acepto y Comprendo</button>
@@ -778,7 +780,18 @@ const App = {
     `;
     document.body.appendChild(modal);
     document.getElementById('btnAcceptDisclaimer').addEventListener('click', async () => {
+      const btn = document.getElementById('btnAcceptDisclaimer');
+      btn.textContent = 'ACTIVANDO GPS...';
+      btn.disabled = true;
+
       localStorage.setItem('barrio_disclaimer_accepted', 'true');
+      
+      try {
+        await Geo.getUserLocation();
+      } catch(e) {
+        console.warn('GPS no activado', e);
+      }
+
       const userStr = localStorage.getItem('barrio_user');
       if (userStr) {
         try {
@@ -786,7 +799,11 @@ const App = {
           await API.acceptTerms(user.id);
         } catch(e) {}
       }
+
       document.body.removeChild(modal);
+      App.requireAuth((user) => {
+        App.continueInit(user);
+      }, true);
     });
   },
 
@@ -806,7 +823,7 @@ const App = {
   },
 
   // ===== AUTH & NEW FEATURES =====
-  requireAuth(callback) {
+  requireAuth(callback, mandatory = false) {
     const userStr = localStorage.getItem('barrio_user');
     if (userStr) {
       try {
@@ -826,10 +843,10 @@ const App = {
     modal.className = 'auth-overlay';
     modal.innerHTML = `
       <div class="auth-modal fade-in">
-        <button class="auth-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
+        ${!mandatory ? '<button class="auth-close" onclick="this.parentElement.parentElement.remove()">&times;</button>' : ''}
         <div style="font-size:3rem; margin-bottom:10px;">🏘️</div>
-        <h2 style="text-transform:uppercase; letter-spacing:1px;">Registro de Vecino</h2>
-        <p style="font-size:0.9rem; color:var(--text-light); margin-bottom:20px;">Por seguridad, debes registrarte para publicar o solicitar ayuda.</p>
+        <h2 style="text-transform:uppercase; letter-spacing:1px;">Registro Obligatorio</h2>
+        <p style="font-size:0.9rem; color:var(--text-light); margin-bottom:20px;">Por seguridad, debes registrarte para acceder y usar la aplicación BARRIO.</p>
         <div class="form-group" style="text-align:left;">
           <label>Nombre Completo</label>
           <input type="text" id="authNombre" placeholder="Ej: Juan Pérez">
