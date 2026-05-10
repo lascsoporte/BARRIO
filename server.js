@@ -301,14 +301,20 @@ app.post('/api/stolen-location', async (req, res) => {
   if (user) {
     await runSql('INSERT INTO rastreo_robos (usuario_id, latitud, longitud) VALUES (?,?,?)', [user.id, latitud, longitud]);
     
-    // Enviar alerta a Telegram en tiempo real
     const mapLink = `https://www.google.com/maps?q=${latitud},${longitud}`;
-    const alertMsg = `📍 <b>RASTREO EN TIEMPO REAL</b>\n\n` +
+    const timestamp = new Date().toLocaleTimeString();
+    
+    // 1. Enviar alerta a Telegram
+    const alertMsg = `🆘 <b>TELÉFONO EXTRAVIADO</b> (Movimiento detectado)\n\n` +
                      `👤 <b>Usuario:</b> ${user.nombre}\n` +
                      `📱 <b>Teléfono:</b> ${user.telefono}\n` +
-                     `🔗 <a href="${mapLink}">VER UBICACIÓN EN MAPA</a>\n\n` +
-                     `<i>Este teléfono está enviando su posición cada 10 segundos.</i>`;
+                     `⏰ <b>Hora:</b> ${timestamp}\n` +
+                     `🔗 <a href="${mapLink}">VER UBICACIÓN EN MAPA</a>`;
     sendTelegramAlert(alertMsg);
+
+    // 2. Guardar en el Buzón (mensajes_admin)
+    const dbMsg = `🚨 TELÉFONO EXTRAVIADO: El usuario ${user.nombre} (${user.telefono}) está usando la app. Ubicación: ${mapLink}`;
+    await runSql('INSERT INTO mensajes_admin (usuario_id, mensaje) VALUES (?, ?)', [user.id, dbMsg]);
   }
   res.json({ message: 'Ok' });
 });
