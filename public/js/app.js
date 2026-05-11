@@ -4,11 +4,13 @@ const App = {
  deferredPrompt: null,
 
  async init() {
- // Excepción para el panel de administración
- if (location.hash.startsWith('#/admin')) {
- this.route();
- return;
- }
+  console.log('App: Instando init...');
+  // Excepción para el panel de administración
+  if (location.hash.startsWith('#/admin')) {
+  console.log('App: Detectada ruta admin');
+  this.route();
+  return;
+  }
 
  this.deviceId = localStorage.getItem('barrio_device_id');
  if (!this.deviceId) {
@@ -17,9 +19,11 @@ const App = {
  }
 
  if (!localStorage.getItem('barrio_disclaimer_v2')) {
- this.showDisclaimer();
- return;
+  console.log('App: Disclaimer no aceptado, mostrando...');
+  this.showDisclaimer();
+  return;
  }
+ console.log('App: Disclaimer ya aceptado');
 
  // Sincronizar el estado de verificación con el servidor antes de bloquear
  const userStr = localStorage.getItem('barrio_user');
@@ -104,126 +108,106 @@ const App = {
  }
  },
 
- route() {
- const hash = location.hash || '#/';
- const app = document.getElementById('app');
+  route() {
+    const hash = location.hash || '#/';
+    const app = document.getElementById('app');
 
- // Show lateral buttons only on home page
- const lateralBtns = document.querySelectorAll('.lateral-btn');
- const isHome = (hash === '#/' || hash === '');
- lateralBtns.forEach(b => b.style.display = isHome ? 'flex' : 'none');
+    // Show lateral buttons only on home page
+    const lateralBtns = document.querySelectorAll('.lateral-btn');
+    const isHome = (hash === '#/' || hash === '');
+    lateralBtns.forEach(b => b.style.display = isHome ? 'flex' : 'none');
 
- if (isHome) this.renderHome(app);
- else if (hash.startsWith('#/buscar')) this.renderSearch(app);
- else if (hash.startsWith('#/local/')) this.renderStore(app);
- else if (hash === '#/compartir') this.renderShare(app);
- else if (hash === '#/mascotas') this.renderMascotas(app);
- else if (hash === '#/legal') this.renderLegal(app);
- else if (hash === '#/emergencia') this.renderEmergencia(app);
- else if (hash === '#/muro') this.renderMuro(app);
- else if (hash === '#/contacto') this.renderContacto(app);
- else if (hash.startsWith('#/admin')) Admin.route(app, hash);
- else this.renderHome(app);
- },
+    if (isHome) this.renderHome(app);
+    else if (hash.startsWith('#/buscar')) this.renderSearch(app);
+    else if (hash.startsWith('#/local/')) this.renderStore(app);
+    else if (hash === '#/compartir') this.renderShare(app);
+    else if (hash === '#/mascotas' || hash === '#/reportar') this.renderReportar(app);
+    else if (hash === '#/legal') this.renderLegal(app);
+    else if (hash === '#/emergencia') this.renderEmergencia(app);
+    else if (hash === '#/muro') this.renderMuro(app);
+    else if (hash === '#/contacto') this.renderContacto(app);
+    else if (hash.startsWith('#/admin')) Admin.route(app, hash);
+    else this.renderHome(app);
+  },
 
  // ===== HOME =====
- renderHome(container) {
- const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || location.search.includes('demo=1');
+  renderHome(container) {
+    container.innerHTML = `
+    <div class="fade-in">
+      <header class="app-header">
+        <h1 style="margin:0; letter-spacing:2px;">BARRIO</h1>
+        <span class="city-subtitle">PUERTO MONTT</span>
+        <div style="font-size:1.2rem; margin-top:5px;">🇨🇱</div>
+      </header>
 
- container.innerHTML = `
- <div class="fade-in">
- <div id="installBanner" style="display:${this.deferredPrompt ? 'block' : 'none'}; background:var(--primary); color:white; padding:12px; text-align:center; font-size:0.85rem; font-weight:700; position:relative;">
- 📲 ¡Instala BARRIO en tu celular! 
- <button onclick="App.installPWA()" style="background:white; color:var(--primary); border:none; padding:4px 12px; border-radius:12px; margin-left:10px; font-weight:900; cursor:pointer;">Instalar</button>
- <button onclick="document.getElementById('installBanner').style.display='none'" style="background:transparent; color:white; border:none; margin-left:10px; font-size:1.2rem; cursor:pointer; vertical-align:middle;">&times;</button>
- </div>
- <header class="app-header">
- <h1 style="margin-top:0;">BARRIO</h1>
- <span class="city-subtitle">PUERTO MONTT</span>
- <div style="font-size:1.8rem; margin: 5px 0 15px;">🇨🇱</div>
+      <div id="homeMap" style="height: 220px; width: 100%; border-radius: 16px; margin: 15px 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
 
+      <div class="qa-grid">
+        <div class="qa-item" style="background: #D32F2F; color:white;" onclick="App.showEmergencyMenu()">
+          <div class="qa-icon">📞</div>
+          <div class="qa-text" style="font-weight:900;">EMERGENCIA</div>
+        </div>
+        <div class="qa-item" style="background: #E65100; color:white;" onclick="location.hash='#/reportar'">
+          <div class="qa-icon">🚨</div>
+          <div class="qa-text" style="font-weight:900;">REPORTAR</div>
+        </div>
+        <div class="qa-item" style="background: #1976D2; color:white;" onclick="App.showSearchModal()">
+          <div class="qa-icon">🛒</div>
+          <div class="qa-text" style="font-weight:900;">BUSCAR</div>
+        </div>
+        <div class="qa-item" style="background: #388E3C; color:white;" onclick="location.hash='#/muro'">
+          <div class="qa-icon">💬</div>
+          <div class="qa-text" style="font-weight:900;">EL MURO</div>
+        </div>
+      </div>
 
+      <div style="margin-top:20px; text-align:center;">
+        <p style="font-size:0.8rem; color:var(--text-light); margin-bottom:10px;">📍 <b>Georreferencia activa</b> para seguridad ciudadana.</p>
+      </div>
 
- </header>
- <div class="search-container" style="text-align:center;">
- <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="text" id="searchInput" placeholder="¿Qué buscas?"
- style="text-align:center; padding-left:15px; width:100%;">
- </div>
- 
- <div class="btn-group">
- <button class="btn btn-primary" id="btnSearchProducts" style="justify-content:center;">
- BUSCAR
- </button>
- <button onclick="App.requireAuth(() => location.hash='#/emergencia')" class="btn btn-emergency" style="justify-content:center;">
- EMERGENCIA
- </button>
- </div>
+      ${this.footerHtml()}
+    </div>
+    <div id="emergencyMenu" class="bottom-sheet">
+      <div class="sheet-content">
+        <div class="sheet-header">
+          <h3>TELÉFONOS DE EMERGENCIA</h3>
+          <button onclick="App.hideEmergencyMenu()">&times;</button>
+        </div>
+        <div class="emergency-list">
+          <a href="tel:133" class="emg-btn" style="background:#006633;">👮 CARABINEROS (133)</a>
+          <a href="tel:132" class="emg-btn" style="background:#D32F2F;">🔥 BOMBEROS (132)</a>
+          <a href="tel:131" class="emg-btn" style="background:#1976D2;">🚑 SAMU (131)</a>
+          <a href="tel:134" class="emg-btn" style="background:#0D47A1;">🔍 PDI (134)</a>
+          <a href="tel:1529" class="emg-btn" style="background:#F57C00;">🛡️ SEGURIDAD PM (1529)</a>
+        </div>
+      </div>
+    </div>
+    `;
 
- ${isMobile ? `
- <div class="qa-grid">
- <div class="qa-item qa-mascotas" onclick="location.hash='#/mascotas'">
- <div class="qa-icon" style="display:flex; flex-direction:row; gap:2px; font-size:1.2rem;">🐶🐱</div>
- <div class="qa-text">Mascotas</div>
- </div>
- <div class="qa-item qa-admin" onclick="location.hash='#/contacto'">
- <div class="qa-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg></div>
- <div class="qa-text">Admin</div>
- </div>
- <div class="qa-item qa-compartir" onclick="location.hash='#/compartir'">
- <div class="qa-icon">📲</div>
- <div class="qa-text">Compartir App</div>
- </div>
- <div class="qa-item qa-vecinos" onclick="location.hash='#/muro'">
- <div class="qa-icon" style="color:#25D366; display:flex; align-items:center; justify-content:center;"><svg viewBox="0 0 24 24" style="width:28px;height:28px;fill:currentColor;" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg></div>
- <div class="qa-text">Muro</div>
- </div>
- </div>
- ` : `
- <div class="btn-group" style="margin-top:0;">
- <button class="btn btn-sm" style="background:#4A90E2; color:white;" onclick="location.hash='#/compartir'">
- <span class="btn-icon">📲</span> Compartir App
- </button>
- <button onclick="location.hash='#/contacto'" class="btn btn-whatsapp btn-sm">
- <svg class="whatsapp-logo-large" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
- Contactar Administrador
- </button>
- </div>
- `}
- ${!Geo.userLat ? '<p style="text-align:center;color:var(--text-light);font-size:0.85rem;margin-top:12px;">📍 Activa tu ubicación para ver negocios cercanos</p>' : `<p style="text-align:center;color:var(--success);font-size:0.85rem;margin-top:12px;">📍 Ubicación activada - Mostrando negocios a ${this.searchRadius} km</p>`}
- ${this.radiusSelectorHtml()}
- ${this.footerHtml()}
- </div>
- `;
- const input = document.getElementById('searchInput');
- const doSearch = async () => {
- const q = input.value.trim();
- if (!q) return;
- 
- const btn = document.getElementById('btnSearchProducts');
- if (!Geo.userLat) {
-   const origText = btn.innerHTML;
-   btn.innerHTML = '📍 UBICANDO...';
-   btn.style.opacity = '0.7';
-   await Geo.getUserLocation().catch(() => {});
-   btn.innerHTML = origText;
-   btn.style.opacity = '1';
- }
- 
-    // Si el teléfono es extraviado, forzamos un reporte al buscar (Consulta directa al servidor)
-    API.ping(this.deviceId).then(res => {
-      if (res.status === 'stolen') {
-        API.logStolenLocation({ 
-          device_id: this.deviceId, 
-          latitud: Geo.userLat, 
-          longitud: Geo.userLng 
-        }).catch(() => {});
-      }
-    }).catch(() => {});
+    // Initialize Mini Map
+    setTimeout(() => {
+      try {
+        const map = L.map('homeMap', { zoomControl: false }).setView([Geo.userLat || -41.4693, Geo.userLng || -72.9423], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        API.getReportes().then(reports => {
+          reports.forEach(r => {
+            if (r.latitud && r.longitud) {
+              const icons = { 'robo': '🚨', 'incendio': '🔥', 'accidente': '🚗', 'sospechoso': '👤', 'mascota': '🐶', 'otros': '📍' };
+              L.marker([r.latitud, r.longitud], {
+                icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px; background:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2); border:2px solid var(--primary);">${icons[r.tipo_reporte] || '📍'}</div>`})
+              }).addTo(map);
+            }
+          });
+        });
+      } catch(e) {}
+    }, 500);
+  },
 
-    location.hash = `#/buscar?q=${encodeURIComponent(q)}`;
-  };
-  input.addEventListener('keypress', (e) => { if (e.key === 'Enter') doSearch(); });
-  document.getElementById('btnSearchProducts').addEventListener('click', doSearch);
+  showEmergencyMenu() { document.getElementById('emergencyMenu').classList.add('active'); },
+  hideEmergencyMenu() { document.getElementById('emergencyMenu').classList.remove('active'); },
+  showSearchModal() { 
+    const q = prompt("¿Qué buscas hoy?");
+    if (q) location.hash = `#/buscar?q=${encodeURIComponent(q)}`;
   },
 
  // ===== PRODUCT SEARCH =====
@@ -290,157 +274,114 @@ const App = {
  },
 
  // ===== MASCOTAS PERDIDAS =====
- async renderMascotas(container) {
+ async renderReportar(container) {
  container.innerHTML = `
  
- <h2 class="section-title">🐶🐱 Mascotas Perdidas</h2>
+  <h2 class="section-title">🚨 Reportar Incidente</h2>
  
- <div id="mascotasMap" style="height: 350px; width: 100%; border-radius: 12px; margin-bottom: 20px; z-index:1; border:2px solid #E65100;"></div>
+  <div id="reportMap" style="height: 250px; width: 100%; border-radius: 12px; margin-bottom: 20px; z-index:1; border:2px solid var(--primary);"></div>
 
- <div class="card" style="margin-bottom:20px; background: #FFF3E0; border: 1px solid #FFCC80;">
- <h3 style="color:#E65100; margin-bottom:10px;">Reportar Mascota Perdida</h3>
- <p style="font-size:0.85rem; color:#666; margin-bottom:10px;">Haz clic en el mapa de arriba para fijar el punto exacto donde se perdió. <b>La publicación dura 30 días en la plataforma, avísanos si encontraste tu mascota para eliminar tu publicación.</b></p>
- <select id="mascotaTipo" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #CCC; background:white;">
- <option value="">Tipo de mascota...</option>
- <option value="Perro">Perro</option>
- <option value="Gato">Gato</option>
- <option value="Ave">Ave</option>
- <option value="Otro">Otro</option>
- </select>
- <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="text" id="mascotaNombreAnimal" placeholder="Nombre de la mascota (opcional)" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #CCC;">
- <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="text" id="mascotaCaracteristicas" placeholder="Características (ej. Color café, collar rojo)" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #CCC;">
- <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="text" id="mascotaUbicacion" placeholder="📍 Ubicación (Pincha en el mapa abajo)" readonly style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #CCC; background:#E5E7EB; cursor:not-allowed; font-weight:bold; color:#444;">
- <textarea autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" id="mascotaComentarios" placeholder="Comentarios adicionales" rows="3" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #CCC; font-family:inherit; resize:vertical;"></textarea>
- 
- <label style="display:block; margin-bottom:5px; font-weight:bold; font-size:0.85rem;">Foto de la mascota (opcional):</label>
- <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="file" id="mascotaFoto" accept="image/*" style="margin-bottom:10px; width:100%;">
- <button id="btnSubmitMascota" class="btn btn-primary btn-sm">Publicar Aviso</button>
- </div>
- <div id="mascotasList">
- <div class="loading"><div class="spinner"></div><p>Cargando avisos...</p></div>
- </div>
- `;
+  <div class="card" style="margin-bottom:20px; background: #FFF3E0; border: 1px solid #FFCC80;">
+    <p style="font-size:0.85rem; color:#666; margin-bottom:15px;">Fija el punto en el mapa y selecciona el tipo de reporte. <b>Tu identidad pública será protegida con tu Nickname.</b></p>
+    
+    <div class="report-grid">
+      <button class="report-opt" data-tipo="robo">🚨 Robo</button>
+      <button class="report-opt" data-tipo="accidente">🚗 Choque</button>
+      <button class="report-opt" data-tipo="incendio">🔥 Incendio</button>
+      <button class="report-opt" data-tipo="sospechoso">👤 Sospechoso</button>
+      <button class="report-opt" data-tipo="mascota">🐶 Mascota</button>
+      <button class="report-opt" data-tipo="otros">📍 Otros</button>
+    </div>
 
- let map = null;
- let markersLayer = null;
- let newPetMarker = null;
- let selectedLat = null;
- let selectedLng = null;
+    <input type="text" id="reportUbicacion" placeholder="📍 Ubicación (Pincha en el mapa)" readonly style="width:100%; padding:10px; margin:10px 0; border-radius:8px; border:1px solid #CCC; background:#EEE;">
+    <textarea id="reportDetalles" placeholder="Detalles adicionales (opcional)" rows="3" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #CCC;"></textarea>
+    
+    <label style="display:block; margin-bottom:5px; font-weight:bold; font-size:0.85rem;">Duración en el mapa:</label>
+    <select id="reportDuracion" style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #CCC;">
+      <option value="1">1 hora</option>
+      <option value="4">4 horas</option>
+      <option value="12">12 horas</option>
+      <option value="24" selected>24 horas</option>
+      <option value="168">7 días</option>
+      <option value="720">30 días (Mascotas)</option>
+    </select>
 
- // Initialize Map
- setTimeout(() => {
- try {
- const centerLat = Geo.userLat || -41.4693; // Puerto Montt
- const centerLng = Geo.userLng || -72.9423;
- map = L.map('mascotasMap').setView([centerLat, centerLng], 14);
- L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
- attribution: '&copy; OpenStreetMap'
- }).addTo(map);
- markersLayer = L.layerGroup().addTo(map);
+    <button id="btnSubmitReporte" class="btn btn-primary" style="width:100%;">Publicar Reporte</button>
+  </div>
+  <div id="reportList"></div>
+  `;
 
- // Click on map to set location
- map.on('click', function(e) {
- selectedLat = e.latlng.lat;
- selectedLng = e.latlng.lng;
- if (newPetMarker) map.removeLayer(newPetMarker);
- newPetMarker = L.marker([selectedLat, selectedLng], {
- icon: L.divIcon({className: 'custom-pin', html: '<div style="font-size:24px;">📍</div>', iconSize: [24,24]})
- }).addTo(map);
- document.getElementById('mascotaUbicacion').value = "Ubicación fijada en el mapa";
- App.toast("📍 Punto fijado para el reporte");
- });
- } catch(e) { console.error("Error al cargar mapa", e); }
- }, 500);
+    let map = null;
+    let selectedLat = null, selectedLng = null;
+    let currentMarker = null;
 
- // No GPS button listener anymore
+    setTimeout(() => {
+      try {
+        map = L.map('reportMap').setView([Geo.userLat || -41.4693, Geo.userLng || -72.9423], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        map.on('click', (e) => {
+          selectedLat = e.latlng.lat;
+          selectedLng = e.latlng.lng;
+          if (currentMarker) map.removeLayer(currentMarker);
+          currentMarker = L.marker([selectedLat, selectedLng]).addTo(map);
+          document.getElementById('reportUbicacion').value = "📍 Punto fijado";
+        });
+      } catch(e) {}
+    }, 500);
 
- document.getElementById('btnSubmitMascota').addEventListener('click', async () => {
- const tipo_animal = document.getElementById('mascotaTipo').value;
- const nombre_mascota = document.getElementById('mascotaNombreAnimal').value.trim();
- const caracteristicas = document.getElementById('mascotaCaracteristicas').value.trim();
- const comentarios = document.getElementById('mascotaComentarios').value.trim();
- const ubicacion = document.getElementById('mascotaUbicacion').value.trim();
- const fotoInput = document.getElementById('mascotaFoto');
+    let selectedTipo = 'otros';
+    document.querySelectorAll('.report-opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.report-opt').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedTipo = btn.dataset.tipo;
+      });
+    });
 
- if (!ubicacion) return App.toast('Lugar de extravío es requerido');
+    document.getElementById('btnSubmitReporte').addEventListener('click', () => {
+      const detalles = document.getElementById('reportDetalles').value.trim();
+      const duracion = document.getElementById('reportDuracion').value;
+      if (!selectedLat) return App.toast("Pincha el mapa primero");
 
- this.requireAuth(async (user) => {
- const btn = document.getElementById('btnSubmitMascota');
- btn.disabled = true;
- btn.textContent = 'Publicando...';
+      this.requireAuth(async (user) => {
+        try {
+          await API.createReporte({
+            usuario_id: user.id,
+            nombre_contacto: user.nombre, telefono: user.telefono,
+            tipo_reporte: selectedTipo, detalles, latitud: selectedLat, longitud: selectedLng,
+            duracion_horas: duracion
+          });
+          App.toast("Reporte publicado con éxito");
+          location.hash = '#/';
+        } catch(e) { App.toast("Error al publicar"); }
+      });
+    });
 
- let foto_base64 = '';
- if (fotoInput.files && fotoInput.files[0]) {
- const file = fotoInput.files[0];
- foto_base64 = await new Promise((resolve) => {
- const reader = new FileReader();
- reader.onload = (e) => resolve(e.target.result);
- reader.readAsDataURL(file);
- });
- }
+    // List existing reports
+    try {
+      const reports = await API.getReportes();
+      const listEl = document.getElementById('reportList');
+      if (reports.length === 0) {
+        listEl.innerHTML = '<p style="text-align:center; padding:20px; color:#999;">No hay reportes activos.</p>';
+      } else {
+        listEl.innerHTML = reports.map(r => `
+          <div class="card fade-in" style="margin-bottom:10px; border-left:4px solid var(--primary);">
+            <div style="font-weight:bold; font-size:1.1rem; margin-bottom:5px;">
+              ${r.tipo_reporte.toUpperCase()} - ${new Date(r.created_at).toLocaleTimeString('es-CL')}
+            </div>
+            <p style="font-size:0.9rem; margin:0;">${r.detalles || 'Sin detalles adicionales.'}</p>
+            <div style="font-size:0.75rem; color:#999; margin-top:10px; text-align:right;">
+              Reportado por: ${r.autor_nick || 'Vecino Verificado'}
+            </div>
+          </div>
+        `).join('');
+      }
+    } catch(e) {}
 
- try {
- await API.createMascota({ 
- nombre_contacto: user.nombre, telefono: user.telefono, ubicacion_extravio: ubicacion, 
- foto_base64, tipo_animal, caracteristicas, nombre_mascota, comentarios,
- latitud: selectedLat, longitud: selectedLng
- });
- App.toast('Aviso publicado');
- this.renderMascotas(container); // reload
- } catch (e) {
- btn.disabled = false;
- btn.textContent = 'Publicar Aviso';
- App.toast('Error al publicar aviso');
- }
- });
- });
-
- try {
- const mascotas = await API.getMascotas();
- const listEl = document.getElementById('mascotasList');
- 
- // Plot on map
- setTimeout(() => {
- if (map && markersLayer) {
- mascotas.forEach(m => {
- if (m.latitud && m.longitud) {
- const iconEmoji = m.tipo_animal === 'Gato' ? '🐱' : (m.tipo_animal === 'Perro' ? '🐶' : '🐾');
- const marker = L.marker([m.latitud, m.longitud], {
- icon: L.divIcon({className: 'pet-pin', html: `<div style="font-size:24px;background:white;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(0,0,0,0.3); border:2px solid #E65100;">${iconEmoji}</div>`, iconSize: [34,34], iconAnchor: [17,17]})
- }).addTo(markersLayer);
- marker.bindPopup(`<b>${m.nombre_mascota || 'Mascota perdida'}</b><br>${m.ubicacion_extravio}<br><a href="tel:${m.telefono}" style="display:inline-block;margin-top:5px;padding:4px 8px;background:var(--primary);color:white;border-radius:8px;text-decoration:none;">📞 Llamar</a>`);
- }
- });
- }
- }, 800);
-
- if (mascotas.length === 0) {
- listEl.innerHTML = `<div class="empty-state"><p>No hay avisos de mascotas perdidas.</p></div>`;
- } else {
- listEl.innerHTML = mascotas.map(m => `
- <div class="card fade-in" style="margin-bottom:15px; border-left: 4px solid #E65100;">
- ${m.foto_base64 ? `<img src="${m.foto_base64}" alt="Mascota" style="width:100%; max-height:250px; object-fit:cover; border-radius:8px; margin-bottom:10px;">` : ''}
- <div style="font-weight:bold; font-size:1.1rem; margin-bottom:4px;">${m.tipo_animal === 'Gato' ? '🐱' : (m.tipo_animal === 'Perro' ? '🐶' : '🐾')} ${m.nombre_mascota ? `Se busca a ${m.nombre_mascota}` : `Se busca ${m.tipo_animal || 'mascota'}`}</div>
- ${m.caracteristicas ? `<div style="font-size:0.9rem; margin-bottom:4px;"><strong>Características:</strong> ${m.caracteristicas}</div>` : ''}
- <div style="font-size:0.9rem; margin-bottom:4px;">📍 <strong>Se perdió en:</strong> ${m.ubicacion_extravio || 'No especificado'}</div>
- ${m.comentarios ? `<div style="font-size:0.85rem; color:var(--text-light); margin-bottom:8px; font-style:italic;">"${m.comentarios}"</div>` : ''}
- <div style="background:#F5F5F5; padding:8px; border-radius:8px; font-size:0.9rem;">
- <strong>Contacto:</strong> ${m.nombre_contacto}<br>
- <strong>Teléfono:</strong> <a href="tel:${m.telefono.replace(/\s+/g,'')}">${m.telefono}</a>
- </div>
- <div style="font-size:0.75rem; color:#999; margin-top:8px; text-align:right;">
- Publicado: ${new Date(m.created_at).toLocaleDateString('es-CL')}
- </div>
- </div>
- `).join('');
- }
- } catch (e) {
- document.getElementById('mascotasList').innerHTML = `<div class="empty-state"><p>Error al cargar avisos.</p></div>`;
- }
- const f = document.createElement('div');
- f.innerHTML = this.footerHtml();
- container.appendChild(f);
- },
+    const f = document.createElement('div');
+    f.innerHTML = this.footerHtml();
+    container.appendChild(f);
+  },
 
 
  footerHtml() {
@@ -871,73 +812,93 @@ const App = {
  },
 
  // ===== AUTH & NEW FEATURES =====
- requireAuth(callback, mandatory = false) {
- const userStr = localStorage.getItem('barrio_user');
- if (userStr) {
- try {
- const user = JSON.parse(userStr);
- if (user && user.id) {
- // Solo bloquear si is_verified es explícitamente 0
- if (user.is_verified === 0) {
- this.showPendingVerification();
- return;
- }
- return callback(user);
- }
- } catch(e) {}
- }
- 
- const modal = document.createElement('div');
- modal.className = 'auth-overlay';
- modal.innerHTML = `
- <div class="auth-modal fade-in">
- ${!mandatory ? '<button class="auth-close" onclick="this.parentElement.parentElement.remove()">&times;</button>' : ''}
- <div style="font-size:3rem; margin-bottom:10px;">🏘️</div>
- <h2 style="text-transform:uppercase; letter-spacing:1px;">Registro Obligatorio</h2>
- <p style="font-size:0.9rem; color:var(--text-light); margin-bottom:10px;">Por seguridad, debes registrarte para acceder y usar la aplicación BARRIO.</p>
- <div class="form-group" style="text-align:left;">
- <label>Nombre Completo</label>
- <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="text" id="authNombre" placeholder="Ej: Juan Pérez">
- </div>
- <div class="form-group" style="text-align:left;">
- <label>Teléfono de Contacto</label>
- <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="tel" id="authTelefono" placeholder="Ej: +56912345678">
- </div>
- <div class="form-group" style="text-align:left;">
- <label>Poblacion, Sector , Ciudad</label>
- <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="text" id="authDireccion" placeholder="Ej: Mirasol, Puerto Montt">
- </div>
- <button id="authSubmit" class="btn btn-primary" style="margin-top:10px; width:100%; font-weight:900;">REGISTRARME AHORA</button>
- <p style="font-size:0.7rem; color:var(--text-light); margin-top:15px;">Tus datos son privados y solo se usan para alertas de seguridad.</p>
- </div>
- `;
- document.body.appendChild(modal);
+  requireAuth(callback, mandatory = false) {
+    const userStr = localStorage.getItem('barrio_user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user && user.id) {
+          if (user.is_verified === 0) {
+            this.showPendingVerification();
+            return;
+          }
+          return callback(user);
+        }
+      } catch(e) {}
+    }
+    
+    const modal = document.createElement('div');
+    modal.className = 'auth-overlay';
+    modal.innerHTML = `
+    <div class="auth-modal fade-in">
+      ${!mandatory ? '<button class="auth-close" onclick="this.parentElement.parentElement.remove()">&times;</button>' : ''}
+      <div style="font-size:3rem; margin-bottom:10px;">🏘️</div>
+      <h2 style="text-transform:uppercase; letter-spacing:1px;">Registro de Vecino</h2>
+      <p style="font-size:0.9rem; color:var(--text-light); margin-bottom:10px;">Únete a la red de seguridad y comercio de tu barrio.</p>
+      <div class="form-grid-auth">
+        <div class="form-group">
+          <label>Nombre Real</label>
+          <input type="text" id="authNombre" placeholder="Ej: Juan Pérez">
+        </div>
+        <div class="form-group">
+          <label>Nickname (Público)</label>
+          <input type="text" id="authNickname" placeholder="Ej: VecinoMirasol">
+        </div>
+        <div class="form-group">
+          <label>Teléfono</label>
+          <input type="tel" id="authTelefono" placeholder="+569...">
+        </div>
+        <div class="form-group">
+          <label>Correo Electrónico</label>
+          <input type="email" id="authEmail" placeholder="Para recibir tu PIN">
+        </div>
+        <div class="form-group">
+          <label>PIN Seguridad (4 dígitos)</label>
+          <input type="password" id="authPin" maxlength="4" placeholder="****">
+        </div>
+        <div class="form-group">
+          <label>Población/Sector</label>
+          <input type="text" id="authDireccion" placeholder="Mirasol, PM">
+        </div>
+      </div>
+      <button id="authSubmit" class="btn btn-primary" style="margin-top:10px; width:100%; font-weight:900;">REGISTRARME AHORA</button>
+      <p style="font-size:0.7rem; color:var(--text-light); margin-top:15px;">Tus datos reales son privados. El PIN se enviará a tu correo.</p>
+    </div>
+    `;
+    document.body.appendChild(modal);
 
- document.getElementById('authSubmit').addEventListener('click', async () => {
- const nombre = document.getElementById('authNombre').value.trim();
- const telefono = document.getElementById('authTelefono').value.trim();
- const direccion = document.getElementById('authDireccion').value.trim();
+    document.getElementById('authSubmit').addEventListener('click', async () => {
+      const nombre = document.getElementById('authNombre').value.trim();
+      const nickname = document.getElementById('authNickname').value.trim();
+      const telefono = document.getElementById('authTelefono').value.trim();
+      const email = document.getElementById('authEmail').value.trim();
+      const pin = document.getElementById('authPin').value.trim();
+      const direccion = document.getElementById('authDireccion').value.trim();
 
- if (!nombre || !telefono || !direccion) return this.toast('Todos los campos son obligatorios');
+      if (!nombre || !telefono || !nickname || !email || !pin) return this.toast('Completa todos los campos');
+      if (pin.length !== 4) return this.toast('El PIN debe ser de 4 dígitos');
 
- const btn = document.getElementById('authSubmit');
- btn.disabled = true;
- btn.textContent = 'Registrando...';
+      const btn = document.getElementById('authSubmit');
+      btn.disabled = true;
+      btn.textContent = 'Registrando...';
 
- try {
- const termsAccepted = localStorage.getItem('barrio_disclaimer_v2') === 'true';
- const res = await API.registerUser({ nombre, telefono, direccion, device_id: this.deviceId, terms_accepted: termsAccepted });
- localStorage.setItem('barrio_user', JSON.stringify(res.user));
- this.toast('¡Registro enviado!');
- modal.remove();
- this.showPendingVerification();
- } catch (err) {
- btn.disabled = false;
- btn.textContent = 'Continuar';
- this.toast(err.message || 'Error al registrar');
- }
- });
- },
+      try {
+        const termsAccepted = localStorage.getItem('barrio_disclaimer_v2') === 'true';
+        const res = await API.registerUser({ 
+          nombre, nickname, telefono, email, pin_seguridad: pin, 
+          direccion, device_id: this.deviceId, terms_accepted: termsAccepted 
+        });
+        localStorage.setItem('barrio_user', JSON.stringify(res.user));
+        this.toast('¡Registro enviado! Revisa tu correo por tu PIN.');
+        modal.remove();
+        this.showPendingVerification();
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Registrarme';
+        this.toast(err.message || 'Error al registrar');
+      }
+    });
+  },
 
  showPendingVerification() {
  const modal = document.createElement('div');
@@ -1154,4 +1115,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
   if (banner) banner.style.display = 'block';
 });
 
-document.addEventListener('DOMContentLoaded', () => App.init());
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => App.init());
+} else {
+  App.init();
+}

@@ -2,42 +2,51 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const https = require('https');
-const { initDatabase, cleanupMascotas, ...dbHelper } = require('./database');
+const { initDatabase, cleanupMascotas, cleanupReportes, isUsingMysql, ...dbHelper } = require('./database');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-let ADMIN_PASSWORDS = ['barrio2025', 'admin2025', 'seguridad2025']; // Triple seguridad
-const DEFAULT_PASSWORDS = ['barrio2025', 'admin2025', 'seguridad2025']; // Claves por defecto para reset
-const MASTER_RESET_KEY = 'BARRIO-RESET-2026-PUERTOMAS'; // Clave maestra para reseteo de emergencia
+let ADMIN_PASSWORDS = ['barrio2025', 'admin2025', 'seguridad2025'];
+const DEFAULT_PASSWORDS = ['barrio2025', 'admin2025', 'seguridad2025'];
+const MASTER_RESET_KEY = 'BARRIO-RESET-2026-PUERTOMAS';
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Configuración Telegram (Obtenida del usuario)
 let TELEGRAM_TOKEN = '8788499800:AAF0Lcc7HbVJcB-DB6dxFpxaksixNxngqds'; 
 let TELEGRAM_CHAT_ID = '2007857065'; 
 
 function sendTelegramAlert(message) {
-  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.log('Telegram no configurado:', message);
-    return;
-  }
+  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return;
   const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
   const data = JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message, parse_mode: 'HTML' });
-  const options = {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Content-Length': data.length }
-  };
-  const req = https.request(url, options, (res) => {
-    res.on('data', (d) => { console.log('Telegram API Response:', d.toString()); });
-  });
-  req.on('error', (error) => { console.error('Error Telegram:', error); });
+  const options = { method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': data.length } };
+  const req = https.request(url, options);
+  req.on('error', (e) => console.error('Telegram Error:', e));
   req.write(data);
   req.end();
 }
 
-// --- Helpers ---
+const mailTransporter = nodemailer.createTransport({
+  host: 'mail.puertomas.cl', port: 465, secure: true,
+  auth: { user: 'contacto@puertomas.cl', pass: 'TU_PASSWORD_AQUI' }
+});
+
+function sendEmailPin(to, nickname, pin) {
+  const mailOptions = {
+    from: '"BARRIO Seguridad" <no-reply@puertomas.cl>', to,
+    subject: 'Tu PIN de Seguridad - BARRIO',
+    html: `<h2>Hola ${nickname}!</h2><p>Tu PIN es: <b>${pin}</b></p>`
+  };
+  mailTransporter.sendMail(mailOptions).catch(e => console.error('Mail Error:', e));
+}
+
+async function queryAll(sql, params = []) { return await dbHelper.queryAll(sql, params); }
+async function queryOne(sql, params = []) { return await dbHelper.queryOne(sql, params); }
+async function runSql(sql, params = []) { return await dbHelper.runSql(sql, params); }
+
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -47,30 +56,11 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
 }
 
 function isLocalOpen(ha, hc, dias) {
-  const now = new Date();
-  const day = now.getDay();
-  const ct = now.toTimeString().slice(0, 5);
-  let od;
-  if (dias === 'lun-dom') od = [0,1,2,3,4,5,6];
-  else if (dias === 'lun-vie') od = [1,2,3,4,5];
-  else od = [1,2,3,4,5,6];
-  if (!od.includes(day)) return false;
-  return ct >= ha && ct <= hc;
+  const now = new Date(); const day = now.getDay(); const ct = now.toTimeString().slice(0, 5);
+  let od = (dias === 'lun-dom') ? [0,1,2,3,4,5,6] : (dias === 'lun-vie' ? [1,2,3,4,5] : [1,2,3,4,5,6]);
+  return od.includes(day) && ct >= ha && ct <= hc;
 }
 
-async function queryAll(sql, params = []) {
-  return await dbHelper.queryAll(sql, params);
-}
-
-async function queryOne(sql, params = []) {
-  return await dbHelper.queryOne(sql, params);
-}
-
-async function runSql(sql, params = []) {
-  return await dbHelper.runSql(sql, params);
-}
-
-// --- Auth ---
 const adminTokens = new Set();
 function authMw(req, res, next) {
   const t = req.headers.authorization?.replace('Bearer ', '');
@@ -78,769 +68,340 @@ function authMw(req, res, next) {
   next();
 }
 
-// ========== PUBLIC API ==========
-
+// PUBLIC API
 app.get('/api/productos/buscar', async (req, res) => {
   const { q, lat, lng, radio = 1 } = req.query;
-  if (!q) return res.status(400).json({ error: 'Parámetro q requerido' });
-
-  let rows = await queryAll(`
-    SELECT p.id, p.nombre, p.marca, p.precio, p.en_stock, p.unidad, p.local_id,
-           l.nombre as local_nombre, l.direccion, l.horario_apertura, l.horario_cierre,
-           l.dias_atencion, l.acepta_efectivo, l.acepta_tarjeta, l.latitud, l.longitud
-    FROM productos p JOIN locales l ON p.local_id = l.id
-    WHERE LOWER(p.nombre) LIKE LOWER(?)
-    ORDER BY p.precio ASC
-  `, [`%${q}%`]);
-
-  // Add ratings
-  for (let r of rows) {
-    const rating = await queryOne('SELECT COALESCE(AVG(estrellas),0) as avg, COUNT(*) as cnt FROM calificaciones WHERE local_id = ?', [r.local_id]);
-    r.calificacion_promedio = Math.round((rating?.avg || 0) * 10) / 10;
-    r.total_calificaciones = rating?.cnt || 0;
-  }
-
+  let rows = await queryAll(`SELECT p.*, l.nombre as local_nombre, l.direccion, l.horario_apertura, l.horario_cierre, l.dias_atencion, l.latitud, l.longitud FROM productos p JOIN locales l ON p.local_id = l.id WHERE LOWER(p.nombre) LIKE LOWER(?)`, [`%${q}%`]);
   if (lat && lng) {
-    const uLat = parseFloat(lat), uLng = parseFloat(lng);
-    const radiusKm = parseFloat(radio || 1);
-    
-    rows = rows.map(r => ({ 
-      ...r, 
-      distancia: Math.round(haversineDistance(uLat, uLng, r.latitud, r.longitud) * 1000) 
-    })).filter(r => r.distancia <= radiusKm * 1000);
+    rows = rows.map(r => ({ ...r, distancia: Math.round(haversineDistance(parseFloat(lat), parseFloat(lng), r.latitud, r.longitud) * 1000) }))
+               .filter(r => r.distancia <= parseFloat(radio) * 1000);
   }
-
-  rows = rows.map(r => ({ ...r, abierto: isLocalOpen(r.horario_apertura, r.horario_cierre, r.dias_atencion) }));
-  res.json(rows);
+  res.json(rows.map(r => ({ ...r, abierto: isLocalOpen(r.horario_apertura, r.horario_cierre, r.dias_atencion) })));
 });
 
 app.get('/api/locales/:id', async (req, res) => {
-  const local = await queryOne('SELECT * FROM locales WHERE id = ?', [req.params.id]);
-  if (!local) return res.status(404).json({ error: 'No encontrado' });
-
-  const rating = await queryOne('SELECT COALESCE(AVG(estrellas),0) as avg, COUNT(*) as cnt FROM calificaciones WHERE local_id = ?', [local.id]);
-  local.calificacion_promedio = Math.round((rating?.avg || 0) * 10) / 10;
-  local.total_calificaciones = rating?.cnt || 0;
-  local.productos = await queryAll('SELECT * FROM productos WHERE local_id = ? ORDER BY nombre', [local.id]);
-  local.abierto = isLocalOpen(local.horario_apertura, local.horario_cierre, local.dias_atencion);
-  res.json(local);
-});
-
-app.get('/api/servicios/buscar', async (req, res) => {
-  const { q } = req.query;
-  let sql = 'SELECT * FROM servicios';
-  let params = [];
-  if (q) { sql += ' WHERE LOWER(tipo) LIKE LOWER(?)'; params.push(`%${q}%`); }
-  sql += ' ORDER BY tipo ASC';
-  let rows = await queryAll(sql, params);
-  res.json(rows);
-});
-
-app.get('/api/servicios/tipos', async (req, res) => {
-  const rows = await queryAll('SELECT DISTINCT tipo FROM servicios ORDER BY tipo');
-  res.json(rows.map(r => r.tipo));
-});
-
-app.get('/api/locales/:id/calificaciones', (req, res) => {
-  res.json(queryAll('SELECT * FROM calificaciones WHERE local_id = ? ORDER BY created_at DESC', [req.params.id]));
-});
-
-app.post('/api/locales/:id/calificaciones', async (req, res) => {
-  const { estrellas, comentario, device_id } = req.body;
-  if (!estrellas || estrellas < 1 || estrellas > 5) return res.status(400).json({ error: 'Calificación 1-5' });
-  if (!device_id) return res.status(400).json({ error: 'device_id requerido' });
-
-  if (existing) {
-    await runSql('UPDATE calificaciones SET estrellas=?, comentario=?, created_at=datetime("now") WHERE id=?', [estrellas, comentario || '', existing.id]);
-    sendTelegramAlert(`⭐ <b>Calificación Actualizada</b>\nLocal ID: ${req.params.id}\nEstrellas: ${estrellas}\nComentario: ${comentario || '-'}\nDevice: ${device_id}`);
-    return res.json({ message: 'Calificación actualizada', id: existing.id });
-  }
-  await runSql('INSERT INTO calificaciones (local_id,estrellas,comentario,device_id) VALUES (?,?,?,?)', [req.params.id, estrellas, comentario || '', device_id]);
-  const last = await queryOne('SELECT last_insert_rowid() as id');
-  sendTelegramAlert(`⭐ <b>Nueva Calificación</b>\nLocal ID: ${req.params.id}\nEstrellas: ${estrellas}\nComentario: ${comentario || '-'}\nDevice: ${device_id}`);
-  res.json({ message: 'Calificación enviada', id: last?.id });
+  const l = await queryOne('SELECT * FROM locales WHERE id = ?', [req.params.id]);
+  if (!l) return res.status(404).json({ error: 'No encontrado' });
+  l.productos = await queryAll('SELECT * FROM productos WHERE local_id = ?', [l.id]);
+  res.json(l);
 });
 
 app.get('/api/config', async (req, res) => {
   const rows = await queryAll('SELECT * FROM configuracion');
-  const config = {};
-  rows.forEach(r => { config[r.clave] = r.valor; });
-  res.json(config);
+  const c = {}; rows.forEach(r => c[r.clave] = r.valor); res.json(c);
 });
 
-app.get('/api/mascotas', async (req, res) => {
-  res.json(await queryAll('SELECT * FROM mascotas_perdidas ORDER BY created_at DESC'));
+app.get('/api/reportes', async (req, res) => {
+  const sql = isUsingMysql() 
+    ? `SELECT r.*, COALESCE(u.nickname, u.nombre) as autor_nick FROM reportes_ciudadanos r LEFT JOIN usuarios u ON r.usuario_id = u.id WHERE r.fecha_expiracion > NOW() OR r.fecha_expiracion IS NULL ORDER BY r.created_at DESC`
+    : `SELECT r.*, COALESCE(u.nickname, u.nombre) as autor_nick FROM reportes_ciudadanos r LEFT JOIN usuarios u ON r.usuario_id = u.id WHERE r.fecha_expiracion > datetime('now') OR r.fecha_expiracion IS NULL ORDER BY r.created_at DESC`;
+  res.json(await queryAll(sql));
 });
 
-app.post('/api/mascotas', async (req, res) => {
-  const { nombre_contacto, telefono, ubicacion_extravio, direccion, foto_base64, tipo_animal, caracteristicas, nombre_mascota, comentarios, latitud, longitud } = req.body;
-  if (!nombre_contacto || !telefono) return res.status(400).json({ error: 'Nombre y teléfono requeridos' });
-
-  const user = await queryOne('SELECT is_blocked FROM usuarios WHERE telefono = ?', [telefono]);
-  if (user && user.is_blocked) return res.status(403).json({ error: 'Usuario bloqueado por el administrador' });
-
-  await runSql('INSERT INTO mascotas_perdidas (nombre_contacto,telefono,ubicacion_extravio,direccion,foto_base64,tipo_animal,caracteristicas,nombre_mascota,comentarios,latitud,longitud) VALUES (?,?,?,?,?,?,?,?,?,?,?)', 
-    [nombre_contacto, telefono, ubicacion_extravio||'', direccion||'', foto_base64||'', tipo_animal||'', caracteristicas||'', nombre_mascota||'', comentarios||'', latitud || null, longitud || null]);
-  
-  sendTelegramAlert(`🐾 <b>Nueva Mascota Perdida</b>\n` +
-    `Tipo: ${tipo_animal || 'No especificado'}\n` +
-    `Nombre Mascota: ${nombre_mascota || '-'}\n` +
-    `Contacto: ${nombre_contacto} (${telefono})\n` +
-    `Ubicación: ${ubicacion_extravio || '-'}\n` +
-    `Características: ${caracteristicas || '-'}`);
-
-  res.json({ message: 'Aviso publicado' });
+app.post('/api/reportes', async (req, res) => {
+  const { usuario_id, nombre_contacto, telefono, tipo_reporte, detalles, latitud, longitud, duracion_horas } = req.body;
+  const user = usuario_id ? await queryOne('SELECT nickname, nombre FROM usuarios WHERE id = ?', [usuario_id]) : null;
+  const exp = new Date(Date.now() + (parseInt(duracion_horas)||24)*3600000).toISOString().slice(0,19).replace('T',' ');
+  await runSql('INSERT INTO reportes_ciudadanos (usuario_id, nombre_contacto, telefono, tipo_reporte, detalles, latitud, longitud, fecha_expiracion) VALUES (?,?,?,?,?,?,?,?)', [usuario_id||null, nombre_contacto, telefono, tipo_reporte, detalles||'', latitud, longitud, exp]);
+  sendTelegramAlert(`📢 <b>NUEVO REPORTE</b>\nTipo: ${tipo_reporte}\nPor: ${user?.nickname || user?.nombre || nombre_contacto}\nDetalles: ${detalles}`);
+  res.json({ ok: true });
 });
 
-// ========== REGISTRO / USUARIOS ==========
 app.post('/api/registro', async (req, res) => {
-  const { nombre, telefono, direccion, device_id, terms_accepted } = req.body;
-  if (!nombre || !telefono) return res.status(400).json({ error: 'Nombre y teléfono son obligatorios' });
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  const termsVal = terms_accepted ? 1 : 0;
-
+  const { nombre, telefono, email, nickname, pin_seguridad, device_id } = req.body;
   let user = await queryOne('SELECT * FROM usuarios WHERE telefono = ?', [telefono]);
   if (!user) {
-    const result = await runSql('INSERT INTO usuarios (nombre, telefono, direccion, ip, device_id, terms_accepted) VALUES (?,?,?,?,?,?)', 
-      [nombre, telefono, direccion || '', ip, device_id || '', termsVal]);
-    const newId = result.insertId;
-    user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [newId]);
-    sendTelegramAlert(`👤 <b>Nuevo Usuario Registrado</b>\nNombre: ${nombre}\nTel: ${telefono}\nDir: ${direccion || '-'}\nCiudad: Puerto Montt`);
+    const r = await runSql('INSERT INTO usuarios (nombre, telefono, email, nickname, pin_seguridad, device_id) VALUES (?,?,?,?,?,?)', [nombre, telefono, email||'', nickname||'', pin_seguridad||'', device_id||'']);
+    user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [r.insertId]);
+    sendTelegramAlert(`🆕 <b>NUEVO REGISTRO</b>\nNombre: ${nombre}\nNick: ${nickname}\nTel: ${telefono}`);
+    if (email && pin_seguridad) sendEmailPin(email, nickname||nombre, pin_seguridad);
   } else {
-    await runSql('UPDATE usuarios SET nombre=?, direccion=?, ip=?, device_id=?, terms_accepted=? WHERE id=?', 
-      [nombre, direccion || '', ip, device_id || '', termsVal, user.id]);
-    user = { ...user, nombre, direccion, ip, device_id, terms_accepted: termsVal };
+    await runSql('UPDATE usuarios SET nombre=?, email=?, nickname=?, pin_seguridad=? WHERE id=?', [nombre, email||user.email, nickname||user.nickname, pin_seguridad||user.pin_seguridad, user.id]);
+    user = { ...user, nombre, email, nickname, pin_seguridad };
+    sendTelegramAlert(`🔄 <b>PERFIL ACTUALIZADO</b>\nUsuario: ${nickname || nombre}`);
   }
-  res.json({ message: 'Usuario registrado', user });
+  res.json({ user });
 });
 
-app.put('/api/usuarios/:id/accept-terms', async (req, res) => {
-  await runSql('UPDATE usuarios SET terms_accepted = 1 WHERE id = ?', [req.params.id]);
-  const u = await queryOne('SELECT nombre FROM usuarios WHERE id = ?', [req.params.id]);
-  sendTelegramAlert(`📜 <b>Términos Aceptados</b>\nUsuario: ${u ? u.nombre : 'ID:'+req.params.id}`);
-  res.json({ message: 'Términos aceptados' });
+app.get('/api/verificar-usuario/:id', async (req, res) => {
+  const u = await queryOne('SELECT * FROM usuarios WHERE id = ?', [req.params.id]);
+  if (!u) return res.status(404).json({ error: 'No encontrado' });
+  res.json(u);
 });
 
-// ========== MURO COMUNITARIO ==========
 app.get('/api/muro', async (req, res) => {
-  const rows = await queryAll(`
-    SELECT m.id, m.contenido, m.created_at, u.nombre as autor
-    FROM muro_comunitario m
-    JOIN usuarios u ON m.usuario_id = u.id
-    ORDER BY m.created_at DESC LIMIT 50
-  `);
-  res.json(rows);
+  res.json(await queryAll('SELECT m.*, COALESCE(u.nickname, u.nombre) as autor FROM muro_comunitario m JOIN usuarios u ON m.usuario_id = u.id ORDER BY m.created_at DESC LIMIT 50'));
 });
 
 app.post('/api/muro', async (req, res) => {
-  const { usuario_id, contenido, latitud, longitud } = req.body;
-  if (!usuario_id || !contenido) return res.status(400).json({ error: 'Faltan datos' });
-
-  const user = await queryOne('SELECT nombre, telefono, direccion, is_blocked, is_stolen FROM usuarios WHERE id = ?', [usuario_id]);
-  if (user && user.is_blocked) return res.status(403).json({ error: 'Usuario bloqueado por el administrador' });
-
+  const { usuario_id, contenido } = req.body;
+  const user = await queryOne('SELECT nickname, nombre, is_stolen FROM usuarios WHERE id = ?', [usuario_id]);
   await runSql('INSERT INTO muro_comunitario (usuario_id, contenido) VALUES (?,?)', [usuario_id, contenido]);
-  
-  if (user && user.is_stolen) {
-    const mapLink = latitud && longitud ? `https://www.google.com/maps?q=${latitud},${longitud}` : 'No disponible';
-    const alertMsg = `🚨 <b>ALERTA: TELÉFONO EXTRAVIADO EN USO</b>\n\n` +
-                     `👤 <b>Usuario:</b> ${user.nombre}\n` +
-                     `📱 <b>Teléfono:</b> ${user.telefono}\n` +
-                     `🏠 <b>Dirección:</b> ${user.direccion || '-'}\n` +
-                     `📍 <b>Acción:</b> Publicación en Muro\n` +
-                     `💬 <b>Contenido:</b> "${contenido}"\n` +
-                     `🗺️ <b>Ubicación:</b> ${mapLink}\n\n` +
-                     `<i>El sistema ha detectado actividad en un dispositivo reportado.</i>`;
-    sendTelegramAlert(alertMsg);
+  if (user?.is_stolen) {
+    sendTelegramAlert(`🚨 <b>EXTRAVÍO DETECTADO (MURO)</b>\nUsuario: ${user.nickname || user.nombre}\nContenido: ${contenido}`);
   } else {
-    const userInfo = user ? `${user.nombre} (${user.telefono || 'Sin Tel'})\n📍 Dir: ${user.direccion || 'No especificada'}` : 'Desconocido';
-    sendTelegramAlert(`📝 <b>Nueva Publicación en el Muro</b>\n👤 Vecino: ${userInfo}\n💬 Dice: "${contenido}"`);
+    sendTelegramAlert(`💬 <b>NUEVO POST</b>\nAutor: ${user?.nickname || user?.nombre}\nMsg: ${contenido}`);
   }
-  
-  res.json({ message: 'Publicado en el muro' });
+  res.json({ ok: true });
 });
 
-// ========== BUZÓN ADMIN ==========
-app.post('/api/admin/mensaje', async (req, res) => {
-  const { usuario_id, mensaje, latitud, longitud } = req.body;
-  if (!usuario_id || !mensaje) return res.status(400).json({ error: 'Faltan datos' });
-
-  const user = await queryOne('SELECT nombre, telefono, direccion, is_blocked, is_stolen FROM usuarios WHERE id = ?', [usuario_id]);
-  if (user && user.is_blocked) return res.status(403).json({ error: 'Usuario bloqueado por el administrador' });
-
-  await runSql('INSERT INTO mensajes_admin (usuario_id, mensaje) VALUES (?,?)', [usuario_id, mensaje]);
-  
-  if (user && user.is_stolen) {
-    const mapLink = latitud && longitud ? `https://www.google.com/maps?q=${latitud},${longitud}` : 'No disponible';
-    const alertMsg = `🚨 <b>ALERTA: TELÉFONO EXTRAVIADO EN USO</b>\n\n` +
-                     `👤 <b>Usuario:</b> ${user.nombre}\n` +
-                     `📱 <b>Teléfono:</b> ${user.telefono}\n` +
-                     `🏠 <b>Dirección:</b> ${user.direccion || '-'}\n` +
-                     `📍 <b>Acción:</b> Mensaje al Buzón\n` +
-                     `💬 <b>Mensaje:</b> "${mensaje}"\n` +
-                     `🗺️ <b>Ubicación:</b> ${mapLink}\n\n` +
-                     `<i>El sistema ha detectado actividad en un dispositivo reportado.</i>`;
-    sendTelegramAlert(alertMsg);
-  } else {
-    const autorInfo = user ? `<b>${user.nombre}</b> (${user.telefono})` : `ID:${usuario_id}`;
-    // Alerta especial si el mensaje contiene la palabra EXTRAVIASTE o EXTRAVIADO
-    const upperM = mensaje.toUpperCase();
-    if (upperM.includes('EXTRAVIASTE') || upperM.includes('EXTRAVIADO') || mensaje.includes('🚨')) {
-      sendTelegramAlert(`🚨 <b>ALERTA DE EXTRAVÍO/SEGURIDAD</b>\nUsuario: ${autorInfo}\nDetalle: ${mensaje}`);
-    } else {
-      sendTelegramAlert(`✉️ <b>Nuevo Mensaje en Buzón</b>\nDe: ${autorInfo}\nContenido: ${mensaje.slice(0, 50)}...`);
-    }
-  }
-
-  res.json({ message: 'Mensaje enviado al administrador' });
-});
-
-// ========== REGISTRO EMERGENCIAS ==========
-app.post('/api/emergencia', async (req, res) => {
-  const { usuario_id, institucion, latitud, longitud } = req.body;
-  if (!usuario_id || !institucion) return res.status(400).json({ error: 'Faltan datos' });
-
-  const user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [usuario_id]);
-  if (!user) return res.status(404).json({ error: 'Usuario no identificado' });
-
-  await runSql('INSERT INTO registro_emergencias (usuario_id, institucion, latitud, longitud) VALUES (?, ?, ?, ?)', 
-    [usuario_id, institucion, latitud || null, longitud || null]);
-  
-  const googleMapsLink = latitud && longitud ? `https://maps.google.com/?q=${latitud},${longitud}` : 'Sin GPS';
-  
-  sendTelegramAlert(`🚨 <b>LLAMADA DE EMERGENCIA</b>\n` +
-    `Institución: ${institucion}\n` +
-    `Vecino: ${user.nombre}\n` +
-    `Teléfono: ${user.telefono}\n` +
-    `Dirección: ${user.direccion || 'No especificada'}\n` +
-    `Mapa: ${googleMapsLink}`);
-
-  res.json({ message: 'Emergencia registrada' });
-});
-
-// Ping / Estadísticas y Rastreo Extravíos
 app.post('/api/ping', async (req, res) => {
   const { device_id } = req.body;
-  if (!device_id) return res.status(400).json({ error: 'Faltan datos' });
   await runSql('INSERT INTO visitas (device_id) VALUES (?)', [device_id]);
-  const user = await queryOne('SELECT is_stolen FROM usuarios WHERE device_id = ?', [device_id]);
-  res.json({ status: user?.is_stolen ? 'stolen' : 'ok' });
+  const u = await queryOne('SELECT is_stolen, nickname, nombre FROM usuarios WHERE device_id = ?', [device_id]);
+  if (u?.is_stolen) sendTelegramAlert(`🕵️ <b>VIGILANCIA EXTRAVÍO</b>\nDispositivo detectado: ${u.nickname || u.nombre}`);
+  res.json({ status: u?.is_stolen ? 'stolen' : 'ok' });
 });
 
 app.post('/api/stolen-location', async (req, res) => {
   const { device_id, latitud, longitud } = req.body;
-  if (!device_id || !latitud || !longitud) return res.status(400).json({ error: 'Faltan datos' });
-  
-  const user = await queryOne('SELECT id, nombre, telefono FROM usuarios WHERE device_id = ?', [device_id]);
-  if (user) {
-    await runSql('INSERT INTO rastreo_robos (usuario_id, latitud, longitud) VALUES (?,?,?)', [user.id, latitud, longitud]);
-    
-    const mapLink = `https://www.google.com/maps?q=${latitud},${longitud}`;
-    const timestamp = new Date().toLocaleString('es-CL');
-    
-    // 1. Alerta a Telegram con formato urgente
-    const alertMsg = `🚨 <b>ALERTA: TELÉFONO EXTRAVIADO EN USO</b>\n\n` +
-                     `👤 <b>Usuario:</b> ${user.nombre}\n` +
-                     `📱 <b>Teléfono:</b> ${user.telefono}\n` +
-                     `📅 <b>Fecha/Hora:</b> ${timestamp}\n` +
-                     `📍 <b>Ubicación:</b> <a href="${mapLink}">VER MAPA EN VIVO</a>\n\n` +
-                     `<i>El sistema está rastreando este dispositivo automáticamente.</i>`;
-    sendTelegramAlert(alertMsg);
-
-    // 2. Registro en el Buzón (mensajes_admin)
-    const dbMsg = `🚨 ALERTA DE RASTREO: El usuario ${user.nombre} (${user.telefono}) está operando el teléfono marcado como EXTRAVIADO. Ubicación detectada: ${mapLink}`;
-    await runSql('INSERT INTO mensajes_admin (usuario_id, mensaje) VALUES (?, ?)', [user.id, dbMsg]);
+  const u = await queryOne('SELECT id, nickname, nombre FROM usuarios WHERE device_id = ?', [device_id]);
+  if (u) {
+    await runSql('INSERT INTO rastreo_robos (usuario_id, latitud, longitud) VALUES (?,?,?)', [u.id, latitud, longitud]);
+    sendTelegramAlert(`📍 <b>UBICACIÓN EXTRAVÍO</b>\nUsuario: ${u.nickname || u.nombre}\nLat: ${latitud}, Lng: ${longitud}`);
   }
-  res.json({ message: 'Ok' });
-});
-
-app.get('/api/verificar-usuario/:id', async (req, res) => {
-  const user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [req.params.id]);
-  if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
-  res.json(user);
-});
-
-
-
-app.post('/api/reportar-extravio', async (req, res) => {
-  const { reporting_user_id, reported_phone, mensaje_extra } = req.body;
-  if (!reporting_user_id || !reported_phone) return res.status(400).json({ error: 'Datos incompletos' });
-
-  const reportedUser = await queryOne('SELECT id, nombre FROM usuarios WHERE telefono = ?', [reported_phone]);
-  const reporter = await queryOne('SELECT nombre, telefono FROM usuarios WHERE id = ?', [reporting_user_id]);
-  const reporterInfo = reporter ? `<b>${reporter.nombre}</b> (${reporter.telefono})` : `ID:${reporting_user_id}`;
-
-  const alertMsg = `🚨 <b>REPORTE DE EXTRAVÍO</b>\nDenunciante: ${reporterInfo}\nTeléfono Extraviado: <b>${reported_phone}</b>\nEstado: Marcado para rastreo silencioso.${mensaje_extra || ''}`;
-
-  if (reportedUser) {
-    await runSql('UPDATE usuarios SET is_stolen = 1 WHERE id = ?', [reportedUser.id]);
-    sendTelegramAlert(`${alertMsg}\n<i>Usuario identificado en el sistema.</i>`);
-  } else {
-    sendTelegramAlert(`${alertMsg}\n<i>⚠️ El número no está registrado en la base de datos de la App.</i>`);
-  }
-  await runSql('INSERT INTO mensajes_admin (usuario_id, mensaje) VALUES (?, ?)', [reporting_user_id, `🚨 REPORTE EXTRAVÍO: Se reportó el número ${reported_phone}${mensaje_extra || ''}`]);
-  res.json({ success: true, message: 'Reporte procesado' });
-});
-
-
-// ========== ADMIN API ==========
-
-app.post('/api/admin/login', (req, res) => {
-  const { passwords } = req.body;
-  if (!Array.isArray(passwords) || passwords.length !== 3) {
-    return res.status(400).json({ error: 'Se requieren 3 contraseñas' });
-  }
-  
-  const isValid = passwords.every((p, i) => p === ADMIN_PASSWORDS[i]);
-  
-  if (!isValid) return res.status(401).json({ error: 'Contraseñas incorrectas' });
-  
-  const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  adminTokens.add(token);
-  sendTelegramAlert(`🔐 <b>Acceso Panel Admin</b>\nSe ha iniciado sesión en el Panel de Administración.`);
-  res.json({ token });
-});
-
-app.post('/api/admin/notify-entry', authMw, (req, res) => {
-  sendTelegramAlert(`👀 <b>Ingreso al Panel Admin</b>\nUn administrador ha entrado a revisar el Panel.`);
   res.json({ ok: true });
 });
 
-app.post('/api/admin/resolve-map', authMw, async (req, res) => {
-  let { url } = req.body;
-  if (!url) return res.status(400).json({ error: 'URL requerida' });
-  
-  console.log(`[MAPS] Intentando resolver URL: ${url}`);
-
-  if (url.includes('<iframe')) {
-    const srcMatch = url.match(/src="([^"]+)"/);
-    if (srcMatch) url = srcMatch[1];
+app.post('/api/reportar-extravio', async (req, res) => {
+  const { reported_phone, pin } = req.body;
+  const u = await queryOne('SELECT id, nickname, nombre FROM usuarios WHERE telefono = ? AND pin_seguridad = ?', [reported_phone, pin]);
+  if (!u) {
+    sendTelegramAlert(`⚠️ <b>FALLO REPORTE EXTRAVÍO</b>\nIntento para: ${reported_phone} (PIN Incorrecto)`);
+    return res.status(403).json({ error: 'PIN incorrecto' });
   }
+  await runSql('UPDATE usuarios SET is_stolen = 1 WHERE id = ?', [u.id]);
+  sendTelegramAlert(`🚨 <b>EXTREMA: EXTRAVÍO CONFIRMADO</b>\nTeléfono: ${reported_phone}\nUsuario: ${u.nickname || u.nombre}`);
+  res.json({ success: true });
+});
 
-  // Helper para extraer de texto
-  const extractCoords = (text) => {
-    // 1. Patrón @lat,lng (Formato estándar web)
-    let m = text.match(/@([-\d.]+),([-\d.]+)/);
-    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+app.post('/api/emergencia', async (req, res) => {
+  const { usuario_id, institucion, latitud, longitud } = req.body;
+  const user = await queryOne('SELECT nickname, nombre, telefono FROM usuarios WHERE id = ?', [usuario_id]);
+  await runSql('INSERT INTO registro_emergencias (usuario_id, institucion, latitud, longitud) VALUES (?,?,?,?)', [usuario_id, institucion, latitud, longitud]);
+  sendTelegramAlert(`🚨 <b>EMERGENCIA ACTIVADA</b>\nInstitución: ${institucion}\nVecino: ${user?.nickname || user?.nombre}\nTel: ${user?.telefono}\nLat: ${latitud}, Lng: ${longitud}`);
+  res.json({ ok: true });
+});
 
-    // 2. Patrón !3dLAT!4dLNG (Formato interno de Google / Embeds)
-    const d3 = text.match(/!3d([-\d.]+)/);
-    const d4 = text.match(/!4d([-\d.]+)/) || text.match(/!2d([-\d.]+)/);
-    if (d3 && d4) return { lat: parseFloat(d3[1]), lng: parseFloat(d4[1]) };
+app.post('/api/admin/mensaje', async (req, res) => {
+  const { usuario_id, mensaje } = req.body;
+  const user = await queryOne('SELECT nickname, nombre FROM usuarios WHERE id = ?', [usuario_id]);
+  await runSql('INSERT INTO mensajes_admin (usuario_id, mensaje) VALUES (?,?)', [usuario_id, mensaje]);
+  sendTelegramAlert(`✉️ <b>MENSAJE AL BUZÓN</b>\nDe: ${user?.nickname || user?.nombre}\nMsg: ${mensaje}`);
+  res.json({ ok: true });
+});
 
-    // 3. Patrón /search/lat,lng (Formato de enlaces compartidos/cortos)
-    m = text.match(/\/search\/([-\d.]+),\+?([-\d.]+)/);
-    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-
-    // 4. Patrón q=lat,lng o center=lat,lng
-    m = text.match(/[?&]q=([-\d.]+),([-\d.]+)/) || text.match(/center=([-\d.]+),([-\d.]+)/) || text.match(/ll=([-\d.]+),([-\d.]+)/);
-    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
-
-    return null;
-  };
-
-  // 1. Intento directo sobre el string pegado (ahorra tiempo y red)
-  let coords = extractCoords(url);
-  if (coords) {
-    console.log(`[MAPS] Coordenadas extraídas directamente: ${coords.lat}, ${coords.lng}`);
-    let address = '';
-    const placeMatch = url.match(/\/place\/([^\/]+)/);
-    if (placeMatch) {
-      try { address = decodeURIComponent(placeMatch[1].replace(/\+/g, ' ')); } catch(e) {}
-    }
-    return res.json({ ...coords, address });
-  }
-
-  // 2. Si es link corto o no tiene coords, hacemos FETCH
-  try {
-    console.log(`[MAPS] Fetching URL...`);
-    let response = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-    });
-    
-    let finalUrl = response.url;
-    let html = await response.text();
-    console.log(`[MAPS] Final URL: ${finalUrl}`);
-
-    // Intentar extraer de la URL final
-    coords = extractCoords(finalUrl);
-    
-    // Si no está en la URL, buscar en el HTML
-    if (!coords) {
-      coords = extractCoords(html);
-      if (!coords) {
-        // Buscar patrones JSON internos de Google Maps en el HTML
-        const jsonCoords = html.match(/\[null,null,([-\d.]+),([-\d.]+)\]/) || 
-                           html.match(/\[\[([-3-4][0-9]\.[0-9]+),([-6-7][0-9]\.[0-9]+)\]\]/); // Específico para Chile
-        if (jsonCoords) coords = { lat: parseFloat(jsonCoords[1]), lng: parseFloat(jsonCoords[2]) };
-      }
-    }
-
-    if (coords) {
-      console.log(`[MAPS] Coordenadas encontradas: ${coords.lat}, ${coords.lng}`);
-      let address = '';
-      const placeMatch = finalUrl.match(/\/place\/([^\/]+)/) || html.match(/"([^"]+)",null,null,null,null,null,\[null,\[([-\d.]+),([-\d.]+)\]/);
-      if (placeMatch) {
-        try { address = decodeURIComponent((placeMatch[1] || placeMatch[0]).replace(/\+/g, ' ')).replace(/"/g, ''); } catch(e) {}
-      }
-      return res.json({ ...coords, address });
-    }
-
-    console.error(`[MAPS] No se encontraron coordenadas en el contenido.`);
-    res.status(400).json({ error: 'No se pudieron extraer las coordenadas. Intenta con el link que sale al presionar "Compartir" en Google Maps.' });
-  } catch (err) {
-    console.error(`[MAPS] Error de red:`, err);
-    res.status(500).json({ error: 'Error de conexión con Google Maps' });
+// ADMIN API
+app.post('/api/admin/login', (req, res) => {
+  const { passwords } = req.body;
+  if (passwords.every((p, i) => p === ADMIN_PASSWORDS[i])) {
+    const t = Math.random().toString(36).slice(2); 
+    adminTokens.add(t); 
+    sendTelegramAlert(`🔐 <b>ADMIN: SESIÓN INICIADA</b>\nAcceso exitoso al panel de control.`);
+    res.json({ token: t });
+  } else {
+    sendTelegramAlert(`⚠️ <b>ADMIN: FALLO DE ACCESO</b>\nIntento de login con llaves incorrectas.`);
+    res.status(401).json({ error: 'Incorrecto' });
   }
 });
 
-// Mensajes Admin
-app.get('/api/admin/mensajes', authMw, async (req, res) => {
-  const rows = await queryAll(`
-    SELECT m.*, u.nombre, u.telefono 
-    FROM mensajes_admin m
-    JOIN usuarios u ON m.usuario_id = u.id
-    ORDER BY m.created_at DESC
-  `);
-  res.json(rows);
-});
-app.put('/api/admin/mensajes/:id/leido', authMw, async (req, res) => {
-  await runSql('UPDATE mensajes_admin SET leido = 1 WHERE id = ?', [req.params.id]);
-  res.json({ message: 'Marcado como leído' });
-});
-
-// Locales
-app.get('/api/admin/locales', authMw, async (req, res) => res.json(await queryAll('SELECT * FROM locales ORDER BY nombre')));
-app.post('/api/admin/locales', authMw, async (req, res) => {
-  const { nombre, direccion, horario_apertura, horario_cierre, dias_atencion, acepta_efectivo, acepta_tarjeta, latitud, longitud } = req.body;
-  await runSql('INSERT INTO locales (nombre,direccion,horario_apertura,horario_cierre,dias_atencion,acepta_efectivo,acepta_tarjeta,latitud,longitud) VALUES (?,?,?,?,?,?,?,?,?)',
-    [nombre, direccion||'', horario_apertura||'08:00', horario_cierre||'20:00', dias_atencion||'lun-sab', acepta_efectivo?1:0, acepta_tarjeta?1:0, parseFloat(latitud), parseFloat(longitud)]);
-  sendTelegramAlert(`🏪 <b>Local Creado</b>\nNombre: ${nombre}\nDir: ${direccion}`);
-  res.json({ message: 'Local creado' });
-});
-app.put('/api/admin/locales/:id', authMw, async (req, res) => {
-  const { nombre, direccion, horario_apertura, horario_cierre, dias_atencion, acepta_efectivo, acepta_tarjeta, latitud, longitud } = req.body;
-  await runSql('UPDATE locales SET nombre=?,direccion=?,horario_apertura=?,horario_cierre=?,dias_atencion=?,acepta_efectivo=?,acepta_tarjeta=?,latitud=?,longitud=? WHERE id=?',
-    [nombre, direccion, horario_apertura, horario_cierre, dias_atencion, acepta_efectivo?1:0, acepta_tarjeta?1:0, parseFloat(latitud), parseFloat(longitud), req.params.id]);
-  sendTelegramAlert(`🏪 <b>Local Actualizado</b>\nNombre: ${nombre}`);
-  res.json({ message: 'Local actualizado' });
-});
-app.delete('/api/admin/locales/:id', authMw, async (req, res) => {
-  const l = await queryOne('SELECT nombre FROM locales WHERE id = ?', [req.params.id]);
-  await runSql('DELETE FROM productos WHERE local_id = ?', [req.params.id]);
-  await runSql('DELETE FROM calificaciones WHERE local_id = ?', [req.params.id]);
-  await runSql('DELETE FROM locales WHERE id = ?', [req.params.id]);
-  sendTelegramAlert(`🏪 <b>Local Eliminado</b>\nNombre: ${l ? l.nombre : 'ID:'+req.params.id}`);
-  res.json({ message: 'Local eliminado' });
-});
-
-// Productos
-app.get('/api/admin/productos', authMw, async (req, res) => res.json(await queryAll('SELECT p.*, l.nombre as local_nombre FROM productos p JOIN locales l ON p.local_id = l.id ORDER BY l.nombre, p.nombre')));
-app.post('/api/admin/productos', authMw, async (req, res) => {
-  const { local_id, nombre, marca, precio, en_stock, unidad } = req.body;
-  await runSql('INSERT INTO productos (local_id,nombre,marca,precio,en_stock,unidad) VALUES (?,?,?,?,?,?)', [local_id, nombre, marca||'', parseFloat(precio), en_stock?1:0, unidad||'kg']);
-  sendTelegramAlert(`🛒 <b>Producto Creado</b>\nNombre: ${nombre}\nPrecio: $${precio}`);
-  res.json({ message: 'Producto creado' });
-});
-app.put('/api/admin/productos/:id', authMw, async (req, res) => {
-  const { local_id, nombre, marca, precio, en_stock, unidad } = req.body;
-  await runSql('UPDATE productos SET local_id=?,nombre=?,marca=?,precio=?,en_stock=?,unidad=? WHERE id=?', [local_id, nombre, marca||'', parseFloat(precio), en_stock?1:0, unidad||'kg', req.params.id]);
-  sendTelegramAlert(`🛒 <b>Producto Actualizado</b>\nNombre: ${nombre}`);
-  res.json({ message: 'Producto actualizado' });
-});
-app.post('/api/admin/productos/masivo', authMw, (req, res) => {
-  const { local_id, productos } = req.body;
-  if (!local_id || !Array.isArray(productos)) return res.status(400).json({ error: 'Datos inválidos' });
-  const db = getDb();
-  
-  try {
-    db.run('DELETE FROM productos WHERE local_id = ?', [local_id]);
-    const stmt = db.prepare('INSERT INTO productos (local_id,nombre,marca,precio,en_stock,unidad) VALUES (?,?,?,?,?,?)');
-    for (const p of productos) {
-      stmt.run([local_id, p.nombre, p.marca || '', parseFloat(p.precio), p.en_stock ? 1 : 0, p.unidad || 'kg']);
-    }
-    stmt.free();
-    saveDb();
-    sendTelegramAlert(`📦 <b>Carga Masiva</b>\nLocal ID: ${local_id}\nTotal productos: ${productos.length}`);
-    res.json({ message: `Inventario actualizado: ${productos.length} productos` });
-  } catch (err) {
-    res.status(500).json({ error: 'Error procesando el listado' });
+app.put('/api/admin/passwords', authMw, async (req, res) => {
+  const { old_passwords, new_passwords } = req.body;
+  if (old_passwords.every((p, i) => p === ADMIN_PASSWORDS[i])) {
+    ADMIN_PASSWORDS = new_passwords;
+    sendTelegramAlert(`🔐 <b>ADMIN: LLAVES CAMBIADAS</b>\nSe han actualizado las 3 llaves maestras de acceso.`);
+    res.json({ ok: true });
+  } else {
+    sendTelegramAlert(`⚠️ <b>ADMIN: FALLO CAMBIO LLAVES</b>\nIntento de cambio con llaves antiguas incorrectas.`);
+    res.status(400).json({ error: 'Claves antiguas incorrectas' });
   }
-});
-app.delete('/api/admin/productos/:id', authMw, async (req, res) => { 
-  const p = await queryOne('SELECT nombre FROM productos WHERE id = ?', [req.params.id]);
-  await runSql('DELETE FROM productos WHERE id=?', [req.params.id]); 
-  sendTelegramAlert(`🛒 <b>Producto Eliminado</b>\nNombre: ${p ? p.nombre : 'ID:'+req.params.id}`);
-  res.json({ message: 'Eliminado' }); 
-});
-
-// Servicios
-app.get('/api/admin/servicios', authMw, async (req, res) => res.json(await queryAll('SELECT * FROM servicios ORDER BY tipo, nombre_prestador')));
-app.post('/api/admin/servicios', authMw, async (req, res) => {
-  const { tipo, nombre_prestador, telefono } = req.body;
-  await runSql('INSERT INTO servicios (tipo,nombre_prestador,telefono) VALUES (?,?,?)', [tipo, nombre_prestador, telefono||'']);
-  sendTelegramAlert(`🔧 <b>Servicio Creado</b>\nTipo: ${tipo}\nPrestador: ${nombre_prestador}`);
-  res.json({ message: 'Servicio creado' });
-});
-app.put('/api/admin/servicios/:id', authMw, async (req, res) => {
-  const { tipo, nombre_prestador, telefono } = req.body;
-  await runSql('UPDATE servicios SET tipo=?,nombre_prestador=?,telefono=? WHERE id=?', [tipo, nombre_prestador, telefono||'', req.params.id]);
-  sendTelegramAlert(`🔧 <b>Servicio Actualizado</b>\nPrestador: ${nombre_prestador}`);
-  res.json({ message: 'Servicio actualizado' });
-});
-app.delete('/api/admin/servicios/:id', authMw, async (req, res) => { 
-  const s = await queryOne('SELECT nombre_prestador FROM servicios WHERE id = ?', [req.params.id]);
-  await runSql('DELETE FROM servicios WHERE id=?', [req.params.id]); 
-  sendTelegramAlert(`🔧 <b>Servicio Eliminado</b>\nPrestador: ${s ? s.nombre_prestador : 'ID:'+req.params.id}`);
-  res.json({ message: 'Eliminado' }); 
-});
-
-// Mascotas
-app.delete('/api/admin/mascotas/:id', authMw, async (req, res) => {
-  const m = await queryOne('SELECT nombre_mascota, tipo_animal FROM mascotas_perdidas WHERE id = ?', [req.params.id]);
-  await runSql('DELETE FROM mascotas_perdidas WHERE id=?', [req.params.id]);
-  sendTelegramAlert(`🐶 <b>Aviso de Mascota Borrado</b>\n${m ? m.tipo_animal + ': ' + m.nombre_mascota : 'ID:'+req.params.id}`);
-  res.json({ message: 'Aviso eliminado' });
-});
-
-// Configuración
-app.put('/api/admin/config', authMw, async (req, res) => {
-  const { admin_whatsapp, plan_cuadrante, whatsapp_vecinos, tel_carabineros, tel_bomberos, tel_pdi, tel_ambulancia, tel_seguridad } = req.body;
-  if (admin_whatsapp) await runSql('UPDATE configuracion SET valor=? WHERE clave=?', [admin_whatsapp, 'admin_whatsapp']);
-  if (plan_cuadrante) await runSql('UPDATE configuracion SET valor=? WHERE clave=?', [plan_cuadrante, 'plan_cuadrante']);
-  if (whatsapp_vecinos) await runSql('UPDATE configuracion SET valor=? WHERE clave=?', [whatsapp_vecinos, 'whatsapp_vecinos']);
-  if (tel_carabineros) await runSql('UPDATE configuracion SET valor=? WHERE clave=?', [tel_carabineros, 'tel_carabineros']);
-  if (tel_bomberos) await runSql('UPDATE configuracion SET valor=? WHERE clave=?', [tel_bomberos, 'tel_bomberos']);
-  if (tel_pdi) await runSql('UPDATE configuracion SET valor=? WHERE clave=?', [tel_pdi, 'tel_pdi']);
-  if (tel_ambulancia) await runSql('UPDATE configuracion SET valor=? WHERE clave=?', [tel_ambulancia, 'tel_ambulancia']);
-  if (tel_seguridad) await runSql('UPDATE configuracion SET valor=? WHERE clave=?', [tel_seguridad, 'tel_seguridad']);
-  sendTelegramAlert(`⚙️ <b>Configuración Actualizada</b>\nSe han modificado los parámetros del sistema.`);
-  res.json({ message: 'Configuración actualizada' });
-});
-// ===== USUARIOS =====
-app.get('/api/admin/usuarios', authMw, async (req, res) => {
-  res.json(await queryAll('SELECT * FROM usuarios ORDER BY created_at DESC'));
-});
-
-app.put('/api/admin/usuarios/:id/bloquear', authMw, async (req, res) => {
-  try {
-    const { is_blocked } = req.body;
-    const userId = parseInt(req.params.id);
-    await runSql('UPDATE usuarios SET is_blocked = ? WHERE id = ?', [Number(is_blocked) ? 1 : 0, userId]);
-    const u = await queryOne('SELECT nombre FROM usuarios WHERE id = ?', [userId]);
-    sendTelegramAlert(`🚫 <b>Usuario ${is_blocked ? 'Bloqueado' : 'Desbloqueado'}</b>\nNombre: ${u ? u.nombre : 'ID:'+userId}`);
-    res.json({ message: 'Estado actualizado' });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.put('/api/admin/usuarios/:id/robado', authMw, async (req, res) => {
-  try {
-    const { is_stolen } = req.body;
-    const userId = parseInt(req.params.id);
-    const newState = Number(is_stolen) ? 1 : 0;
-    await runSql('UPDATE usuarios SET is_stolen=? WHERE id=?', [newState, userId]);
-    const u = await queryOne('SELECT nombre FROM usuarios WHERE id = ?', [userId]);
-    sendTelegramAlert(`📢 <b>Estado Extravío</b>\nUsuario: ${u ? u.nombre : 'ID:'+userId}\nEstado: ${is_stolen ? 'EXTRAVIADO' : 'RECUPERADO'}`);
-    res.json({ success: true, message: 'Estado de extravío actualizado' });
-  } catch (e) {
-    console.error('Error en robado:', e);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ===== EMERGENCIAS =====
-app.get('/api/admin/emergencias', authMw, async (req, res) => {
-  const rows = await queryAll(`
-    SELECT e.*, u.nombre, u.telefono 
-    FROM registro_emergencias e
-    JOIN usuarios u ON e.usuario_id = u.id
-    ORDER BY e.created_at DESC
-  `);
-  res.json(rows);
-});
-
-// ===== MURO ADMIN =====
-app.delete('/api/admin/muro', authMw, async (req, res) => {
-  await runSql('DELETE FROM muro_comunitario');
-  sendTelegramAlert(`🧹 <b>Muro Limpiado</b>\nSe han borrado todos los mensajes del muro.`);
-  res.json({ message: 'Muro limpiado' });
-});
-
-app.delete('/api/admin/muro/:id', authMw, async (req, res) => {
-  await runSql('DELETE FROM muro_comunitario WHERE id=?', [req.params.id]);
-  res.json({ message: 'Mensaje eliminado' });
-});
-
-// ===== RASTREO EXTRAVÍOS =====
-app.get('/api/admin/rastreo', authMw, async (req, res) => {
-  const rows = await queryAll(`
-    SELECT r.*, u.nombre, u.telefono 
-    FROM rastreo_robos r
-    JOIN usuarios u ON r.usuario_id = u.id
-    ORDER BY r.created_at DESC
-  `);
-  res.json(rows);
-});
-
-app.get('/api/stats', async (req, res) => {
-  const visitas = await queryOne('SELECT COUNT(*) as count FROM visitas');
-  const usuarios = await queryOne('SELECT COUNT(*) as count FROM usuarios');
-  const locales = await queryOne('SELECT COUNT(*) as count FROM locales');
-  res.json({ visitas: visitas?.count || 0, usuarios: usuarios?.count || 0, locales: locales?.count || 0 });
 });
 
 app.get('/api/admin/stats', authMw, async (req, res) => {
-  const totalVisitas = await queryOne('SELECT COUNT(*) as count FROM visitas v JOIN usuarios u ON v.device_id = u.device_id');
-  const uniqueUsers = await queryOne('SELECT COUNT(*) as count FROM usuarios');
-  
-  // Ajuste para hora local de Chile compensando el servidor UTC
-  const visitasHoy = await queryOne(`
-    SELECT COUNT(*) as count 
-    FROM visitas v 
-    JOIN usuarios u ON v.device_id = u.device_id 
-    WHERE DATE(DATE_SUB(v.created_at, INTERVAL 4 HOUR)) = DATE(DATE_SUB(NOW(), INTERVAL 4 HOUR))
-  `);
-  
-  const topLocales = await queryAll(`
-    SELECT l.nombre, COUNT(c.id) as calif_count, AVG(c.estrellas) as avg_estrellas
-    FROM locales l
-    LEFT JOIN calificaciones c ON l.id = c.local_id
-    GROUP BY l.id
-    ORDER BY calif_count DESC
-    LIMIT 5
-  `);
-
-  const totalMascotas = await queryOne('SELECT COUNT(*) as count FROM mascotas_perdidas');
-
-  res.json({
-    totalVisitas: totalVisitas.count,
-    uniqueUsers: uniqueUsers.count,
-    visitasHoy: visitasHoy.count,
-    totalMascotas: totalMascotas.count,
-    topLocales
-  });
-});
-// Cambiar contraseñas
-app.put('/api/admin/passwords', authMw, (req, res) => {
-  const { old_passwords, new_passwords } = req.body;
-  if (!Array.isArray(old_passwords) || old_passwords.length !== 3 || !Array.isArray(new_passwords) || new_passwords.length !== 3) {
-    return res.status(400).json({ error: 'Se requieren 3 claves actuales y 3 nuevas' });
-  }
-  const isValid = old_passwords.every((p, i) => p === ADMIN_PASSWORDS[i]);
-  if (!isValid) return res.status(401).json({ error: 'Las claves actuales son incorrectas' });
-  ADMIN_PASSWORDS = [...new_passwords];
-  adminTokens.clear();
-  sendTelegramAlert(`🔑 <b>Claves Cambiadas</b>\nSe han actualizado las contraseñas del Panel Admin.`);
-  res.json({ message: 'Claves actualizadas' });
-});
-// Reset de emergencia (sin necesidad de estar logueado)
-app.post('/api/emergency-reset', (req, res) => {
-  const { master_key } = req.body;
-  if (master_key !== MASTER_RESET_KEY) {
-    return res.status(403).json({ error: 'Clave maestra incorrecta' });
-  }
-  ADMIN_PASSWORDS = [...DEFAULT_PASSWORDS];
-  adminTokens.clear();
-  console.log('\n⚠️  RESET DE EMERGENCIA: Las claves de administrador fueron restauradas a los valores por defecto.\n');
-  res.json({ message: 'Claves restauradas a valores por defecto. Use las claves originales para ingresar.' });
+  const totalVisitas = (await queryOne('SELECT COUNT(*) as count FROM visitas')).count;
+  const uniqueUsers = (await queryOne('SELECT COUNT(*) as count FROM usuarios')).count;
+  const visitasHoy = (await queryOne(isUsingMysql() ? 'SELECT COUNT(*) as count FROM visitas WHERE DATE(created_at) = CURDATE()' : "SELECT COUNT(*) as count FROM visitas WHERE date(created_at) = date('now')")).count;
+  const totalMascotas = (await queryOne('SELECT COUNT(*) as count FROM mascotas_perdidas')).count;
+  const topLocales = await queryAll('SELECT l.nombre, COUNT(c.id) as calif_count, AVG(c.estrellas) as avg_estrellas FROM locales l LEFT JOIN calificaciones c ON l.id = c.local_id GROUP BY l.id ORDER BY calif_count DESC LIMIT 5');
+  res.json({ totalVisitas, uniqueUsers, visitasHoy, totalMascotas, topLocales });
 });
 
-// Admin User Management
+app.get('/api/admin/usuarios', authMw, async (req, res) => res.json(await queryAll('SELECT * FROM usuarios ORDER BY created_at DESC')));
+
 app.put('/api/admin/usuarios/:id/verificar', authMw, async (req, res) => {
-  try {
-    const { is_verified } = req.body;
-    const userId = parseInt(req.params.id);
-    await runSql('UPDATE usuarios SET is_verified = ? WHERE id = ?', [Number(is_verified) ? 1 : 0, userId]);
-    const u = await queryOne('SELECT nombre FROM usuarios WHERE id = ?', [userId]);
-    sendTelegramAlert(`✅ <b>Usuario ${is_verified ? 'Verificado' : 'Pendiente'}</b>\nNombre: ${u ? u.nombre : 'ID:'+userId}`);
-    res.json({ message: 'Estado de verificación actualizado' });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  const user = await queryOne('SELECT nickname, nombre FROM usuarios WHERE id = ?', [req.params.id]);
+  await runSql('UPDATE usuarios SET is_verified = ? WHERE id = ?', [req.body.is_verified?1:0, req.params.id]);
+  sendTelegramAlert(`🛠️ <b>ADMIN: VERIFICACIÓN</b>\nUsuario: ${user?.nickname || user?.nombre}\nEstado: ${req.body.is_verified ? 'VERIFICADO ✅' : 'PENDIENTE ⏳'}`);
+  res.json({ ok: true });
+});
+
+app.put('/api/admin/usuarios/:id/robado', authMw, async (req, res) => {
+  const user = await queryOne('SELECT nickname, nombre FROM usuarios WHERE id = ?', [req.params.id]);
+  await runSql('UPDATE usuarios SET is_stolen = ? WHERE id = ?', [req.body.is_stolen?1:0, req.params.id]);
+  sendTelegramAlert(`🛠️ <b>ADMIN: ESTADO DISPOSITIVO</b>\nUsuario: ${user?.nickname || user?.nombre}\nEstado: ${req.body.is_stolen ? 'EXTRAVIADO 🚨' : 'NORMAL ✅'}`);
+  res.json({ ok: true });
+});
+
+app.put('/api/admin/usuarios/:id/bloquear', authMw, async (req, res) => {
+  const user = await queryOne('SELECT nickname, nombre FROM usuarios WHERE id = ?', [req.params.id]);
+  await runSql('UPDATE usuarios SET is_blocked = ? WHERE id = ?', [req.body.is_blocked?1:0, req.params.id]);
+  sendTelegramAlert(`🛠️ <b>ADMIN: BLOQUEO</b>\nUsuario: ${user?.nickname || user?.nombre}\nEstado: ${req.body.is_blocked ? 'BLOQUEADO 🚫' : 'ACTIVO ✅'}`);
+  res.json({ ok: true });
 });
 
 app.delete('/api/admin/usuarios/:id', authMw, async (req, res) => {
-  try {
-    const userId = parseInt(req.params.id);
-    const u = await queryOne('SELECT nombre FROM usuarios WHERE id = ?', [userId]);
-    await runSql('DELETE FROM usuarios WHERE id = ?', [userId]);
-    sendTelegramAlert(`🗑️ <b>Usuario Eliminado</b>\nNombre: ${u ? u.nombre : 'ID:'+userId}`);
-    res.json({ success: true, message: 'Usuario eliminado' });
-  } catch (e) {
-    console.error('Error en delete usuario:', e);
-    res.status(500).json({ error: e.message });
-  }
+  const user = await queryOne('SELECT nickname, nombre FROM usuarios WHERE id = ?', [req.params.id]);
+  await runSql('DELETE FROM usuarios WHERE id = ?', [req.params.id]);
+  sendTelegramAlert(`🗑️ <b>ADMIN: USUARIO ELIMINADO</b>\nUsuario: ${user?.nickname || user?.nombre}`);
+  res.json({ ok: true });
 });
 
+app.get('/api/admin/mensajes', authMw, async (req, res) => res.json(await queryAll('SELECT m.*, u.nombre, u.telefono FROM mensajes_admin m JOIN usuarios u ON m.usuario_id = u.id ORDER BY m.created_at DESC')));
 
-// Endpoints de eliminación con registro en consola/logs
+app.put('/api/admin/mensajes/:id/leido', authMw, async (req, res) => {
+  await runSql('UPDATE mensajes_admin SET leido = 1 WHERE id = ?', [req.params.id]);
+  sendTelegramAlert(`🛠️ <b>ADMIN: MENSAJE LEÍDO</b>\nID: ${req.params.id}`);
+  res.json({ ok: true });
+});
+
 app.delete('/api/admin/mensajes/:id', authMw, async (req, res) => {
-  const msg = await queryOne('SELECT m.*, u.nombre FROM mensajes_admin m JOIN usuarios u ON m.usuario_id = u.id WHERE m.id = ?', [req.params.id]);
-  if (msg) sendTelegramAlert(`🗑️ <b>Mensaje Buzón Borrado</b>\nDe: ${msg.nombre}\nTexto: ${msg.mensaje.slice(0,30)}...`);
   await runSql('DELETE FROM mensajes_admin WHERE id = ?', [req.params.id]);
-  res.json({ message: 'Mensaje eliminado' });
+  sendTelegramAlert(`🗑️ <b>ADMIN: MENSAJE BORRADO</b>\nID: ${req.params.id}`);
+  res.json({ ok: true });
 });
+
+app.get('/api/admin/emergencias', authMw, async (req, res) => res.json(await queryAll('SELECT e.*, u.nombre, u.telefono FROM registro_emergencias e JOIN usuarios u ON e.usuario_id = u.id ORDER BY e.created_at DESC')));
 
 app.delete('/api/admin/emergencias/:id', authMw, async (req, res) => {
-  const emg = await queryOne('SELECT e.*, u.nombre FROM registro_emergencias e JOIN usuarios u ON e.usuario_id = u.id WHERE e.id = ?', [req.params.id]);
-  if (emg) sendTelegramAlert(`🗑️ <b>Registro Emergencia Borrado</b>\nVecino: ${emg.nombre}\nInstitución: ${emg.institucion}`);
   await runSql('DELETE FROM registro_emergencias WHERE id = ?', [req.params.id]);
-  res.json({ message: 'Registro eliminado' });
+  sendTelegramAlert(`🗑️ <b>ADMIN: REGISTRO EMERGENCIA BORRADO</b>\nID: ${req.params.id}`);
+  res.json({ ok: true });
 });
+
+app.get('/api/admin/rastreo', authMw, async (req, res) => res.json(await queryAll('SELECT r.*, u.nombre, u.telefono FROM rastreo_robos r JOIN usuarios u ON r.usuario_id = u.id ORDER BY r.created_at DESC')));
 
 app.delete('/api/admin/rastreo/:id', authMw, async (req, res) => {
-  const track = await queryOne('SELECT r.*, u.nombre FROM rastreo_robos r JOIN usuarios u ON r.usuario_id = u.id WHERE r.id = ?', [req.params.id]);
-  if (track) sendTelegramAlert(`🗑️ <b>Registro Rastreo Borrado</b>\nVecino: ${track.nombre}`);
   await runSql('DELETE FROM rastreo_robos WHERE id = ?', [req.params.id]);
-  res.json({ message: 'Registro eliminado' });
+  sendTelegramAlert(`🗑️ <b>ADMIN: RASTREO BORRADO</b>\nID: ${req.params.id}`);
+  res.json({ ok: true });
 });
 
-// SPA fallback
+app.put('/api/admin/config', authMw, async (req, res) => {
+  for (const [k, v] of Object.entries(req.body)) await runSql('UPDATE configuracion SET valor=? WHERE clave=?', [v, k]);
+  sendTelegramAlert(`🛠️ <b>ADMIN: CONFIGURACIÓN ACTUALIZADA</b>\nParámetros modificados.`);
+  res.json({ ok: true });
+});
+
+app.delete('/api/admin/muro', authMw, async (req, res) => {
+  await runSql('DELETE FROM muro_comunitario');
+  sendTelegramAlert(`🗑️ <b>ADMIN: MURO VACIADO</b>\nTodos los posts eliminados.`);
+  res.json({ ok: true });
+});
+
+app.delete('/api/admin/muro/:id', authMw, async (req, res) => {
+  await runSql('DELETE FROM muro_comunitario WHERE id = ?', [req.params.id]);
+  sendTelegramAlert(`🗑️ <b>ADMIN: POST MURO BORRADO</b>\nID: ${req.params.id}`);
+  res.json({ ok: true });
+});
+
+app.delete('/api/admin/mascotas/:id', authMw, async (req, res) => {
+  await runSql('DELETE FROM mascotas_perdidas WHERE id = ?', [req.params.id]);
+  sendTelegramAlert(`🗑️ <b>ADMIN: AVISO MASCOTA BORRADO</b>\nID: ${req.params.id}`);
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/locales', authMw, async (req, res) => res.json(await queryAll('SELECT * FROM locales ORDER BY nombre')));
+
+app.post('/api/admin/locales', authMw, async (req, res) => {
+  const { nombre, direccion, latitud, longitud } = req.body;
+  await runSql('INSERT INTO locales (nombre,direccion,latitud,longitud) VALUES (?,?,?,?)', [nombre, direccion, latitud, longitud]);
+  sendTelegramAlert(`➕ <b>ADMIN: NUEVO LOCAL</b>\nNombre: ${nombre}`);
+  res.json({ ok: true });
+});
+
+app.put('/api/admin/locales/:id', authMw, async (req, res) => {
+  const { nombre, direccion, latitud, longitud } = req.body;
+  await runSql('UPDATE locales SET nombre=?, direccion=?, latitud=?, longitud=? WHERE id=?', [nombre, direccion, latitud, longitud, req.params.id]);
+  sendTelegramAlert(`🛠️ <b>ADMIN: LOCAL ACTUALIZADO</b>\nID: ${req.params.id}\nNombre: ${nombre}`);
+  res.json({ ok: true });
+});
+
+app.delete('/api/admin/locales/:id', authMw, async (req, res) => {
+  const local = await queryOne('SELECT nombre FROM locales WHERE id = ?', [req.params.id]);
+  await runSql('DELETE FROM locales WHERE id = ?', [req.params.id]);
+  sendTelegramAlert(`🗑️ <b>ADMIN: LOCAL ELIMINADO</b>\nLocal: ${local?.nombre}`);
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/productos', authMw, async (req, res) => res.json(await queryAll('SELECT p.*, l.nombre as local_nombre FROM productos p JOIN locales l ON p.local_id = l.id')));
+
+app.post('/api/admin/productos', authMw, async (req, res) => {
+  const { local_id, nombre, precio } = req.body;
+  await runSql('INSERT INTO productos (local_id, nombre, precio) VALUES (?,?,?)', [local_id, nombre, precio]);
+  sendTelegramAlert(`➕ <b>ADMIN: NUEVO PRODUCTO</b>\nNombre: ${nombre}`);
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/productos/masivo', authMw, async (req, res) => {
+  const { productos } = req.body;
+  for (const p of productos) {
+    await runSql('INSERT INTO productos (local_id, nombre, precio) VALUES (?,?,?)', [p.local_id, p.nombre, p.precio]);
+  }
+  sendTelegramAlert(`➕ <b>ADMIN: CARGA MASIVA</b>\nProductos añadidos: ${productos.length}`);
+  res.json({ ok: true });
+});
+
+app.put('/api/admin/productos/:id', authMw, async (req, res) => {
+  const { nombre, precio } = req.body;
+  await runSql('UPDATE productos SET nombre=?, precio=? WHERE id=?', [nombre, precio, req.params.id]);
+  sendTelegramAlert(`🛠️ <b>ADMIN: PRODUCTO ACTUALIZADO</b>\nID: ${req.params.id}\nNombre: ${nombre}`);
+  res.json({ ok: true });
+});
+
+app.delete('/api/admin/productos/:id', authMw, async (req, res) => {
+  await runSql('DELETE FROM productos WHERE id = ?', [req.params.id]);
+  sendTelegramAlert(`🗑️ <b>ADMIN: PRODUCTO ELIMINADO</b>\nID: ${req.params.id}`);
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/servicios', authMw, async (req, res) => res.json(await queryAll('SELECT * FROM servicios ORDER BY nombre_prestador')));
+
+app.post('/api/admin/servicios', authMw, async (req, res) => {
+  const { tipo, nombre_prestador, telefono } = req.body;
+  await runSql('INSERT INTO servicios (tipo, nombre_prestador, telefono) VALUES (?,?,?)', [tipo, nombre_prestador, telefono]);
+  sendTelegramAlert(`➕ <b>ADMIN: NUEVO SERVICIO</b>\nPrestador: ${nombre_prestador}`);
+  res.json({ ok: true });
+});
+
+app.put('/api/admin/servicios/:id', authMw, async (req, res) => {
+  const { tipo, nombre_prestador, telefono } = req.body;
+  await runSql('UPDATE servicios SET tipo=?, nombre_prestador=?, telefono=? WHERE id=?', [tipo, nombre_prestador, telefono, req.params.id]);
+  sendTelegramAlert(`🛠️ <b>ADMIN: SERVICIO ACTUALIZADO</b>\nPrestador: ${nombre_prestador}`);
+  res.json({ ok: true });
+});
+
+app.delete('/api/admin/servicios/:id', authMw, async (req, res) => {
+  await runSql('DELETE FROM servicios WHERE id = ?', [req.params.id]);
+  sendTelegramAlert(`🗑️ <b>ADMIN: SERVICIO ELIMINADO</b>\nID: ${req.params.id}`);
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/export/reportes', authMw, async (req, res) => {
+  const reports = await queryAll('SELECT r.*, u.nombre FROM reportes_ciudadanos r LEFT JOIN usuarios u ON r.usuario_id = u.id');
+  sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN DE DATOS</b>\nReporte CSV generado.`);
+  let csv = 'ID;Fecha;Tipo;Denunciante\n';
+  reports.forEach(r => csv += `${r.id};${r.created_at};${r.tipo_reporte};${r.nombre}\n`);
+  res.setHeader('Content-Type', 'text/csv'); res.setHeader('Content-Disposition', 'attachment; filename=reportes.csv');
+  res.send(csv);
+});
+
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-
-
 
 async function start() {
   await initDatabase();
-  
-  // MIGRACIÓN: Marcar usuarios antiguos como verificados
-  try {
-    const result = await dbHelper.runSql('UPDATE usuarios SET is_verified = 1 WHERE is_verified = 0 OR is_verified IS NULL');
-    console.log('✅ Migración de verificación completada');
-  } catch(e) { console.error('Error migración:', e); }
-
-  // LIMPIEZA: Mascotas de más de 30 días
-  try {
-    const deletedCount = await cleanupMascotas();
-    if (deletedCount > 0) {
-      sendTelegramAlert(`🧹 <b>Limpieza Automática</b>\nSe han eliminado ${deletedCount} avisos de mascotas por cumplir 30 días de antigüedad.`);
-    }
-  } catch(e) { console.error('Error cleanup:', e); }
-
-  sendTelegramAlert('✅ <b>BARRIO ACTUALIZADO</b>\nEl sistema se ha reiniciado con las últimas mejoras (v1.2).\nLas notificaciones están activas.');
-
-  // Keep-Alive para Render
-  const externalUrl = process.env.RENDER_EXTERNAL_URL;
-  if (externalUrl) {
-    const min = 5 * 60 * 1000; // 5 minutos
-    const max = 10 * 60 * 1000; // 10 minutos
-    const pingSelf = () => {
-      fetch(`${externalUrl}/api/ping`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ device_id: 'auto-ping-render' })
-      }).then(() => console.log(`[Anti-Sleep] Ping enviado a ${externalUrl} a las ${new Date().toLocaleTimeString()}`))
-        .catch(e => console.error('[Anti-Sleep] Error:', e.message));
-      
-      const nextPing = Math.floor(Math.random() * (max - min + 1) + min);
-      setTimeout(pingSelf, nextPing);
-    };
-    setTimeout(pingSelf, min);
-    console.log(`[Anti-Sleep] Activado para ${externalUrl}`);
-  }
-
   app.listen(PORT, () => {
-    console.log(`\n🏘️  BARRIO está corriendo en http://localhost:${PORT}`);
-    console.log(`🔐 Clave maestra de reseteo: ${MASTER_RESET_KEY}`);
-    console.log(`   Para resetear claves: POST /api/emergency-reset con { "master_key": "${MASTER_RESET_KEY}" }\n`);
+    console.log(`Server on ${PORT}`);
+    sendTelegramAlert(`🚀 <b>SISTEMA BARRIO INICIADO</b>\nServidor activo y conectado a la base de datos.`);
   });
 }
 start();

@@ -61,6 +61,8 @@ const API = {
   submitRating(storeId, data) { return this.post(`/api/locales/${storeId}/calificaciones`, data); },
 
   getConfig() { return this.get('/api/config'); },
+  getReportes() { return this.get('/api/reportes'); },
+  createReporte(data) { return this.post('/api/reportes', data); },
   getMascotas() { return this.get('/api/mascotas'); },
   createMascota(data) { return this.post('/api/mascotas', data); },
 

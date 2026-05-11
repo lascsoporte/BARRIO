@@ -56,7 +56,14 @@ async function createCloudTables() {
     `CREATE TABLE IF NOT EXISTS usuarios (
       id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(255) NOT NULL, telefono VARCHAR(50) NOT NULL UNIQUE,
       direccion TEXT, ip VARCHAR(100), device_id VARCHAR(255), 
-      is_blocked TINYINT(1) DEFAULT 0, is_stolen TINYINT(1) DEFAULT 0, is_verified TINYINT(1) DEFAULT 0, terms_accepted TINYINT(1) DEFAULT 0,
+      is_blocked TINYINT(1) DEFAULT 0, is_stolen TINYINT(1) DEFAULT 0, is_verified TINYINT(1) DEFAULT 0, 
+      terms_accepted TINYINT(1) DEFAULT 0, nickname VARCHAR(100), email VARCHAR(255), pin_seguridad VARCHAR(4),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS reportes_ciudadanos (
+      id INT AUTO_INCREMENT PRIMARY KEY, usuario_id INT, nombre_contacto VARCHAR(255) NOT NULL, telefono VARCHAR(50) NOT NULL,
+      tipo_reporte VARCHAR(50) DEFAULT 'otros', ubicacion_texto TEXT, foto_base64 LONGTEXT,
+      detalles TEXT, latitud DOUBLE, longitud DOUBLE, fecha_expiracion TIMESTAMP NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS locales (
@@ -122,9 +129,14 @@ async function createCloudTables() {
   try {
     await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN terms_accepted TINYINT(1) DEFAULT 0');
     console.log('✅ Columna terms_accepted añadida a usuarios');
-  } catch (e) {
-    // Si ya existe, fallará pero no pasa nada
-  }
+  } catch (e) {}
+
+  try {
+    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN nickname VARCHAR(100)');
+    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN email VARCHAR(255)');
+    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN pin_seguridad VARCHAR(4)');
+    console.log('✅ Columnas de seguridad añadidas a usuarios');
+  } catch (e) {}
 
   // Configuración inicial
   const [rows] = await mysqlPool.execute('SELECT COUNT(*) as count FROM configuracion');
@@ -197,4 +209,17 @@ async function cleanupMascotas() {
   }
 }
 
-module.exports = { initDatabase, queryAll, queryOne, runSql, cleanupMascotas };
+async function cleanupReportes() {
+  const sql = useMysql 
+    ? "DELETE FROM reportes_ciudadanos WHERE fecha_expiracion < NOW()"
+    : "DELETE FROM reportes_ciudadanos WHERE fecha_expiracion < DATETIME('now')";
+  try {
+    const result = await runSql(sql);
+    return result.affectedRows || 0;
+  } catch (e) {
+    console.error('Error en limpieza de reportes:', e);
+    return 0;
+  }
+}
+
+module.exports = { initDatabase, queryAll, queryOne, runSql, cleanupMascotas, cleanupReportes, isUsingMysql: () => useMysql };
