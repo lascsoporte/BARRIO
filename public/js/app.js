@@ -212,9 +212,9 @@ const App = {
           <button onclick="App.hideShareMenu()">&times;</button>
         </div>
         <div style="padding:20px;">
-          <p style="margin-bottom:20px; font-size:0.9rem; color:#666;">Invita a tus vecinos a unirse a la comunidad de Puerto Montt.</p>
+          <p style="margin-bottom:20px; font-size:0.9rem; color:#666;">Invita a tus vecinos a unirse a la comunidad.</p>
           
-          <a href="https://wa.me/?text=Hola!%20Te%20invito%20a%20usar%20BARRIO,%20la%20app%20de%20nuestra%20comunidad%20en%20Puerto%20Montt:%20https://www.puertomas.cl" target="_blank" class="btn" style="background:#25D366; color:white; width:100%; justify-content:center; margin-bottom:20px; font-weight:900;">
+          <a href="https://wa.me/?text=Hola!%20Te%20invito%20a%20usar%20BARRIO,%20la%20app%20de%20nuestra%20comunidad:%20https://www.puertomas.cl" target="_blank" class="btn" style="background:#25D366; color:white; width:100%; justify-content:center; margin-bottom:20px; font-weight:900;">
             ENVIAR POR WHATSAPP
           </a>
 
