@@ -836,7 +836,7 @@ const Admin = {
  
   // ===== REPORTES TAB =====
   async renderReportesTab(c) {
-    const reportes = await API.get('/api/admin/reportes');
+    const reportes = await API.get('/api/admin/reportes', this.token);
     window._tempReportes = reportes.map(r => ({ 
       "Tipo": r.tipo_reporte,
       "Detalles": r.detalles,

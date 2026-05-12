@@ -2,8 +2,10 @@
 const API = {
   base: '',
 
-  async get(url) {
-    const res = await fetch(this.base + url);
+  async get(url, token) {
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(this.base + url, { headers });
     if (!res.ok) throw new Error(`Error ${res.status}`);
     return res.json();
   },
@@ -80,24 +82,18 @@ const API = {
   adminLogin(passwords) { return this.post('/api/admin/login', { passwords }); },
   adminResolveMap(url, token) { return this.post('/api/admin/resolve-map', { url }, token); },
 
-  adminGetLocales(token) {
-    return fetch('/api/admin/locales', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
-  },
+  adminGetLocales(token) { return this.get('/api/admin/locales', token); },
   adminCreateLocal(data, token) { return this.post('/api/admin/locales', data, token); },
   adminUpdateLocal(id, data, token) { return this.put(`/api/admin/locales/${id}`, data, token); },
   adminDeleteLocal(id, token) { return this.del(`/api/admin/locales/${id}`, token); },
 
-  adminGetProductos(token) {
-    return fetch('/api/admin/productos', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
-  },
+  adminGetProductos(token) { return this.get('/api/admin/productos', token); },
   adminCreateProducto(data, token) { return this.post('/api/admin/productos', data, token); },
   adminCreateProductosMasivo(data, token) { return this.post('/api/admin/productos/masivo', data, token); },
   adminUpdateProducto(id, data, token) { return this.put(`/api/admin/productos/${id}`, data, token); },
   adminDeleteProducto(id, token) { return this.del(`/api/admin/productos/${id}`, token); },
 
-  adminGetServicios(token) {
-    return fetch('/api/admin/servicios', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
-  },
+  adminGetServicios(token) { return this.get('/api/admin/servicios', token); },
   adminCreateServicio(data, token) { return this.post('/api/admin/servicios', data, token); },
   adminUpdateServicio(id, data, token) { return this.put(`/api/admin/servicios/${id}`, data, token); },
   adminDeleteServicio(id, token) { return this.del(`/api/admin/servicios/${id}`, token); },
@@ -108,36 +104,16 @@ const API = {
   adminDeleteRastreo(id, token) { return this.del(`/api/admin/rastreo/${id}`, token); },
   adminUpdateConfig(data, token) { return this.put('/api/admin/config', data, token); },
   adminChangePasswords(data, token) { return this.put('/api/admin/passwords', data, token); },
-  adminGetStats(token) {
-    return fetch('/api/admin/stats', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
-  },
-  adminGetMensajes(token) {
-    return fetch('/api/admin/mensajes', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
-  },
-  adminMarkMensaje(id, token) {
-    return this.put(`/api/admin/mensajes/${id}/leido`, {}, token);
-  },
-  adminGetUsuarios(token) {
-    return fetch('/api/admin/usuarios', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
-  },
-  adminToggleStolenUsuario(id, is_stolen, token) {
-    return this.put(`/api/admin/usuarios/${id}/robado`, { is_stolen }, token);
-  },
-  adminToggleBlockUsuario(id, is_blocked, token) {
-    return this.put(`/api/admin/usuarios/${id}/bloquear`, { is_blocked }, token);
-  },
-  adminVerifyUsuario(id, is_verified, token) {
-    return this.put(`/api/admin/usuarios/${id}/verificar`, { is_verified }, token);
-  },
-  adminDeleteUsuario(id, token) {
-    return this.del(`/api/admin/usuarios/${id}`, token);
-  },
-  adminGetEmergencias(token) {
-    return fetch('/api/admin/emergencias', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
-  },
-  adminGetRastreo(token) {
-    return fetch('/api/admin/rastreo', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json());
-  },
+  adminGetStats(token) { return this.get('/api/admin/stats', token); },
+  adminGetMensajes(token) { return this.get('/api/admin/mensajes', token); },
+  adminMarkMensaje(id, token) { return this.put(`/api/admin/mensajes/${id}/leido`, {}, token); },
+  adminGetUsuarios(token) { return this.get('/api/admin/usuarios', token); },
+  adminToggleStolenUsuario(id, is_stolen, token) { return this.put(`/api/admin/usuarios/${id}/robado`, { is_stolen }, token); },
+  adminToggleBlockUsuario(id, is_blocked, token) { return this.put(`/api/admin/usuarios/${id}/bloquear`, { is_blocked }, token); },
+  adminVerifyUsuario(id, is_verified, token) { return this.put(`/api/admin/usuarios/${id}/verificar`, { is_verified }, token); },
+  adminDeleteUsuario(id, token) { return this.del(`/api/admin/usuarios/${id}`, token); },
+  adminGetEmergencias(token) { return this.get('/api/admin/emergencias', token); },
+  adminGetRastreo(token) { return this.get('/api/admin/rastreo', token); },
   adminClearMuro(token) { return this.del('/api/admin/muro', token); },
   adminDeleteMuroPost(id, token) { return this.del(`/api/admin/muro/${id}`, token); },
   adminNotifyEntry(token) { return this.post('/api/admin/notify-entry', {}, token); },
