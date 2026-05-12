@@ -186,7 +186,7 @@ const App = {
           <a href="tel:134" onclick="App.logLlamada('134 - PDI')" class="emg-btn" style="background:#0D47A1;">PDI (134)</a>
           <a href="tel:1529" onclick="App.logLlamada('1529 - SEGURIDAD CIUDADANA PUERTO MONTT')" class="emg-btn" style="background:#F57C00;">SEGURIDAD CIUDADANA PUERTO MONTT (1529)</a>
           <div style="margin-top:15px; border-top:1px solid #EEE; padding-top:15px;">
-            <button onclick="location.hash='#/legal'" class="btn btn-sm" style="background:#D32F2F; color:white; width:100%; justify-content:center;">🚨 REPORTAR TELÉFONO EXTRAVIADO</button>
+            <button onclick="location.hash='#/legal'" class="btn btn-sm" style="background:#673AB7; color:white; width:100%; justify-content:center; font-weight:900;">REPORTAR TELÉFONO EXTRAVIADO</button>
           </div>
         </div>
       </div>
@@ -1056,9 +1056,9 @@ const App = {
       <p><strong>2. Emergencias:</strong> Esta app NO reemplaza a los servicios de emergencia oficiales. Siempre llame al 133 o 132 primero.</p>
       <p><strong>3. Privacidad:</strong> Sus datos personales están protegidos y solo se muestra su Nickname en el muro y mapa.</p>
       <hr style="margin:20px 0; border:0; border-top:1px solid #EEE;">
-      <h3 style="color:#D32F2F; margin-bottom:10px;">🚨 Reporte de Extravío</h3>
-      <p>Si perdiste tu celular o fue robado y tenías instalada esta aplicación, puedes reportarlo aquí para activar el <strong>Rastreo Silencioso</strong>.</p>
-      <button id="btnReportarRobo" class="btn btn-primary" style="background:#D32F2F; width:100%; margin-top:10px;">Reportar Teléfono Extraviado</button>
+      <h3 style="color:#673AB7; margin-bottom:10px;">Reporte de Extravío</h3>
+      <p>Si extraviaste tu celular y tenías instalada esta aplicación, puedes reportarlo aquí para <strong>saber si se continúa utilizando nuestra aplicación</strong>.</p>
+      <button id="btnReportarRobo" class="btn btn-primary" style="background:#673AB7; width:100%; margin-top:10px; font-weight:900;">REPORTAR TELÉFONO EXTRAVIADO</button>
     </div>
     ${this.footerHtml()}
     `;
