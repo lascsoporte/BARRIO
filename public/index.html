@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BARRIO - Bienvenido a tu Comunidad</title>
+    <meta name="description" content="BARRIO - Encuentra productos y servicios en tu barrio. Puerto Montt, Chile.">
+    <meta name="theme-color" content="#FF6B35">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www=' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏘️</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -143,6 +148,15 @@
     </div>
 
     <script>
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(reg => {
+                    console.log('SW Registered', reg);
+                }).catch(err => console.error('SW Error', err));
+            });
+        }
+
         // Redirección automática si entran con #/admin en la URL raíz
         if (window.location.hash.startsWith('#/admin')) {
             window.location.href = '/app.html' + window.location.hash;
