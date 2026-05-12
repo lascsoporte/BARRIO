@@ -1024,10 +1024,12 @@ const App = {
           <input type="password" id="authPin" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" maxlength="4" placeholder="****">
         </div>
         <div class="form-group">
-          <label>Población/Sector</label>
+          <label>Población/Sector (Referencia)</label>
           <input type="text" id="authDireccion" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Mirasol, PM">
         </div>
       </div>
+      <p style="font-size:0.8rem; color:var(--primary); font-weight:bold; margin:10px 0 5px;">📍 MARCA TU HOGAR EN EL MAPA</p>
+      <div id="homeSelectMap" style="height: 180px; width: 100%; border-radius: 12px; margin-bottom: 10px; border: 2px solid var(--primary); z-index:1;"></div>
       <button id="authSubmit" class="btn btn-primary" style="margin-top:10px; width:100%; font-weight:900;">REGISTRARME AHORA</button>
       <p style="font-size:0.7rem; color:var(--text-light); margin-top:15px;">Tus datos reales son privados. El PIN se enviará a tu correo.</p>
     </div>
@@ -1053,7 +1055,8 @@ const App = {
         const termsAccepted = localStorage.getItem('barrio_disclaimer_v2') === 'true';
         const res = await API.registerUser({ 
           nombre, nickname, telefono, email, pin_seguridad: pin, 
-          direccion, device_id: this.deviceId, terms_accepted: termsAccepted 
+          direccion, device_id: this.deviceId, terms_accepted: termsAccepted,
+          home_lat: homeLat, home_lng: homeLng
         });
         localStorage.setItem('barrio_user', JSON.stringify(res.user));
         this.toast('¡Registro enviado! Revisa tu correo por tu PIN.');
@@ -1061,10 +1064,29 @@ const App = {
         this.showPendingVerification();
       } catch (err) {
         btn.disabled = false;
-        btn.textContent = 'Registrarme';
+        btn.textContent = 'Registrarme AHORA';
         this.toast(err.message || 'Error al registrar');
       }
     });
+
+    // Iniciar mapa de hogar
+    let homeLat = null, homeLng = null;
+    let homeMarker = null;
+    setTimeout(() => {
+      try {
+        const hMap = L.map('homeSelectMap').setView([-41.4693, -72.9423], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(hMap);
+        hMap.on('click', (e) => {
+          homeLat = e.latlng.lat;
+          homeLng = e.latlng.lng;
+          if (homeMarker) hMap.removeLayer(homeMarker);
+          homeMarker = L.marker([homeLat, homeLng], {
+            icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px; background:var(--primary); color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.4); border:2px solid white;">🏠</div>`})
+          }).addTo(hMap);
+        });
+        if (Geo.userLat) hMap.setView([Geo.userLat, Geo.userLng], 16);
+      } catch(e) { console.error("Error al cargar mapa de hogar"); }
+    }, 500);
   },
 
  showPendingVerification() {

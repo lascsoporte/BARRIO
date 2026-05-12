@@ -142,7 +142,9 @@ async function createCloudTables() {
     await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN push_enabled TINYINT(1) DEFAULT 0');
     await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN last_lat DOUBLE');
     await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN last_lng DOUBLE');
-    console.log('✅ Columnas de seguridad, push y ubicación añadidas a usuarios');
+    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN home_lat DOUBLE');
+    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN home_lng DOUBLE');
+    console.log('✅ Columnas de seguridad, push y ubicación (fija y dinámica) añadidas a usuarios');
   } catch (e) {}
 
   // Configuración inicial

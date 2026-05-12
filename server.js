@@ -66,9 +66,12 @@ async function sendPushToNearbyUsers(reportLat, reportLng, title, body, excludeU
   `, [excludeUserId || 0]);
 
   for (let s of subscriptions) {
-    // Filtrar por distancia si tenemos la ubicación del usuario
-    if (s.last_lat && s.last_lng) {
-      const dist = haversineDistance(reportLat, reportLng, s.last_lat, s.last_lng) * 1000; // a metros
+    // Prioridad: 1. Ubicación dinámica (si la app está abierta) 2. Ubicación del hogar (si la app está cerrada)
+    const userLat = s.last_lat || s.home_lat;
+    const userLng = s.last_lng || s.home_lng;
+
+    if (userLat && userLng) {
+      const dist = haversineDistance(reportLat, reportLng, userLat, userLng) * 1000;
       if (dist > radius) continue;
     }
 
@@ -173,16 +176,16 @@ app.post('/api/reportes', async (req, res) => {
 });
 
 app.post('/api/registro', async (req, res) => {
-  const { nombre, telefono, email, nickname, pin_seguridad, device_id } = req.body;
+  const { nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion } = req.body;
   let user = await queryOne('SELECT * FROM usuarios WHERE telefono = ?', [telefono]);
   if (!user) {
-    const r = await runSql('INSERT INTO usuarios (nombre, telefono, email, nickname, pin_seguridad, device_id) VALUES (?,?,?,?,?,?)', [nombre, telefono, email||'', nickname||'', pin_seguridad||'', device_id||'']);
+    const r = await runSql('INSERT INTO usuarios (nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion) VALUES (?,?,?,?,?,?,?,?,?)', [nombre, telefono, email||'', nickname||'', pin_seguridad||'', device_id||'', home_lat||null, home_lng||null, direccion||'']);
     user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [r.insertId]);
     sendTelegramAlert(`🆕 <b>NUEVO REGISTRO</b>\nNombre: ${nombre}\nNick: ${nickname}\nTel: ${telefono}`);
     if (email && pin_seguridad) sendEmailPin(email, nickname||nombre, pin_seguridad);
   } else {
-    await runSql('UPDATE usuarios SET nombre=?, email=?, nickname=?, pin_seguridad=? WHERE id=?', [nombre, email||user.email, nickname||user.nickname, pin_seguridad||user.pin_seguridad, user.id]);
-    user = { ...user, nombre, email, nickname, pin_seguridad };
+    await runSql('UPDATE usuarios SET nombre=?, email=?, nickname=?, pin_seguridad=?, home_lat=?, home_lng=?, direccion=? WHERE id=?', [nombre, email||user.email, nickname||user.nickname, pin_seguridad||user.pin_seguridad, home_lat||user.home_lat, home_lng||user.home_lng, direccion||user.direccion, user.id]);
+    user = { ...user, nombre, email, nickname, pin_seguridad, home_lat, home_lng, direccion };
     sendTelegramAlert(`🔄 <b>PERFIL ACTUALIZADO</b>\nUsuario: ${nickname || nombre}`);
   }
   res.json({ user });
