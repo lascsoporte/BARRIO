@@ -70,7 +70,7 @@ async function sendPushToNearbyUsers(reportLat, reportLng, title, body, excludeU
   const radius = parseFloat(radiusConfig?.valor || 500);
   
   const subscriptions = await queryAll(`
-    SELECT ps.subscription_json, u.id, u.last_lat, u.last_lng 
+    SELECT ps.subscription_json, u.id, u.last_lat, u.last_lng, u.home_lat, u.home_lng
     FROM push_subscriptions ps
     JOIN usuarios u ON ps.usuario_id = u.id
     WHERE u.push_enabled = 1 AND u.id != ?

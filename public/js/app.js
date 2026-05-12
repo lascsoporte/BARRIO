@@ -6,11 +6,9 @@ const App = {
  async init() {
   const hash = location.hash || '#/';
   if (hash.includes('/admin')) {
-    setTimeout(() => {
-      const loader = document.querySelector('.loading-screen');
-      if (loader) loader.remove();
-      Admin.route(document.getElementById('app'), hash);
-    }, 100);
+    const loader = document.querySelector('.loading-screen') || document.getElementById('loadingScreen');
+    if (loader) loader.style.display = 'none';
+    Admin.route(document.getElementById('app'), hash);
     return;
   }
 
