@@ -6,7 +6,7 @@ const App = {
  async init() {
   const hash = location.hash || '#/';
   if (hash.includes('/admin')) {
-    const loader = document.getElementById('loadingScreen');
+    const loader = document.querySelector('.loading-screen');
     if (loader) loader.remove();
     Admin.route(document.getElementById('app'), hash);
     return; // Detener init normal para el admin
