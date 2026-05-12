@@ -164,8 +164,9 @@ const App = {
         </div>
       </div>
 
-      <div style="margin-top:20px; text-align:center;">
-        <p style="font-size:0.8rem; color:var(--text-light); margin-bottom:10px;">📍 <b>Georreferencia activa</b> para seguridad ciudadana.</p>
+      <div style="margin-top:20px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px;">
+        <p style="font-size:0.8rem; color:var(--text-light); margin-bottom:0;">📍 <b>Georreferencia activa</b> para seguridad ciudadana.</p>
+        <button onclick="App.showShareMenu()" style="background:#673AB7; color:white; border:none; padding:10px 25px; border-radius:25px; font-weight:900; font-size:0.9rem; cursor:pointer; width:80%; max-width:250px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">COMPARTIR APP</button>
       </div>
 
       ${this.footerHtml()}
@@ -201,6 +202,27 @@ const App = {
         <div style="padding:15px;">
           <input type="text" id="searchInputModal" placeholder="Ej: pan, gasfiter, farmacia..." style="width:100%; padding:15px; border-radius:12px; border:2px solid #EEE; font-size:1.1rem; outline:none; font-family:inherit;">
           <button onclick="App.doSearchModal()" class="btn btn-primary" style="margin-top:15px; width:100%; font-weight:900;">BUSCAR AHORA</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="shareModal" class="bottom-sheet">
+      <div class="sheet-content" style="padding-bottom:30px; text-align:center;">
+        <div class="sheet-header">
+          <h3 style="margin:0; font-weight:900; color:#673AB7;">COMPARTIR BARRIO</h3>
+          <button onclick="App.hideShareMenu()">&times;</button>
+        </div>
+        <div style="padding:20px;">
+          <p style="margin-bottom:20px; font-size:0.9rem; color:#666;">Invita a tus vecinos a unirse a la comunidad de Puerto Montt.</p>
+          
+          <a href="https://wa.me/?text=Hola!%20Te%20invito%20a%20usar%20BARRIO,%20la%20app%20de%20nuestra%20comunidad%20en%20Puerto%20Montt:%20https://www.puertomas.cl" target="_blank" class="btn" style="background:#25D366; color:white; width:100%; justify-content:center; margin-bottom:20px; font-weight:900;">
+            ENVIAR POR WHATSAPP
+          </a>
+
+          <div style="background:#F9F9F9; padding:15px; border-radius:12px;">
+            <p style="font-weight:bold; margin-bottom:10px; font-size:0.8rem; color:#333;">ESCANEA EL CÓDIGO QR</p>
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://www.puertomas.cl" style="width:180px; height:180px; border:5px solid white; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+          </div>
         </div>
       </div>
     </div>
@@ -256,6 +278,8 @@ const App = {
       location.hash = `#/buscar?q=${encodeURIComponent(q)}`;
     }
   },
+  showShareMenu() { document.getElementById('shareModal').classList.add('active'); },
+  hideShareMenu() { document.getElementById('shareModal').classList.remove('active'); },
 
  // ===== PRODUCT SEARCH =====
  async renderSearch(container) {
