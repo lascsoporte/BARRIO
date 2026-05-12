@@ -42,9 +42,10 @@ const App = {
   }
  }
 
- this.requireAuth((user) => {
- this.continueInit(user);
- }, true);
+  this.requireAuth((user) => {
+  this.continueInit(user);
+  this.setupPushNotifications(user);
+  }, true);
  },
 
  async continueInit(user) {
@@ -63,9 +64,9 @@ const App = {
  }
 
  document.getElementById('btnLateralWhatsapp').href = this.config.whatsapp_vecinos || '#';
- let isTrackingStarted = false;
- const checkExtravio = () => {
-   API.ping(this.deviceId).then(res => {
+  let isTrackingStarted = false;
+  const checkExtravio = () => {
+    API.ping(this.deviceId, Geo.userLat, Geo.userLng).then(res => {
      if (res.status === 'stolen' && !isTrackingStarted) {
        isTrackingStarted = true;
        // Obligar al sensor GPS a darnos coordenadas reales cada 10 segundos
@@ -89,7 +90,12 @@ const App = {
  }
  }
 
- window.addEventListener('hashchange', () => this.route());
+  window.addEventListener('hashchange', () => this.route());
+  
+  // Actualizar ubicación para geofencing de push
+  setInterval(() => {
+    if (Geo.userLat) API.ping(this.deviceId, Geo.userLat, Geo.userLng).catch(()=>{});
+  }, 300000); // Cada 5 minutos si está la app abierta
  
  setTimeout(() => {
  if (!Geo.userLat && !localStorage.getItem('barrio_gps_dismissed')) {
@@ -261,6 +267,68 @@ const App = {
   hideEmergencyMenu() { 
     document.getElementById('emergencyMenu').classList.remove('active');
     if (location.hash === '#/emergencia-menu') history.back();
+  },
+
+  urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  },
+
+  async setupPushNotifications(user) {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (localStorage.getItem('barrio_push_enabled')) return;
+
+    setTimeout(() => {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay active';
+      modal.innerHTML = `
+        <div class="modal-content" style="text-align:center; padding:30px; border-radius:20px; background:white;">
+          <div style="font-size:3.5rem; margin-bottom:15px;">🔔</div>
+          <h2 style="color:var(--primary); margin-bottom:10px; font-weight:900;">¡Mantente Alerta!</h2>
+          <p style="color:#666; margin-bottom:20px; font-size:0.95rem; line-height:1.4;">¿Deseas recibir avisos de seguridad (robos, incendios, sospechosos) que ocurran a menos de 500m de tu ubicación?</p>
+          <button id="btnAcceptPush" class="btn btn-primary" style="width:100%; margin-bottom:10px; font-weight:900; height:50px;">SÍ, ACTIVAR ALERTAS</button>
+          <button id="btnDenyPush" class="btn btn-outline" style="width:100%; border:none; color:#999; font-weight:700;">Ahora no, gracias</button>
+          <p style="font-size:0.75rem; color:#AAA; margin-top:15px;">Tu privacidad está protegida. Podrás desactivarlas cuando quieras.</p>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      document.getElementById('btnDenyPush').onclick = () => {
+        modal.remove();
+        localStorage.setItem('barrio_push_enabled', 'denied_temp');
+      };
+
+      document.getElementById('btnAcceptPush').onclick = async () => {
+        const btn = document.getElementById('btnAcceptPush');
+        btn.disabled = true; btn.textContent = 'Activando...';
+        try {
+          const permission = await Notification.requestPermission();
+          if (permission === 'granted') {
+            const registration = await navigator.serviceWorker.ready;
+            const subscription = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: this.urlBase64ToUint8Array('BPfYyug0EiK_oS0FRF8w-k2WpxoDs79-DZjjFI505RsAeUrzi5e88XPgsj8Pp2YV6pZfMtnb-IXiYN8tJ9mgrFc')
+            });
+            await API.savePushSubscription({ userId: user.id, subscription });
+            localStorage.setItem('barrio_push_enabled', 'true');
+            App.toast("✅ Alertas activadas correctamente");
+          } else {
+            localStorage.setItem('barrio_push_enabled', 'denied_perm');
+          }
+        } catch (e) {
+          console.error('Push Error:', e);
+          App.toast("Error al activar notificaciones");
+        } finally {
+          modal.remove();
+        }
+      };
+    }, 3000);
   },
   showSearchModal() { 
     document.getElementById('searchModal').classList.add('active');

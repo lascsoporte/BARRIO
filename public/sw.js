@@ -15,3 +15,21 @@ self.addEventListener('fetch', (e) => {
   if (e.request.url.includes('/api/')) return; // Don't cache API calls
   e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });
+
+self.addEventListener('push', (event) => {
+  const data = event.data.json();
+  const title = data.title;
+  const options = {
+    body: data.body,
+    icon: '/favicon.ico', // Usar icono disponible
+    badge: '/favicon.ico',
+    vibrate: [200, 100, 200],
+    data: { url: '/app.html' }
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(clients.openWindow(event.notification.data.url));
+});

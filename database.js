@@ -111,6 +111,10 @@ async function createCloudTables() {
       id INT AUTO_INCREMENT PRIMARY KEY, usuario_id INT NOT NULL, latitud DOUBLE NOT NULL,
       longitud DOUBLE NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
+    `CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id INT AUTO_INCREMENT PRIMARY KEY, usuario_id INT NOT NULL, 
+      subscription_json TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
     `CREATE TABLE IF NOT EXISTS configuracion ( clave VARCHAR(100) PRIMARY KEY, valor TEXT )`
   ];
 
@@ -135,7 +139,10 @@ async function createCloudTables() {
     await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN nickname VARCHAR(100)');
     await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN email VARCHAR(255)');
     await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN pin_seguridad VARCHAR(4)');
-    console.log('✅ Columnas de seguridad añadidas a usuarios');
+    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN push_enabled TINYINT(1) DEFAULT 0');
+    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN last_lat DOUBLE');
+    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN last_lng DOUBLE');
+    console.log('✅ Columnas de seguridad, push y ubicación añadidas a usuarios');
   } catch (e) {}
 
   // Configuración inicial
@@ -147,6 +154,7 @@ async function createCloudTables() {
     await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('tel_pdi', '134')");
     await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('tel_ambulancia', '131')");
     await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('tel_seguridad', '1529')");
+    await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('push_radius', '500')");
   }
 }
 

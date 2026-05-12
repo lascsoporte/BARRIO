@@ -470,6 +470,13 @@ const Admin = {
  <label>Seguridad Ciudadana</label>
  <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="text" id="confSeguridad" value="${config.tel_seguridad || '1529'}" placeholder="Ej: 1529">
  </div>
+  
+  <h3 style="margin-top:25px; margin-bottom:15px; color:#2E7D32;">🔔 Configuración de Notificaciones</h3>
+  <div class="form-group">
+  <label>Radio de Alerta (Metros)</label>
+  <input autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" type="number" id="confPushRadius" value="${config.push_radius || '500'}" placeholder="Ej: 500">
+  <small style="color:#666;">Distancia a la redonda para notificar a los vecinos cercanos.</small>
+  </div>
 
  <button class="btn btn-primary" id="btnSaveConfig" style="margin-top:10px;">💾 Guardar Cambios</button>
  </div>
@@ -480,7 +487,8 @@ const Admin = {
  tel_bomberos: document.getElementById('confBomberos').value.trim(),
  tel_pdi: document.getElementById('confPdi').value.trim(),
  tel_ambulancia: document.getElementById('confAmbulancia').value.trim(),
- tel_seguridad: document.getElementById('confSeguridad').value.trim()
+ tel_seguridad: document.getElementById('confSeguridad').value.trim(),
+ push_radius: document.getElementById('confPushRadius').value.trim()
  };
 
  const btn = document.getElementById('btnSaveConfig');
@@ -672,7 +680,16 @@ const Admin = {
  // ===== USUARIOS TAB =====
  async renderUsuariosTab(c) {
  const usuarios = await API.adminGetUsuarios(this.token);
- window._tempUsuariosExport = usuarios.map(u => ({ "Nombre": u.nombre || "No especificado", "Nickname": u.nickname || "No especificado", "Telefono": u.telefono || "No especificado", "Fecha": new Date(u.created_at).toLocaleDateString(), "Ubicacion": u.direccion || "No especificada", "Hora de Aceptación": u.terms_accepted ? new Date(u.created_at).toLocaleTimeString() : "No registrada", "Estado de Uso (Condicion)": u.is_blocked ? "Bloqueado" : (u.is_verified ? "Activo" : "En Verificación"), "Terminos y Condiciones": u.terms_accepted ? "Aceptados" : "Pendientes" }));
+ window._tempUsuariosExport = usuarios.map(u => ({ 
+    "Nombre": u.nombre || "No especificado", 
+    "Nickname": u.nickname || "No especificado", 
+    "Telefono": u.telefono || "No especificado", 
+    "Fecha": new Date(u.created_at).toLocaleDateString(), 
+    "Ubicacion": u.direccion || "No especificada", 
+    "Estado Notificaciones": u.push_enabled ? "ACTIVADO" : "INACTIVO",
+    "Estado de Uso (Condicion)": u.is_blocked ? "Bloqueado" : (u.is_verified ? "Activo" : "En Verificación"), 
+    "Terminos y Condiciones": u.terms_accepted ? "Aceptados" : "Pendientes" 
+  }));
  
    c.innerHTML = `
  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
@@ -685,7 +702,7 @@ const Admin = {
  <div class="item-name">${u.nombre} <span style="font-size:0.9rem; color:#666;">(@${u.nickname || "sin-nick"})</span> ${u.is_verified ? "✅" : "⏳"}</div>
  <div class="item-detail">
  <strong>Nick:</strong> ${u.nickname || "-" } | <strong>Tel:</strong> ${u.telefono} | <strong>Ubicación:</strong> ${u.direccion || "-"}<br>
- <strong>Términos:</strong> ${u.terms_accepted ? '✅ Aceptados' : '❌ Pendiente'}<br>
+ <strong>Términos:</strong> ${u.terms_accepted ? '✅ Aceptados' : '❌ Pendiente'} | <strong>Notificaciones:</strong> ${u.push_enabled ? '✅ Activas' : '❌ Inactivas'}<br>
  <small>Registro: ${new Date(u.created_at).toLocaleString()}</small>
  </div>
  </div>

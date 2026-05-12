@@ -4,6 +4,12 @@ const cors = require('cors');
 const https = require('https');
 const { initDatabase, cleanupMascotas, cleanupReportes, isUsingMysql, ...dbHelper } = require('./database');
 const nodemailer = require('nodemailer');
+const webpush = require('web-push');
+
+// VAPID keys para notificaciones push
+const publicVapidKey = 'BPfYyug0EiK_oS0FRF8w-k2WpxoDs79-DZjjFI505RsAeUrzi5e88XPgsj8Pp2YV6pZfMtnb-IXiYN8tJ9mgrFc';
+const privateVapidKey = 'U1cp2rbRx71On29mhZ9N6cTn-hBs74iLq6K_Nx16mh4';
+webpush.setVapidDetails('mailto:contacto@puertomas.cl', publicVapidKey, privateVapidKey);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -46,6 +52,37 @@ function sendEmailPin(to, nickname, pin) {
 async function queryAll(sql, params = []) { return await dbHelper.queryAll(sql, params); }
 async function queryOne(sql, params = []) { return await dbHelper.queryOne(sql, params); }
 async function runSql(sql, params = []) { return await dbHelper.runSql(sql, params); }
+
+// Helper para notificaciones push por proximidad
+async function sendPushToNearbyUsers(reportLat, reportLng, title, body, excludeUserId) {
+  const radiusConfig = await queryOne("SELECT valor FROM configuracion WHERE clave = 'push_radius'");
+  const radius = parseFloat(radiusConfig?.valor || 500);
+  
+  const subscriptions = await queryAll(`
+    SELECT ps.subscription_json, u.id, u.last_lat, u.last_lng 
+    FROM push_subscriptions ps
+    JOIN usuarios u ON ps.usuario_id = u.id
+    WHERE u.push_enabled = 1 AND u.id != ?
+  `, [excludeUserId || 0]);
+
+  for (let s of subscriptions) {
+    // Filtrar por distancia si tenemos la ubicación del usuario
+    if (s.last_lat && s.last_lng) {
+      const dist = haversineDistance(reportLat, reportLng, s.last_lat, s.last_lng) * 1000; // a metros
+      if (dist > radius) continue;
+    }
+
+    try {
+      const payload = JSON.stringify({ title, body, lat: reportLat, lng: reportLng });
+      await webpush.sendNotification(JSON.parse(s.subscription_json), payload);
+    } catch (e) {
+      if (e.statusCode === 410 || e.statusCode === 404) {
+        await runSql('DELETE FROM push_subscriptions WHERE usuario_id = ?', [s.id]);
+        await runSql('UPDATE usuarios SET push_enabled = 0 WHERE id = ?', [s.id]);
+      }
+    }
+  }
+}
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -128,6 +165,10 @@ app.post('/api/reportes', async (req, res) => {
   const exp = new Date(Date.now() + (parseInt(duracion_horas)||24)*3600000).toISOString().slice(0,19).replace('T',' ');
   await runSql('INSERT INTO reportes_ciudadanos (usuario_id, nombre_contacto, telefono, tipo_reporte, detalles, latitud, longitud, fecha_expiracion) VALUES (?,?,?,?,?,?,?,?)', [usuario_id||null, nombre_contacto, telefono, tipo_reporte, detalles||'', latitud, longitud, exp]);
   sendTelegramAlert(`📢 <b>NUEVO REPORTE</b>\nTipo: ${tipo_reporte}\nPor: ${user?.nickname || user?.nombre || nombre_contacto}\nDetalles: ${detalles}`);
+  
+  // Enviar Notificación Push (Solo a vecinos cercanos)
+  sendPushToNearbyUsers(latitud, longitud, `🚨 REPORTE: ${tipo_reporte.toUpperCase()}`, detalles || 'Hay un nuevo reporte cerca de tu ubicación.', usuario_id);
+  
   res.json({ ok: true });
 });
 
@@ -165,6 +206,12 @@ app.post('/api/mascotas', async (req, res) => {
   const { nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, foto_base64 } = req.body;
   await runSql('INSERT INTO mascotas_perdidas (nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, foto_base64) VALUES (?,?,?,?,?,?,?)', [nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, foto_base64]);
   sendTelegramAlert(`🐶 <b>MASCOTA PERDIDA</b>\nNombre: ${nombre_mascota}\nContacto: ${nombre_contacto}\nLugar: ${ubicacion_extravio}`);
+  
+  // Como mascotas no tiene lat/lng obligatorio en el form pero sí en la DB, si están presentes, notificar
+  if (req.body.latitud && req.body.longitud) {
+    sendPushToNearbyUsers(req.body.latitud, req.body.longitud, `🐶 MASCOTA PERDIDA`, `Se ha reportado la pérdida de ${nombre_mascota} cerca de aquí.`);
+  }
+
   res.json({ ok: true });
 });
 
@@ -180,9 +227,21 @@ app.post('/api/muro', async (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/push/subscribe', async (req, res) => {
+  const { userId, subscription } = req.body;
+  if (!userId || !subscription) return res.status(400).json({ error: 'Faltan datos' });
+  await runSql('DELETE FROM push_subscriptions WHERE usuario_id = ?', [userId]);
+  await runSql('INSERT INTO push_subscriptions (usuario_id, subscription_json) VALUES (?, ?)', [userId, JSON.stringify(subscription)]);
+  await runSql('UPDATE usuarios SET push_enabled = 1 WHERE id = ?', [userId]);
+  res.status(201).json({ ok: true });
+});
+
 app.post('/api/ping', async (req, res) => {
-  const { device_id } = req.body;
+  const { device_id, lat, lng } = req.body;
   await runSql('INSERT INTO visitas (device_id) VALUES (?)', [device_id]);
+  if (lat && lng) {
+    await runSql('UPDATE usuarios SET last_lat = ?, last_lng = ? WHERE device_id = ?', [lat, lng, device_id]);
+  }
   const u = await queryOne('SELECT is_stolen, nickname, nombre FROM usuarios WHERE device_id = ?', [device_id]);
   if (u?.is_stolen) sendTelegramAlert(`🕵️ <b>VIGILANCIA EXTRAVÍO</b>\nDispositivo detectado: ${u.nickname || u.nombre}`);
   res.json({ status: u?.is_stolen ? 'stolen' : 'ok' });
