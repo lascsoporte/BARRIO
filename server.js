@@ -91,6 +91,21 @@ app.get('/api/config', async (req, res) => {
   const c = {}; rows.forEach(r => c[r.clave] = r.valor); res.json(c);
 });
 
+app.get('/api/servicios/buscar', async (req, res) => {
+  const { q, lat, lng, radio = 1 } = req.query;
+  let rows = await queryAll(`SELECT * FROM servicios WHERE LOWER(tipo) LIKE LOWER(?) OR LOWER(nombre_prestador) LIKE LOWER(?)`, [`%${q}%`, `%${q}%`]);
+  if (lat && lng) {
+    rows = rows.map(s => ({ ...s, distancia: Math.round(haversineDistance(parseFloat(lat), parseFloat(lng), s.latitud, s.longitud) * 1000) }))
+               .filter(s => s.distancia <= parseFloat(radio) * 1000);
+  }
+  res.json(rows);
+});
+
+app.get('/api/servicios/tipos', async (req, res) => {
+  const rows = await queryAll('SELECT DISTINCT tipo FROM servicios');
+  res.json(rows.map(r => r.tipo));
+});
+
 app.get('/api/reportes', async (req, res) => {
   const sql = isUsingMysql() 
     ? `SELECT r.*, COALESCE(u.nickname, u.nombre) as autor_nick FROM reportes_ciudadanos r LEFT JOIN usuarios u ON r.usuario_id = u.id WHERE r.fecha_expiracion > NOW() OR r.fecha_expiracion IS NULL ORDER BY r.created_at DESC`

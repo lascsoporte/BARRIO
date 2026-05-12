@@ -338,7 +338,13 @@ const App = {
               const m = L.marker([r.latitud, r.longitud], {
                 icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px; background:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2); border:2px solid #BBB;">${icons[r.tipo_reporte] || '📍'}</div>`})
               }).addTo(map);
-              m.bindPopup(`<strong>${r.tipo_reporte.toUpperCase()}</strong><br>${r.detalles || ''}`);
+              m.bindPopup(`
+                <div style="font-family:Nunito, sans-serif;">
+                  <strong style="color:var(--primary); text-transform:uppercase;">${r.tipo_reporte}</strong><br>
+                  <span style="font-size:0.9rem;">${r.detalles || 'Sin detalles'}</span><br>
+                  <small style="color:#999;">Reportado por: ${r.autor_nick || 'Vecino'}</small>
+                </div>
+              `);
             }
           });
         });
