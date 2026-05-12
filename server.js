@@ -510,10 +510,25 @@ app.get('/api/admin/export/reportes', authMw, async (req, res) => {
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 async function start() {
-  await initDatabase();
-  app.listen(PORT, () => {
-    console.log(`Server on ${PORT}`);
-    sendTelegramAlert(`🚀 <b>SISTEMA BARRIO INICIADO</b>\nServidor activo y conectado a la base de datos.`);
-  });
+  try {
+    await initDatabase();
+    app.listen(PORT, () => {
+      console.log(`Server on ${PORT}`);
+      sendTelegramAlert(`🚀 <b>SISTEMA BARRIO INICIADO</b>\nServidor activo y conectado a la base de datos.`);
+    });
+  } catch (e) {
+    console.error("CRITICAL START ERROR:", e);
+    sendTelegramAlert(`🚨 <b>ERROR CRÍTICO DE INICIO</b>\n${e.message}`);
+  }
 }
+
+// Prevenir que errores no capturados maten el proceso
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  sendTelegramAlert(`⚠️ <b>EXCEPCIÓN NO CAPTURADA</b>\n${err.message}`);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 start();

@@ -122,30 +122,27 @@ async function createCloudTables() {
     await mysqlPool.execute(q);
   }
 
-  // Asegurar que las nuevas columnas existan (para bases de datos ya creadas)
-  try {
-    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN is_verified TINYINT(1) DEFAULT 0');
-    console.log('✅ Columna is_verified añadida a usuarios');
-  } catch (e) {
-    // Si ya existe, fallará pero no pasa nada
+  const columns = [
+    'ALTER TABLE usuarios ADD COLUMN is_verified TINYINT(1) DEFAULT 0',
+    'ALTER TABLE usuarios ADD COLUMN terms_accepted TINYINT(1) DEFAULT 0',
+    'ALTER TABLE usuarios ADD COLUMN nickname VARCHAR(100)',
+    'ALTER TABLE usuarios ADD COLUMN email VARCHAR(255)',
+    'ALTER TABLE usuarios ADD COLUMN pin_seguridad VARCHAR(4)',
+    'ALTER TABLE usuarios ADD COLUMN push_enabled TINYINT(1) DEFAULT 0',
+    'ALTER TABLE usuarios ADD COLUMN last_lat DOUBLE',
+    'ALTER TABLE usuarios ADD COLUMN last_lng DOUBLE',
+    'ALTER TABLE usuarios ADD COLUMN home_lat DOUBLE',
+    'ALTER TABLE usuarios ADD COLUMN home_lng DOUBLE'
+  ];
+
+  for (let col of columns) {
+    try {
+      await mysqlPool.execute(col);
+      console.log(`✅ Columna procesada: ${col.split('ADD COLUMN ')[1]}`);
+    } catch (e) {
+      // Ignorar si la columna ya existe
+    }
   }
-
-  try {
-    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN terms_accepted TINYINT(1) DEFAULT 0');
-    console.log('✅ Columna terms_accepted añadida a usuarios');
-  } catch (e) {}
-
-  try {
-    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN nickname VARCHAR(100)');
-    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN email VARCHAR(255)');
-    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN pin_seguridad VARCHAR(4)');
-    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN push_enabled TINYINT(1) DEFAULT 0');
-    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN last_lat DOUBLE');
-    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN last_lng DOUBLE');
-    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN home_lat DOUBLE');
-    await mysqlPool.execute('ALTER TABLE usuarios ADD COLUMN home_lng DOUBLE');
-    console.log('✅ Columnas de seguridad, push y ubicación (fija y dinámica) añadidas a usuarios');
-  } catch (e) {}
 
   // Configuración inicial
   const [rows] = await mysqlPool.execute('SELECT COUNT(*) as count FROM configuracion');
