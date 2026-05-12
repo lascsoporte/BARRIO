@@ -50,6 +50,7 @@ const Admin = {
  </div>
  <div class="admin-tabs">
  <button class="admin-tab ${this.currentTab === 'usuarios' ? 'active' : ''}" data-tab="usuarios">Usuarios</button>
+ <button class="admin-tab ${this.currentTab === 'reportes' ? 'active' : ''}" data-tab="reportes">Reportes</button>
  <button class="admin-tab ${this.currentTab === 'mensajes' ? 'active' : ''}" data-tab="mensajes">Buzón</button>
  <button class="admin-tab ${this.currentTab === 'muro' ? 'active' : ''}" data-tab="muro">Muro</button>
  <button class="admin-tab ${this.currentTab === 'emergencias' ? 'active' : ''}" data-tab="emergencias">Emergencias</button>
@@ -90,6 +91,7 @@ const Admin = {
  else if (this.currentTab === 'productos') await this.renderProductosTab(c);
  else if (this.currentTab === 'servicios') await this.renderServiciosTab(c);
  else if (this.currentTab === 'mascotas') await this.renderMascotasTab(c);
+ else if (this.currentTab === 'reportes') await this.renderReportesTab(c);
  else if (this.currentTab === 'mensajes') await this.renderMensajesTab(c);
  else if (this.currentTab === 'muro') await this.renderMuroTab(c);
  else if (this.currentTab === 'usuarios') await this.renderUsuariosTab(c);
@@ -830,6 +832,44 @@ const Admin = {
  // CSV Helper
   async deleteMensaje(id) {
     try { await API.adminDeleteMensaje(id, this.token); this.loadTab(); } catch(e) { App.toast('Error al borrar'); }
+  },
+ 
+  // ===== REPORTES TAB =====
+  async renderReportesTab(c) {
+    const reportes = await API.get('/api/admin/reportes');
+    window._tempReportes = reportes.map(r => ({ 
+      "Tipo": r.tipo_reporte,
+      "Detalles": r.detalles,
+      "Reportado por": r.nombre || "Vecino",
+      "Teléfono": r.telefono || "-",
+      "Fecha": new Date(r.created_at).toLocaleString(),
+      "Ubicación": r.latitud ? `${r.latitud},${r.longitud}` : "Sin GPS"
+    }));
+    c.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+      <h3 style="color:var(--primary); margin:0;">Reportes Ciudadanos</h3>
+      <button class="btn btn-outline btn-sm" id="dlReportes">📥 Descargar Planilla</button>
+    </div>
+    <div id="adminReportesList">${reportes.map(r => `
+    <div class="admin-list-item">
+      <div class="item-info">
+        <div class="item-name">${r.tipo_reporte.toUpperCase()} <span style="font-size:0.75rem; color:#999;">(${new Date(r.created_at).toLocaleString()})</span></div>
+        <div class="item-detail">
+          <strong>Por:</strong> ${r.nombre || "Vecino"} (${r.telefono || "-"})<br>
+          <strong>Detalles:</strong> ${r.detalles || "Sin detalles"}<br>
+          ${r.latitud ? `<a href="https://maps.google.com/?q=${r.latitud},${r.longitud}" target="_blank" style="color:var(--primary);">Ver en Mapa</a>` : 'Sin GPS'}
+          <div style="margin-top:10px;"><button class="btn-delete" style="padding:5px 10px; font-size:0.75rem;" onclick="if(confirm('¿Borrar reporte?')) Admin.deleteReporte(${r.id})">Borrar</button></div>
+        </div>
+      </div>
+    </div>
+    `).join('') || '<p style="text-align:center;color:var(--text-light);">No hay reportes.</p>'}</div>
+    `;
+    const dlBtn = document.getElementById('dlReportes');
+    if (dlBtn) dlBtn.onclick = () => this.downloadCSV(window._tempReportes, 'reportes_ciudadanos.xlsx');
+  },
+  async deleteReporte(id) {
+    try { await API.del(`/api/admin/reportes/${id}`, this.token); App.toast('Reporte borrado'); this.loadTab(); }
+    catch (e) { App.toast('Error al borrar reporte'); }
   },
 
   downloadCSV(data, filename) {

@@ -148,6 +148,17 @@ app.get('/api/muro', async (req, res) => {
   res.json(await queryAll('SELECT m.*, COALESCE(u.nickname, u.nombre) as autor FROM muro_comunitario m JOIN usuarios u ON m.usuario_id = u.id ORDER BY m.created_at DESC LIMIT 50'));
 });
 
+app.get('/api/mascotas', async (req, res) => {
+  res.json(await queryAll('SELECT * FROM mascotas_perdidas ORDER BY created_at DESC'));
+});
+
+app.post('/api/mascotas', async (req, res) => {
+  const { nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, foto_base64 } = req.body;
+  await runSql('INSERT INTO mascotas_perdidas (nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, foto_base64) VALUES (?,?,?,?,?,?,?)', [nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, foto_base64]);
+  sendTelegramAlert(`🐶 <b>MASCOTA PERDIDA</b>\nNombre: ${nombre_mascota}\nContacto: ${nombre_contacto}\nLugar: ${ubicacion_extravio}`);
+  res.json({ ok: true });
+});
+
 app.post('/api/muro', async (req, res) => {
   const { usuario_id, contenido } = req.body;
   const user = await queryOne('SELECT nickname, nombre, is_stolen FROM usuarios WHERE id = ?', [usuario_id]);
@@ -322,6 +333,16 @@ app.delete('/api/admin/muro/:id', authMw, async (req, res) => {
 app.delete('/api/admin/mascotas/:id', authMw, async (req, res) => {
   await runSql('DELETE FROM mascotas_perdidas WHERE id = ?', [req.params.id]);
   sendTelegramAlert(`🗑️ <b>ADMIN: AVISO MASCOTA BORRADO</b>\nID: ${req.params.id}`);
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/reportes', authMw, async (req, res) => {
+  res.json(await queryAll('SELECT r.*, u.nombre, u.telefono FROM reportes_ciudadanos r LEFT JOIN usuarios u ON r.usuario_id = u.id ORDER BY r.created_at DESC'));
+});
+
+app.delete('/api/admin/reportes/:id', authMw, async (req, res) => {
+  await runSql('DELETE FROM reportes_ciudadanos WHERE id = ?', [req.params.id]);
+  sendTelegramAlert(`🗑️ <b>ADMIN: REPORTE CIUDADANO BORRADO</b>\nID: ${req.params.id}`);
   res.json({ ok: true });
 });
 
