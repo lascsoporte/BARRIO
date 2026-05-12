@@ -115,9 +115,12 @@ const App = {
     // Show lateral buttons only on home page
     const lateralBtns = document.querySelectorAll('.lateral-btn');
     const isHome = (hash === '#/' || hash === '');
-    lateralBtns.forEach(b => b.style.display = isHome ? 'flex' : 'none');
+    lateralBtns.forEach(b => b.style.display = (isHome || hash === '#/emergencia-menu') ? 'flex' : 'none');
 
-    if (isHome) this.renderHome(app);
+    if (isHome || hash === '#/emergencia-menu') {
+      this.renderHome(app);
+      if (hash === '#/emergencia-menu') this.showEmergencyMenu(true);
+    }
     else if (hash.startsWith('#/buscar')) this.renderSearch(app);
     else if (hash.startsWith('#/local/')) this.renderStore(app);
     else if (hash === '#/compartir') this.renderShare(app);
@@ -140,10 +143,10 @@ const App = {
         <div style="font-size:1.2rem; margin-top:5px;">🇨🇱</div>
       </header>
 
-      <div id="homeMap" style="height: 280px; width: 100%; border-radius: 16px; margin: 15px 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
+      <div id="homeMap" style="height: 240px; width: 100%; border-radius: 16px; margin: 15px 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
 
-      <div class="qa-grid" style="margin-top: 35px;">
-        <div class="qa-item" style="background: #D32F2F; color:white;" onclick="App.showEmergencyMenu()">
+      <div class="qa-grid" style="margin-top: 20px;">
+        <div class="qa-item" style="background: #D32F2F; color:white;" onclick="location.hash='#/emergencia-menu'">
           <div class="qa-icon">📞</div>
           <div class="qa-text" style="font-weight:900;">EMERGENCIA</div>
         </div>
@@ -213,8 +216,14 @@ const App = {
     }, 500);
   },
 
-  showEmergencyMenu() { document.getElementById('emergencyMenu').classList.add('active'); },
-  hideEmergencyMenu() { document.getElementById('emergencyMenu').classList.remove('active'); },
+  showEmergencyMenu(fromHash = false) { 
+    if (!fromHash) { location.hash = '#/emergencia-menu'; return; }
+    document.getElementById('emergencyMenu').classList.add('active'); 
+  },
+  hideEmergencyMenu() { 
+    document.getElementById('emergencyMenu').classList.remove('active');
+    if (location.hash === '#/emergencia-menu') history.back();
+  },
   showSearchModal() { 
     const q = prompt("¿Qué buscas hoy?");
     if (q) location.hash = `#/buscar?q=${encodeURIComponent(q)}`;
@@ -418,12 +427,12 @@ const App = {
 
  footerHtml() {
  return `
- <footer class="legal-footer" style="margin-top: 40px; padding: 15px; text-align: center; border-top: 1px solid rgba(0,0,0,0.08);">
+ <footer class="legal-footer" style="margin-top: 15px; padding: 10px; text-align: center; border-top: 1px solid rgba(0,0,0,0.08);">
  <p style="font-size: 0.7rem; color: var(--text-light); margin: 0;">
  &copy; 2026 BARRIO - PUERTOMAS SPA | 
  <a href="#/legal" style="color:var(--primary); text-decoration:underline; cursor:pointer;">Aviso Legal</a>
  </p>
- <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); margin-top: 8px; text-align: right;">v2.0 Stable</div>
+ <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); margin-top: 5px; text-align: right;">v2.0 Stable</div>
  </footer>
  `;
  },
