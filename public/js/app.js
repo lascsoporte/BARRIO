@@ -4,13 +4,16 @@ const App = {
  deferredPrompt: null,
 
  async init() {
-  console.log('App: Instando init...');
-  // Excepción para el panel de administración
-  if (location.hash.startsWith('#/admin')) {
-  console.log('App: Detectada ruta admin');
-  this.route();
-  return;
+  const hash = location.hash || '#/';
+  if (hash.includes('/admin')) {
+    const loader = document.getElementById('loadingScreen');
+    if (loader) loader.remove();
+    Admin.route(document.getElementById('app'), hash);
+    // No retornamos para dejar que el resto cargue en background si es necesario, 
+    // pero evitamos que el splash screen bloquee.
   }
+
+  console.log('App: Instando init...');
 
  this.deviceId = localStorage.getItem('barrio_device_id');
  if (!this.deviceId) {
