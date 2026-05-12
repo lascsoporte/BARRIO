@@ -250,6 +250,9 @@ app.post('/api/push/subscribe', async (req, res) => {
   res.status(201).json({ ok: true });
 });
 
+app.get('/api/ping', async (req, res) => {
+  res.json({ status: 'ok', server: 'BARRIO PRO', db: isUsingMysql() ? 'Cloud' : 'Local', time: new Date().toISOString() });
+});
 app.post('/api/ping', async (req, res) => {
   const { device_id, lat, lng } = req.body;
   await runSql('INSERT INTO visitas (device_id) VALUES (?)', [device_id]);
