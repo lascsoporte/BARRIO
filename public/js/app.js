@@ -315,15 +315,20 @@ const App = {
               userVisibleOnly: true,
               applicationServerKey: this.urlBase64ToUint8Array('BPfYyug0EiK_oS0FRF8w-k2WpxoDs79-DZjjFI505RsAeUrzi5e88XPgsj8Pp2YV6pZfMtnb-IXiYN8tJ9mgrFc')
             });
-            await API.savePushSubscription({ userId: user.id, subscription });
-            localStorage.setItem('barrio_push_enabled', 'true');
-            App.toast("✅ Alertas activadas correctamente");
+            const res = await API.savePushSubscription({ userId: user.id, subscription });
+            if (res.ok) {
+              localStorage.setItem('barrio_push_enabled', 'true');
+              App.toast("✅ Alertas activadas correctamente");
+            } else {
+              throw new Error("Error en servidor al guardar");
+            }
           } else {
             localStorage.setItem('barrio_push_enabled', 'denied_perm');
+            App.toast("Permiso de notificaciones denegado");
           }
         } catch (e) {
-          console.error('Push Error:', e);
-          App.toast("Error al activar notificaciones");
+          console.error('Push Error Detail:', e);
+          App.toast("Error: " + (e.message || "No se pudo activar"));
         } finally {
           modal.remove();
         }
