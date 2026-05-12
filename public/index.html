@@ -136,10 +136,27 @@
             <div>
                 &copy; 2026 PUERTOMAS SPA | <a href="/app.html#/legal">Aviso Legal</a>
             </div>
-            <div style="font-weight: bold;">
+            <div style="font-weight: bold; cursor: pointer; user-select: none;" id="versionInfo">
                 v2.0 Stable
             </div>
         </div>
     </div>
+
+    <script>
+        // Redirección automática si entran con #/admin en la URL raíz
+        if (window.location.hash.startsWith('#/admin')) {
+            window.location.href = '/app.html' + window.location.hash;
+        }
+
+        // Acceso secreto: 5 clics en la versión para abrir el panel admin
+        let clickCount = 0;
+        document.getElementById('versionInfo').addEventListener('click', () => {
+            clickCount++;
+            if (clickCount === 5) {
+                window.location.href = '/app.html#/admin';
+            }
+            setTimeout(() => { clickCount = 0; }, 3000); // Reiniciar si no hace los 5 clics rápido
+        });
+    </script>
 </body>
 </html>
