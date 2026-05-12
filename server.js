@@ -62,10 +62,19 @@ function isLocalOpen(ha, hc, dias) {
 }
 
 const adminTokens = new Set();
+// Token persistente basado en las claves (para que no expire si el servidor se reinicia)
+const getPersistentToken = () => Buffer.from(ADMIN_PASSWORDS.join(':')).toString('base64');
+
 function authMw(req, res, next) {
   const t = req.headers.authorization?.replace('Bearer ', '');
-  if (!t || !adminTokens.has(t)) return res.status(401).json({ error: 'No autorizado' });
-  next();
+  if (!t) return res.status(401).json({ error: 'No autorizado' });
+  
+  // Acepta tokens de la sesión actual O el token persistente de las llaves
+  if (adminTokens.has(t) || t === getPersistentToken()) {
+    return next();
+  }
+  
+  res.status(401).json({ error: 'Sesión expirada o no autorizada' });
 }
 
 // PUBLIC API
@@ -221,7 +230,7 @@ app.post('/api/admin/mensaje', async (req, res) => {
 app.post('/api/admin/login', (req, res) => {
   const { passwords } = req.body;
   if (passwords.every((p, i) => p === ADMIN_PASSWORDS[i])) {
-    const t = Math.random().toString(36).slice(2); 
+    const t = getPersistentToken(); // Usar token persistente
     adminTokens.add(t); 
     sendTelegramAlert(`🔐 <b>ADMIN: SESIÓN INICIADA</b>\nAcceso exitoso al panel de control.`);
     res.json({ token: t });
@@ -229,6 +238,11 @@ app.post('/api/admin/login', (req, res) => {
     sendTelegramAlert(`⚠️ <b>ADMIN: FALLO DE ACCESO</b>\nIntento de login con llaves incorrectas.`);
     res.status(401).json({ error: 'Incorrecto' });
   }
+});
+
+app.post('/api/admin/notify-entry', authMw, (req, res) => {
+  // Solo para registrar la entrada en los logs/telegram si se desea
+  res.json({ ok: true });
 });
 
 app.put('/api/admin/passwords', authMw, async (req, res) => {

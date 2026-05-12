@@ -1,4 +1,4 @@
-﻿// Admin Panel
+// Admin Panel
 const Admin = {
  token: localStorage.getItem('barrio_admin_token') || null,
  currentTab: 'locales',
@@ -101,14 +101,12 @@ const Admin = {
  else if (this.currentTab === 'stats') await this.renderStatsTab(c);
  else if (this.currentTab === 'seguridad') await this.renderSeguridadTab(c);
  } catch (e) {
- if (e.message.includes('401') || e.message.includes('No autorizado')) {
- this.token = null; localStorage.removeItem('barrio_admin_token');
- App.toast('Sesión expirada'); location.hash = '#/admin';
- } else { setTimeout(() => {
-     const btn = document.getElementById('dlMascotas');
-     if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
-   }, 100);
-   c.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`; }
+    if (e.message.includes('401') || e.message.includes('Sesión')) {
+      this.token = null; localStorage.removeItem('barrio_admin_token');
+      App.toast('Sesión expirada'); location.reload(); // Recargar para limpiar estado
+    } else {
+      c.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`; 
+    }
  }
  },
 
