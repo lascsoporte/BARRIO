@@ -18,46 +18,50 @@
             color: var(--text);
             margin: 0;
             display: flex;
-            align-items: center;
+            align-items: flex-start; /* Subir contenido */
             justify-content: center;
             min-height: 100vh;
-            overflow: hidden;
+            overflow-x: hidden;
+            padding-top: 20px; /* Menos espacio superior */
         }
         .portal-container {
             text-align: center;
-            padding: 30px;
+            padding: 25px;
             max-width: 450px;
             width: 90%;
             background: white;
             border-radius: 30px;
             box-shadow: 0 20px 50px rgba(0,0,0,0.1);
             animation: fadeIn 0.6s ease-out;
+            position: relative;
+            margin-bottom: 60px; /* Espacio para el footer */
         }
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
+            from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
         h1 {
-            font-size: 3rem;
+            font-size: 3.5rem;
             font-weight: 900;
             background: linear-gradient(135deg, var(--primary), #FF2E00);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-bottom: 10px;
+            margin-top: 10px;
+            margin-bottom: 5px;
         }
-        p {
-            font-size: 1.1rem;
+        p.subtitle {
+            font-size: 1rem;
             color: #666;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
         }
         .city-grid {
             display: grid;
             grid-template-columns: 1fr;
             gap: 15px;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
         }
         .city-btn {
-            padding: 20px;
+            padding: 18px;
             border-radius: 20px;
             border: 2px solid #EEE;
             background: white;
@@ -75,14 +79,9 @@
             background: #FFF3E0;
             transform: scale(1.02);
         }
-        .city-btn.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            grayscale: 1;
-        }
         .whatsapp-section {
             border-top: 1px solid #EEE;
-            padding-top: 30px;
+            padding-top: 20px;
         }
         .wa-btn {
             display: inline-flex;
@@ -96,39 +95,60 @@
             font-weight: 700;
             box-shadow: 0 4px 15px rgba(37,211,102,0.3);
         }
-        .footer {
-            margin-top: 30px;
-            font-size: 0.8rem;
-            color: #999;
+        .footer-fixed {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(5px);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: #777;
+            border-top: 1px solid #EEE;
+            box-sizing: border-box;
+        }
+        .footer-fixed a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
     <div class="portal-container">
         <h1>BARRIO</h1>
-        <p>Selecciona tu ciudad para entrar a la red comunitaria.</p>
+        <p class="subtitle">Selecciona tu ciudad para entrar a la red comunitaria.</p>
         
         <div class="city-grid">
             <a href="/app.html" class="city-btn">
                 <span>📍 PUERTO MONTT</span>
                 <span>🇨🇱</span>
             </a>
-            <a href="#" class="city-btn disabled">
-                <span>📍 OSORNO (Próximamente)</span>
-                <span>🏠</span>
-            </a>
         </div>
 
         <div class="whatsapp-section">
-            <p style="font-size: 0.9rem; margin-bottom: 15px;">¿Eres comerciante? Contáctanos para figurar en la app.</p>
-            <a href="https://wa.me/569XXXXXXXX" class="wa-btn">
+            <p style="font-size: 0.85rem; margin-bottom: 15px; color: #444; line-height: 1.4;">
+                ¿Eres Cliente Delivery o comerciante, quieres figurar en la app? <br>
+                <b>Contáctanos con el botón verde...</b>
+            </p>
+            <a href="https://wa.me/56987606517" class="wa-btn">
                 <span>PUERTOMAS DELIVERY</span>
             </a>
         </div>
+    </div>
 
-        <div class="footer">
-            &copy; 2026 PUERTOMAS SPA
+    <div class="footer-fixed">
+        <div>
+            &copy; 2026 PUERTOMAS SPA | <a href="/app.html#/disclaimer">Aviso Legal</a>
+        </div>
+        <div style="font-weight: bold; color: #BBB;">
+            v2.0 Stable
         </div>
     </div>
 </body>
+</html>
 </html>
