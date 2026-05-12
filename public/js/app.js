@@ -185,6 +185,9 @@ const App = {
           <a href="tel:131" onclick="App.logLlamada('131 - SAMU')" class="emg-btn" style="background:#1976D2;">SAMU (131)</a>
           <a href="tel:134" onclick="App.logLlamada('134 - PDI')" class="emg-btn" style="background:#0D47A1;">PDI (134)</a>
           <a href="tel:1529" onclick="App.logLlamada('1529 - SEGURIDAD CIUDADANA PUERTO MONTT')" class="emg-btn" style="background:#F57C00;">SEGURIDAD CIUDADANA PUERTO MONTT (1529)</a>
+          <div style="margin-top:15px; border-top:1px solid #EEE; padding-top:15px;">
+            <button onclick="location.hash='#/legal'" class="btn btn-sm" style="background:#D32F2F; color:white; width:100%; justify-content:center;">🚨 REPORTAR TELÉFONO EXTRAVIADO</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1043,6 +1046,45 @@ const App = {
  document.getElementById('muroList').innerHTML = `<p>Error al cargar el muro.</p>`;
  }
  },
+
+  // ===== LEGAL & EXTRAVIO =====
+  renderLegal(container) {
+    container.innerHTML = `
+    <h2 class="section-title">⚖️ Aviso Legal</h2>
+    <div class="card fade-in" style="font-size:0.9rem; line-height:1.6; color:#444;">
+      <p><strong>1. Uso de la Aplicación:</strong> BARRIO es una red comunitaria. El usuario es responsable de la veracidad de sus reportes.</p>
+      <p><strong>2. Emergencias:</strong> Esta app NO reemplaza a los servicios de emergencia oficiales. Siempre llame al 133 o 132 primero.</p>
+      <p><strong>3. Privacidad:</strong> Sus datos personales están protegidos y solo se muestra su Nickname en el muro y mapa.</p>
+      <hr style="margin:20px 0; border:0; border-top:1px solid #EEE;">
+      <h3 style="color:#D32F2F; margin-bottom:10px;">🚨 Reporte de Extravío</h3>
+      <p>Si perdiste tu celular o fue robado y tenías instalada esta aplicación, puedes reportarlo aquí para activar el <strong>Rastreo Silencioso</strong>.</p>
+      <button id="btnReportarRobo" class="btn btn-primary" style="background:#D32F2F; width:100%; margin-top:10px;">Reportar Teléfono Extraviado</button>
+    </div>
+    ${this.footerHtml()}
+    `;
+
+    document.getElementById('btnReportarRobo').addEventListener('click', () => {
+      const num = prompt("Ingresa el NÚMERO que extraviaste (+569XXXXXXXX):");
+      if (!num) return;
+      const phoneRegex = /^\+\d{11}$/;
+      if (!phoneRegex.test(num.replace(/\s+/g, ''))) return alert("Formato inválido (+56912345678)");
+      
+      this.requireAuth(async (user) => {
+        const btn = document.getElementById('btnReportarRobo');
+        btn.disabled = true; btn.textContent = 'Procesando...';
+        try {
+          await Geo.getUserLocation().catch(() => {});
+          await API.reportarExtravio({ 
+            reporting_user_id: user.id, 
+            reported_phone: num,
+            mensaje_extra: (Geo.userLat) ? `\n📍 Ubicación reporte: https://maps.google.com/?q=${Geo.userLat},${Geo.userLng}` : ""
+          });
+          alert("Teléfono marcado como EXTRAVIADO. El rastreo se activará al abrir la app en ese equipo.");
+        } catch(e) { this.toast('Error al reportar'); }
+        finally { btn.disabled = false; btn.textContent = "Reportar Teléfono Extraviado"; }
+      });
+    });
+  },
 
  // ===== CONTACTO ADMIN =====
  renderContacto(container) {
