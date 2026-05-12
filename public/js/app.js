@@ -143,9 +143,9 @@ const App = {
         <div style="font-size:1.2rem; margin-top:5px;">🇨🇱</div>
       </header>
 
-      <div id="homeMap" style="height: 240px; width: 100%; border-radius: 16px; margin: 15px 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
+      <div id="homeMap" style="height: 270px; width: 100%; border-radius: 16px; margin: 10px 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
 
-      <div class="qa-grid" style="margin-top: 20px;">
+      <div class="qa-grid" style="margin-top: 15px;">
         <div class="qa-item" style="background: #D32F2F; color:white;" onclick="location.hash='#/emergencia-menu'">
           <div class="qa-icon">📞</div>
           <div class="qa-text" style="font-weight:900;">EMERGENCIA</div>
@@ -188,6 +188,19 @@ const App = {
         </div>
       </div>
     </div>
+
+    <div id="searchModal" class="bottom-sheet">
+      <div class="sheet-content" style="padding-bottom:30px;">
+        <div class="sheet-header">
+          <h3 style="margin:0; font-weight:900; color:var(--primary);">¿QUÉ BUSCAS HOY?</h3>
+          <button onclick="App.hideSearchModal()">&times;</button>
+        </div>
+        <div style="padding:15px;">
+          <input type="text" id="searchInputModal" placeholder="Ej: pan, gasfiter, farmacia..." style="width:100%; padding:15px; border-radius:12px; border:2px solid #EEE; font-size:1.1rem; outline:none; font-family:inherit;">
+          <button onclick="App.doSearchModal()" class="btn btn-primary" style="margin-top:15px; width:100%; font-weight:900;">BUSCAR AHORA</button>
+        </div>
+      </div>
+    </div>
     `;
 
     // Initialize Mini Map
@@ -225,8 +238,20 @@ const App = {
     if (location.hash === '#/emergencia-menu') history.back();
   },
   showSearchModal() { 
-    const q = prompt("¿Qué buscas hoy?");
-    if (q) location.hash = `#/buscar?q=${encodeURIComponent(q)}`;
+    document.getElementById('searchModal').classList.add('active');
+    setTimeout(() => {
+      const input = document.getElementById('searchInputModal');
+      input.focus();
+      input.onkeypress = (e) => { if (e.key === 'Enter') this.doSearchModal(); };
+    }, 300);
+  },
+  hideSearchModal() { document.getElementById('searchModal').classList.remove('active'); },
+  doSearchModal() {
+    const q = document.getElementById('searchInputModal').value.trim();
+    if (q) {
+      this.hideSearchModal();
+      location.hash = `#/buscar?q=${encodeURIComponent(q)}`;
+    }
   },
 
  // ===== PRODUCT SEARCH =====
