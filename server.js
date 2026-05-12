@@ -305,6 +305,7 @@ app.post('/api/admin/mensaje', async (req, res) => {
 // ADMIN API
 app.post('/api/admin/login', (req, res) => {
   const { passwords } = req.body;
+  console.log('Admin Login Attempt with keys:', passwords, 'Expected:', ADMIN_PASSWORDS);
   if (passwords.every((p, i) => p === ADMIN_PASSWORDS[i])) {
     const t = getPersistentToken(); // Usar token persistente
     adminTokens.add(t); 
