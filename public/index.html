@@ -11,132 +11,31 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏘️</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --primary: #FF6B35;
-            --secondary: #2EC4B6;
-            --bg: #F9F1E7;
-            --text: #1A1A2E;
-        }
-        body {
-            font-family: 'Nunito', sans-serif;
-            background: var(--bg) !important;
-            color: var(--text);
-            margin: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            overflow-x: hidden;
-            padding: 10px;
-        }
-        .portal-container {
-            text-align: center;
-            padding: 20px;
-            max-width: 450px;
-            width: 95%;
-            background: white;
-            border-radius: 25px;
-            box-shadow: 0 15px 40px rgba(0,0,0,0.1);
-            animation: fadeIn 0.6s ease-out;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            z-index: 10;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        h1 {
-            font-size: 3rem;
-            font-weight: 900;
-            background: linear-gradient(135deg, var(--primary), #FF2E00);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin: 0;
-        }
-        p.subtitle {
-            font-size: 0.95rem;
-            color: #666;
-            margin: 0;
-        }
-        .city-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 10px;
-        }
-        .city-btn {
-            padding: 15px;
-            border-radius: 15px;
-            border: 2px solid #EEE;
-            background: white;
-            text-decoration: none;
-            color: var(--text);
-            font-weight: 800;
-            font-size: 1.1rem;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .city-btn:hover {
-            border-color: var(--primary);
-            background: #FFF3E0;
-        }
-        .whatsapp-section {
-            border-top: 1px solid #EEE;
-            padding-top: 15px;
-        }
-        .wa-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 20px;
-            background: #25D366;
-            color: white;
-            border-radius: 12px;
-            text-decoration: none;
-            font-weight: 700;
-            font-size: 0.9rem;
-        }
-        .footer-inline {
-            margin-top: 5px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.7rem;
-            color: #AAA;
-            border-top: 1px solid #F5F5F5;
-            padding-top: 10px;
-        }
-        .footer-inline a {
-            color: var(--primary);
-            text-decoration: none;
-            font-weight: bold;
-        }
-        /* El root donde vive la app de React */
-        #root:not(:empty) {
-            position: absolute;
-            inset: 0;
-            z-index: 100;
-            background: white;
-        }
+        :root { --primary: #FF6B35; --secondary: #2EC4B6; --bg: #F9F1E7; --text: #1A1A2E; }
+        body { font-family: 'Nunito', sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; padding: 10px; }
+        .portal-container { text-align: center; padding: 20px; max-width: 450px; width: 95%; background: white; border-radius: 25px; box-shadow: 0 15px 40px rgba(0,0,0,0.1); animation: fadeIn 0.6s ease-out; display: flex; flex-direction: column; gap: 15px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        h1 { font-size: 3rem; font-weight: 900; background: linear-gradient(135deg, var(--primary), #FF2E00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; }
+        p.subtitle { font-size: 0.95rem; color: #666; margin: 0; }
+        .city-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        .city-btn { padding: 15px; border-radius: 15px; border: 2px solid #EEE; background: white; text-decoration: none; color: var(--text); font-weight: 800; font-size: 1.1rem; transition: all 0.3s; display: flex; align-items: center; justify-content: space-between; }
+        .city-btn:hover { border-color: var(--primary); background: #FFF3E0; }
+        .whatsapp-section { border-top: 1px solid #EEE; padding-top: 15px; }
+        .wa-btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; background: #25D366; color: white; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 0.9rem; }
+        .footer-inline { margin-top: 5px; display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; color: #AAA; border-top: 1px solid #F5F5F5; padding-top: 10px; }
+        .footer-inline a { color: var(--primary); text-decoration: none; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="root"></div>
-
-    <div class="portal-container" id="portalView">
+    <div class="portal-container">
         <h1>BARRIO</h1>
         <p class="subtitle">Selecciona tu ciudad para entrar a la red comunitaria.</p>
-        
         <div class="city-grid">
-            <a href="#" class="city-btn" id="btnPuertoMontt">
+            <a href="/app.html" class="city-btn">
                 <span>📍 PUERTO MONTT</span>
                 <span>🇨🇱</span>
             </a>
         </div>
-
         <div class="whatsapp-section">
             <p style="font-size: 0.8rem; margin-bottom: 10px; color: #555; line-height: 1.3;">
                 ¿Eres Cliente Delivery o comerciante, quieres figurar en la app? <br>
@@ -146,55 +45,28 @@
                 <span>PUERTOMAS DELIVERY</span>
             </a>
         </div>
-
         <div class="footer-inline">
-            <div>
-                &copy; 2026 PUERTOMAS SPA | <a>Aviso Legal</a>
-            </div>
-            <div style="font-weight: bold; cursor: pointer; user-select: none;" id="versionInfo">
-                v2.0 Stable
-            </div>
+            <div>&copy; 2026 PUERTOMAS SPA | <a href="/app.html#/legal">Aviso Legal</a></div>
+            <div style="font-weight: bold; cursor: pointer;" id="versionInfo">v2.0 Stable</div>
         </div>
     </div>
 
-    <script type="module" src="/src/main.tsx"></script>
-
     <script>
-        // Función para ocultar el portal y mostrar la app
-        function enterApp(isAdmin = false) {
-            const portal = document.getElementById('portalView');
-            if (portal) portal.style.display = 'none';
-            if (isAdmin) {
-                window.location.hash = '#/admin';
-            }
+        // SISTEMA SELF-PING: Mantiene Render despierto (cada 13 min)
+        setInterval(() => {
+            fetch(window.location.origin).then(() => console.log("Servidor Activo")).catch(() => {});
+        }, 780000);
+
+        // Registro de Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(() => {});
         }
 
-        // Sistema de Self-Ping para Render (evita que el servidor se duerma)
-        function selfPing() {
-            fetch(window.location.origin)
-                .then(() => console.log('Ping OK'))
-                .catch(err => console.error('Ping Error:', err));
-        }
-        setInterval(selfPing, 780000); // 13 minutos
-        selfPing();
-
-        // Detectar si entran directo con #/admin en la URL
-        if (window.location.hash.includes('#/admin')) {
-            enterApp();
-        }
-
-        document.getElementById('btnPuertoMontt').addEventListener('click', (e) => {
-            e.preventDefault();
-            enterApp();
-        });
-
-        // Acceso secreto: 5 clics en la versión para abrir el panel admin
+        // Acceso secreto: 5 clics en la versión para entrar como Admin
         let clickCount = 0;
         document.getElementById('versionInfo').addEventListener('click', () => {
             clickCount++;
-            if (clickCount === 5) {
-                enterApp(true);
-            }
+            if (clickCount === 5) { window.location.href = '/app.html#/admin'; }
             setTimeout(() => { clickCount = 0; }, 3000);
         });
     </script>
