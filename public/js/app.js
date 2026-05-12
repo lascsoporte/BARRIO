@@ -140,9 +140,9 @@ const App = {
         <div style="font-size:1.2rem; margin-top:5px;">🇨🇱</div>
       </header>
 
-      <div id="homeMap" style="height: 220px; width: 100%; border-radius: 16px; margin: 15px 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
+      <div id="homeMap" style="height: 280px; width: 100%; border-radius: 16px; margin: 15px 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
 
-      <div class="qa-grid">
+      <div class="qa-grid" style="margin-top: 35px;">
         <div class="qa-item" style="background: #D32F2F; color:white;" onclick="App.showEmergencyMenu()">
           <div class="qa-icon">📞</div>
           <div class="qa-text" style="font-weight:900;">EMERGENCIA</div>
@@ -170,15 +170,18 @@ const App = {
     <div id="emergencyMenu" class="bottom-sheet">
       <div class="sheet-content">
         <div class="sheet-header">
-          <h3>TELÉFONOS DE EMERGENCIA</h3>
-          <button onclick="App.hideEmergencyMenu()">&times;</button>
+          <div style="text-align:center; width:100%;">
+            <h3 style="margin:0; font-weight:900; color:#D32F2F;">TELÉFONOS DE EMERGENCIA</h3>
+            <p style="font-size:0.8rem; color:#666; margin:5px 0 15px;">Pulsa el botón de la institución que necesitas contactar</p>
+          </div>
+          <button onclick="App.hideEmergencyMenu()" style="position:absolute; right:15px; top:15px;">&times;</button>
         </div>
         <div class="emergency-list">
-          <a href="tel:133" class="emg-btn" style="background:#006633;">👮 CARABINEROS (133)</a>
-          <a href="tel:132" class="emg-btn" style="background:#D32F2F;">🔥 BOMBEROS (132)</a>
-          <a href="tel:131" class="emg-btn" style="background:#1976D2;">🚑 SAMU (131)</a>
-          <a href="tel:134" class="emg-btn" style="background:#0D47A1;">🔍 PDI (134)</a>
-          <a href="tel:1529" class="emg-btn" style="background:#F57C00;">🛡️ SEGURIDAD PM (1529)</a>
+          <a href="tel:133" onclick="App.logLlamada('133 - CARABINEROS')" class="emg-btn" style="background:#006633;">CARABINEROS (133)</a>
+          <a href="tel:132" onclick="App.logLlamada('132 - BOMBEROS')" class="emg-btn" style="background:#D32F2F;">BOMBEROS (132)</a>
+          <a href="tel:131" onclick="App.logLlamada('131 - SAMU')" class="emg-btn" style="background:#1976D2;">SAMU (131)</a>
+          <a href="tel:134" onclick="App.logLlamada('134 - PDI')" class="emg-btn" style="background:#0D47A1;">PDI (134)</a>
+          <a href="tel:1529" onclick="App.logLlamada('1529 - SEGURIDAD CIUDADANA PUERTO MONTT')" class="emg-btn" style="background:#F57C00;">SEGURIDAD CIUDADANA PUERTO MONTT (1529)</a>
         </div>
       </div>
     </div>
@@ -193,9 +196,16 @@ const App = {
           reports.forEach(r => {
             if (r.latitud && r.longitud) {
               const icons = { 'robo': '🚨', 'incendio': '🔥', 'accidente': '🚗', 'sospechoso': '👤', 'mascota': '🐶', 'otros': '📍' };
-              L.marker([r.latitud, r.longitud], {
+              const marker = L.marker([r.latitud, r.longitud], {
                 icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px; background:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2); border:2px solid var(--primary);">${icons[r.tipo_reporte] || '📍'}</div>`})
               }).addTo(map);
+              marker.bindPopup(`
+                <div style="font-family:Nunito, sans-serif;">
+                  <strong style="color:var(--primary); text-transform:uppercase;">${r.tipo_reporte}</strong><br>
+                  <span style="font-size:0.9rem;">${r.detalles || 'Sin detalles'}</span><br>
+                  <small style="color:#999;">Reportado por: ${r.autor_nick || 'Vecino'}</small>
+                </div>
+              `);
             }
           });
         });
@@ -319,11 +329,27 @@ const App = {
       try {
         map = L.map('reportMap').setView([Geo.userLat || -41.4693, Geo.userLng || -72.9423], 15);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        
+        // Show existing reports on report map too
+        API.getReportes().then(reports => {
+          reports.forEach(r => {
+            if (r.latitud && r.longitud) {
+              const icons = { 'robo': '🚨', 'incendio': '🔥', 'accidente': '🚗', 'sospechoso': '👤', 'mascota': '🐶', 'otros': '📍' };
+              const m = L.marker([r.latitud, r.longitud], {
+                icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px; background:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2); border:2px solid #BBB;">${icons[r.tipo_reporte] || '📍'}</div>`})
+              }).addTo(map);
+              m.bindPopup(`<strong>${r.tipo_reporte.toUpperCase()}</strong><br>${r.detalles || ''}`);
+            }
+          });
+        });
+
         map.on('click', (e) => {
           selectedLat = e.latlng.lat;
           selectedLng = e.latlng.lng;
           if (currentMarker) map.removeLayer(currentMarker);
-          currentMarker = L.marker([selectedLat, selectedLng]).addTo(map);
+          currentMarker = L.marker([selectedLat, selectedLng], {
+            icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px; background:var(--primary); color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.4); border:2px solid white;">📍</div>`})
+          }).addTo(map);
           document.getElementById('reportUbicacion').value = "📍 Punto fijado";
         });
       } catch(e) {}
@@ -391,7 +417,7 @@ const App = {
  &copy; 2026 BARRIO - PUERTOMAS SPA | 
  <a href="#/legal" style="color:var(--primary); text-decoration:underline; cursor:pointer;">Aviso Legal</a>
  </p>
- <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); margin-top: 8px; text-align: right;">v.1.3</div>
+ <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); margin-top: 8px; text-align: right;">v2.0 Stable</div>
  </footer>
  `;
  },
@@ -408,21 +434,21 @@ const App = {
 
  
  <div style="display:flex; flex-direction:column; gap:16px;">
- <a href="tel:${this.config.tel_carabineros || '133'}" onclick="App.logLlamada('133 - Carabineros')" class="btn" style="background:#006633; color:white; justify-content:center; padding:20px; font-size:1.2rem; font-weight:bold; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+ <a href="tel:${this.config.tel_carabineros || '133'}" onclick="App.logLlamada('133 - CARABINEROS')" class="btn" style="background:#006633; color:white; justify-content:center; padding:20px; font-size:1.2rem; font-weight:bold; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
  CARABINEROS ${this.config.tel_carabineros || '133'}
  </a>
- <a href="tel:${this.config.tel_bomberos || '132'}" onclick="App.logLlamada('132 - Bomberos')" class="btn" style="background:#D32F2F; color:white; justify-content:center; padding:20px; font-size:1.2rem; font-weight:bold; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+ <a href="tel:${this.config.tel_bomberos || '132'}" onclick="App.logLlamada('132 - BOMBEROS')" class="btn" style="background:#D32F2F; color:white; justify-content:center; padding:20px; font-size:1.2rem; font-weight:bold; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
  BOMBEROS ${this.config.tel_bomberos || '132'}
  </a>
- <a href="tel:${this.config.tel_ambulancia || '131'}" onclick="App.logLlamada('131 - Ambulancia')" class="btn" style="background:#1976D2; color:white; justify-content:center; padding:20px; font-size:1.2rem; font-weight:bold; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+ <a href="tel:${this.config.tel_ambulancia || '131'}" onclick="App.logLlamada('131 - SAMU')" class="btn" style="background:#1976D2; color:white; justify-content:center; padding:20px; font-size:1.2rem; font-weight:bold; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
  AMBULANCIA ${this.config.tel_ambulancia || '131'}
  </a>
  <a href="tel:${this.config.tel_pdi || '134'}" onclick="App.logLlamada('134 - PDI')" class="btn" style="background:#0D47A1; color:white; justify-content:center; padding:20px; font-size:1.2rem; font-weight:bold; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
  PDI ${this.config.tel_pdi || '134'}
  </a>
- <a href="tel:${this.config.tel_seguridad || '1529'}" onclick="App.logLlamada('1529 - Seguridad Ciudadana')" class="btn" style="background:#F57C00; color:white; justify-content:center; padding:15px; text-align:center; flex-direction:column; font-size:1.2rem; font-weight:bold; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1); line-height:1.2;">
+ <a href="tel:${this.config.tel_seguridad || '1529'}" onclick="App.logLlamada('1529 - SEGURIDAD CIUDADANA PUERTO MONTT')" class="btn" style="background:#F57C00; color:white; justify-content:center; padding:15px; text-align:center; flex-direction:column; font-size:1.1rem; font-weight:bold; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1); line-height:1.2;">
  <span>SEGURIDAD CIUDADANA ${this.config.tel_seguridad || '1529'}</span>
- <span style="font-size:0.9rem; font-weight:normal; opacity:0.9;">PUERTO MONTT</span>
+ <span style="font-size:0.85rem; font-weight:normal; opacity:0.9;">PUERTO MONTT</span>
  </a>
  </div>
  ${this.footerHtml()}
