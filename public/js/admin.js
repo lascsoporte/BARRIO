@@ -1,4 +1,4 @@
-// Admin Panel
+﻿// Admin Panel
 const Admin = {
  token: localStorage.getItem('barrio_admin_token') || null,
  currentTab: 'locales',
@@ -701,7 +701,7 @@ const Admin = {
  // ===== USUARIOS TAB =====
  async renderUsuariosTab(c) {
  const usuarios = await API.adminGetUsuarios(this.token);
- window._tempUsuariosExport = usuarios.map(u => ({ "Nombre": u.nombre || "No especificado", "Telefono": u.telefono || "No especificado", "Fecha": new Date(u.created_at).toLocaleDateString(), "Ubicacion": u.direccion || "No especificada", "Hora de Aceptación": u.terms_accepted ? new Date(u.created_at).toLocaleTimeString() : "No registrada", "Estado de Uso (Condicion)": u.is_blocked ? "Bloqueado" : (u.is_verified ? "Activo" : "En Verificación"), "Terminos y Condiciones": u.terms_accepted ? "Aceptados" : "Pendientes" }));
+ window._tempUsuariosExport = usuarios.map(u => ({ "Nombre": u.nombre || "No especificado", "Nickname": u.nickname || "No especificado", "Telefono": u.telefono || "No especificado", "Fecha": new Date(u.created_at).toLocaleDateString(), "Ubicacion": u.direccion || "No especificada", "Hora de Aceptación": u.terms_accepted ? new Date(u.created_at).toLocaleTimeString() : "No registrada", "Estado de Uso (Condicion)": u.is_blocked ? "Bloqueado" : (u.is_verified ? "Activo" : "En Verificación"), "Terminos y Condiciones": u.terms_accepted ? "Aceptados" : "Pendientes" }));
  setTimeout(() => {
      const btn = document.getElementById('dlMascotas');
      if(btn) btn.onclick = () => Admin.downloadCSV(window._tempMascotas, 'mascotas_barrio.xlsx');
@@ -716,7 +716,7 @@ const Admin = {
  <div class="item-info">
  <div class="item-name">${u.nombre} ${u.is_verified ? '✅' : '⏳'}</div>
  <div class="item-detail">
- <strong>Tel:</strong> ${u.telefono} | <strong>Ubicación:</strong> ${u.direccion || "-"}<br>
+ <strong>Nick:</strong> ${u.nickname || "-" } | <strong>Tel:</strong> ${u.telefono} | <strong>Ubicación:</strong> ${u.direccion || "-"}<br>
  <strong>Términos:</strong> ${u.terms_accepted ? '✅ Aceptados' : '❌ Pendiente'}<br>
  <small>Registro: ${new Date(u.created_at).toLocaleString()}</small>
  </div>
