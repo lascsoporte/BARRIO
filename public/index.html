@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="manifest" href="/manifest.json">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www=' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏘️</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏘️</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -23,7 +23,7 @@
             color: var(--text);
             margin: 0;
             display: flex;
-            align-items: center; /* Centrar verticalmente si cabe */
+            align-items: center; 
             justify-content: center;
             min-height: 100vh;
             overflow: hidden;
@@ -148,6 +148,16 @@
     </div>
 
     <script>
+        // SISTEMA DE SELF-PING: Evita que Render duerma el servidor cada 14 min
+        function keepAlive() {
+            fetch(window.location.origin)
+                .then(() => console.log('Ping automático exitoso: Servidor activo.'))
+                .catch(err => console.error('Fallo en self-ping:', err));
+        }
+        // Ejecutar cada 13 minutos (780000 ms)
+        setInterval(keepAlive, 780000);
+        keepAlive(); // Ejecución inmediata al cargar
+
         // Service Worker Registration
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -169,7 +179,7 @@
             if (clickCount === 5) {
                 window.location.href = '/app.html#/admin';
             }
-            setTimeout(() => { clickCount = 0; }, 3000); // Reiniciar si no hace los 5 clics rápido
+            setTimeout(() => { clickCount = 0; }, 3000); 
         });
     </script>
 </body>
