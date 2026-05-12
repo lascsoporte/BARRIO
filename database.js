@@ -144,19 +144,29 @@ async function createCloudTables() {
     }
   }
 
-  // Configuración inicial
-  const [rows] = await mysqlPool.execute('SELECT COUNT(*) as count FROM configuracion');
-  if (rows[0].count === 0) {
-    await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('admin_whatsapp', '56987606517')");
-    await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('tel_carabineros', '133')");
-    await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('tel_bomberos', '132')");
-    await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('tel_pdi', '134')");
-    await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('tel_ambulancia', '131')");
-    await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('tel_seguridad', '1529')");
-    await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('push_radius', '500')");
-    await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('admin_pass1', 'barrio2025')");
-    await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('admin_pass2', 'admin2025')");
-    await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('admin_pass3', 'seguridad2025')");
+  const configs = [
+    ['admin_whatsapp', '56987606517'],
+    ['tel_carabineros', '133'],
+    ['tel_bomberos', '132'],
+    ['tel_pdi', '134'],
+    ['tel_ambulancia', '131'],
+    ['tel_seguridad', '1529'],
+    ['push_radius', '500'],
+    ['admin_pass1', 'barrio2025'],
+    ['admin_pass2', 'admin2025'],
+    ['admin_pass3', 'seguridad2025']
+  ];
+
+  for (let [clave, valor] of configs) {
+    try {
+      const [exists] = await mysqlPool.execute('SELECT clave FROM configuracion WHERE clave = ?', [clave]);
+      if (exists.length === 0) {
+        await mysqlPool.execute('INSERT INTO configuracion (clave, valor) VALUES (?, ?)', [clave, valor]);
+        console.log(`✅ Configuración creada: ${clave}`);
+      }
+    } catch (e) {
+      console.error(`❌ Error en config ${clave}:`, e.message);
+    }
   }
 }
 
