@@ -154,6 +154,9 @@ async function createCloudTables() {
     await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('tel_ambulancia', '131')");
     await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('tel_seguridad', '1529')");
     await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('push_radius', '500')");
+    await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('admin_pass1', 'barrio2025')");
+    await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('admin_pass2', 'admin2025')");
+    await mysqlPool.execute("INSERT INTO configuracion (clave, valor) VALUES ('admin_pass3', 'seguridad2025')");
   }
 }
 

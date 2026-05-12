@@ -9,8 +9,7 @@ const App = {
     const loader = document.getElementById('loadingScreen');
     if (loader) loader.remove();
     Admin.route(document.getElementById('app'), hash);
-    // No retornamos para dejar que el resto cargue en background si es necesario, 
-    // pero evitamos que el splash screen bloquee.
+    return; // Detener init normal para el admin
   }
 
   console.log('App: Instando init...');

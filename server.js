@@ -14,6 +14,17 @@ webpush.setVapidDetails('mailto:contacto@puertomas.cl', publicVapidKey, privateV
 const app = express();
 const PORT = process.env.PORT || 3000;
 let ADMIN_PASSWORDS = ['barrio2025', 'admin2025', 'seguridad2025'];
+
+async function loadPasswords() {
+  try {
+    const p1 = await dbHelper.queryOne("SELECT valor FROM configuracion WHERE clave = 'admin_pass1'");
+    const p2 = await dbHelper.queryOne("SELECT valor FROM configuracion WHERE clave = 'admin_pass2'");
+    const p3 = await dbHelper.queryOne("SELECT valor FROM configuracion WHERE clave = 'admin_pass3'");
+    if (p1 && p2 && p3) {
+      ADMIN_PASSWORDS = [p1.valor, p2.valor, p3.valor];
+    }
+  } catch(e) {}
+}
 const DEFAULT_PASSWORDS = ['barrio2025', 'admin2025', 'seguridad2025'];
 const MASTER_RESET_KEY = 'BARRIO-RESET-2026-PUERTOMAS';
 
@@ -512,6 +523,7 @@ app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 async function start() {
   try {
     await initDatabase();
+    await loadPasswords();
     app.listen(PORT, () => {
       console.log(`Server on ${PORT}`);
       sendTelegramAlert(`🚀 <b>SISTEMA BARRIO INICIADO</b>\nServidor activo y conectado a la base de datos.`);
