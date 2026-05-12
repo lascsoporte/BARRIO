@@ -140,6 +140,7 @@ const App = {
       <header class="app-header">
         <h1 style="margin:0; letter-spacing:2px;">BARRIO</h1>
         <span class="city-subtitle">PUERTO MONTT</span>
+        <div style="font-size:1.2rem; margin-top:5px;">🇨🇱</div>
       </header>
 
       <div id="homeMap" style="height: 250px; width: 100%; border-radius: 16px; margin: 10px 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
