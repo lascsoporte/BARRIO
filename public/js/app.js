@@ -230,7 +230,7 @@ const App = {
     // Initialize Mini Map
     setTimeout(() => {
       try {
-        const map = L.map('homeMap', { zoomControl: false }).setView([Geo.userLat || -41.4693, Geo.userLng || -72.9423], 15);
+        const map = L.map('homeMap', { zoomControl: false }).setView([-41.4693, -72.9423], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         API.getReportes().then(reports => {
           reports.forEach(r => {
@@ -387,7 +387,7 @@ const App = {
 
     setTimeout(() => {
       try {
-        map = L.map('reportMap').setView([Geo.userLat || -41.4693, Geo.userLng || -72.9423], 15);
+        map = L.map('reportMap').setView([-41.4693, -72.9423], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         
         // Show existing reports on report map too
