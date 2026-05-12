@@ -6,10 +6,12 @@ const App = {
  async init() {
   const hash = location.hash || '#/';
   if (hash.includes('/admin')) {
-    const loader = document.querySelector('.loading-screen');
-    if (loader) loader.remove();
-    Admin.route(document.getElementById('app'), hash);
-    return; // Detener init normal para el admin
+    setTimeout(() => {
+      const loader = document.querySelector('.loading-screen');
+      if (loader) loader.remove();
+      Admin.route(document.getElementById('app'), hash);
+    }, 100);
+    return;
   }
 
   console.log('App: Instando init...');
@@ -36,13 +38,11 @@ const App = {
       const serverUser = await API.checkUser(localUser.id);
       localStorage.setItem('barrio_user', JSON.stringify(serverUser));
     }
-  } catch(e) {
-    // Si el usuario no existe en la DB (404), borramos caché y TÉRMINOS para forzar re-registro completo
-    localStorage.removeItem('barrio_user');
-    localStorage.removeItem('barrio_disclaimer_v2');
-    location.reload();
+    } catch(e) {
+      console.warn('Sesión no verificada:', e.message);
+      // No recargamos para evitar bucles. Si el usuario no existe, requireAuth lo manejará.
+    }
   }
- }
 
   this.requireAuth((user) => {
   this.continueInit(user);
