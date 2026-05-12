@@ -200,7 +200,7 @@ const App = {
           <button onclick="App.hideSearchModal()">&times;</button>
         </div>
         <div style="padding:15px;">
-          <input type="text" id="searchInputModal" placeholder="Ej: pan, gasfiter, farmacia..." style="width:100%; padding:15px; border-radius:12px; border:2px solid #EEE; font-size:1.1rem; outline:none; font-family:inherit;">
+          <input type="text" id="searchInputModal" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Ej: pan, gasfiter, farmacia..." style="width:100%; padding:15px; border-radius:12px; border:2px solid #EEE; font-size:1.1rem; outline:none; font-family:inherit;">
           <button onclick="App.doSearchModal()" class="btn btn-primary" style="margin-top:15px; width:100%; font-weight:900;">BUSCAR AHORA</button>
         </div>
       </div>
@@ -370,8 +370,8 @@ const App = {
       <button class="report-opt" data-tipo="otros">📍 Otros</button>
     </div>
 
-    <input type="text" id="reportUbicacion" placeholder="📍 Ubicación (Pincha en el mapa)" readonly style="width:100%; padding:10px; margin:10px 0; border-radius:8px; border:1px solid #CCC; background:#EEE;">
-    <textarea id="reportDetalles" placeholder="Detalles adicionales (opcional)" rows="3" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #CCC;"></textarea>
+    <input type="text" id="reportUbicacion" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="📍 Ubicación (Pincha en el mapa)" readonly style="width:100%; padding:10px; margin:10px 0; border-radius:8px; border:1px solid #CCC; background:#EEE;">
+    <textarea id="reportDetalles" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Detalles adicionales (opcional)" rows="3" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #CCC;"></textarea>
     
     <label style="display:block; margin-bottom:5px; font-weight:bold; font-size:0.85rem;">Duración en el mapa:</label>
     <select id="reportDuracion" style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #CCC;">
@@ -937,27 +937,27 @@ const App = {
       <div class="form-grid-auth">
         <div class="form-group">
           <label>Nombre Real</label>
-          <input type="text" id="authNombre" placeholder="Ej: Juan Pérez">
+          <input type="text" id="authNombre" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Ej: Juan Pérez">
         </div>
         <div class="form-group">
           <label>Nickname (Público)</label>
-          <input type="text" id="authNickname" placeholder="Ej: VecinoMirasol">
+          <input type="text" id="authNickname" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Ej: VecinoMirasol">
         </div>
         <div class="form-group">
           <label>Teléfono</label>
-          <input type="tel" id="authTelefono" placeholder="+569...">
+          <input type="tel" id="authTelefono" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="+569...">
         </div>
         <div class="form-group">
           <label>Correo Electrónico</label>
-          <input type="email" id="authEmail" placeholder="Para recibir tu PIN">
+          <input type="email" id="authEmail" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Para recibir tu PIN">
         </div>
         <div class="form-group">
           <label>PIN Seguridad (4 dígitos)</label>
-          <input type="password" id="authPin" maxlength="4" placeholder="****">
+          <input type="password" id="authPin" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" maxlength="4" placeholder="****">
         </div>
         <div class="form-group">
           <label>Población/Sector</label>
-          <input type="text" id="authDireccion" placeholder="Mirasol, PM">
+          <input type="text" id="authDireccion" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Mirasol, PM">
         </div>
       </div>
       <button id="authSubmit" class="btn btn-primary" style="margin-top:10px; width:100%; font-weight:900;">REGISTRARME AHORA</button>
