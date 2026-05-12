@@ -117,13 +117,13 @@ const App = {
     const isHome = (hash === '#/' || hash === '');
     lateralBtns.forEach(b => b.style.display = (isHome || hash === '#/emergencia-menu') ? 'flex' : 'none');
 
-    if (isHome || hash === '#/emergencia-menu') {
+    if (isHome || hash === '#/emergencia-menu' || hash === '#/compartir') {
       this.renderHome(app);
       if (hash === '#/emergencia-menu') this.showEmergencyMenu(true);
+      if (hash === '#/compartir') this.showShareMenu(true);
     }
     else if (hash.startsWith('#/buscar')) this.renderSearch(app);
     else if (hash.startsWith('#/local/')) this.renderStore(app);
-    else if (hash === '#/compartir') this.renderShare(app);
     else if (hash === '#/mascotas' || hash === '#/reportar') this.renderReportar(app);
     else if (hash === '#/legal') this.renderLegal(app);
     else if (hash === '#/emergencia') this.renderEmergencia(app);
@@ -277,8 +277,14 @@ const App = {
       location.hash = `#/buscar?q=${encodeURIComponent(q)}`;
     }
   },
-  showShareMenu() { document.getElementById('shareModal').classList.add('active'); },
-  hideShareMenu() { document.getElementById('shareModal').classList.remove('active'); },
+  showShareMenu(fromHash = false) { 
+    if (!fromHash) { location.hash = '#/compartir'; return; }
+    document.getElementById('shareModal').classList.add('active'); 
+  },
+  hideShareMenu() { 
+    document.getElementById('shareModal').classList.remove('active');
+    if (location.hash === '#/compartir') history.back();
+  },
 
  // ===== PRODUCT SEARCH =====
  async renderSearch(container) {
