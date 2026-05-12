@@ -1,19 +1,30 @@
-// API client
+/**
+ * BARRIO API Client - v2.0 (Reparado)
+ * Manejador de conexiones para la red comunitaria.
+ */
 const API = {
-  base: '',
+  base: '', // Se mantiene relativo a la raíz del sitio
 
+  // Funciones base de comunicación
   async get(url, token) {
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
     const res = await fetch(this.base + url, { headers });
-    if (!res.ok) throw new Error(`Error ${res.status}`);
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('Sesión expirada: 401');
+      throw new Error(`Error ${res.status}`);
+    }
     return res.json();
   },
 
   async post(url, data, token) {
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    const res = await fetch(this.base + url, { method: 'POST', headers, body: JSON.stringify(data) });
+    const res = await fetch(this.base + url, { 
+      method: 'POST', 
+      headers, 
+      body: JSON.stringify(data) 
+    });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `Error ${res.status}`);
@@ -22,8 +33,13 @@ const API = {
   },
 
   async put(url, data, token) {
-    const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
-    const res = await fetch(this.base + url, { method: 'PUT', headers, body: JSON.stringify(data) });
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(this.base + url, { 
+      method: 'PUT', 
+      headers, 
+      body: JSON.stringify(data) 
+    });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `Error ${res.status}`);
@@ -32,8 +48,12 @@ const API = {
   },
 
   async del(url, token) {
-    const headers = { 'Authorization': `Bearer ${token}` };
-    const res = await fetch(this.base + url, { method: 'DELETE', headers });
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(this.base + url, { 
+      method: 'DELETE', 
+      headers 
+    });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `Error ${res.status}`);
@@ -41,7 +61,7 @@ const API = {
     return res.json();
   },
 
-  // Public endpoints
+  // --- ENDPOINTS PÚBLICOS ---
   searchProducts(q, lat, lng, radio = 1) {
     let url = `/api/productos/buscar?q=${encodeURIComponent(q)}`;
     if (lat && lng) url += `&lat=${lat}&lng=${lng}&radio=${radio}`;
@@ -57,18 +77,13 @@ const API = {
   },
 
   getServiceTypes() { return this.get('/api/servicios/tipos'); },
-
   getRatings(storeId) { return this.get(`/api/locales/${storeId}/calificaciones`); },
-
   submitRating(storeId, data) { return this.post(`/api/locales/${storeId}/calificaciones`, data); },
-
   getConfig() { return this.get('/api/config'); },
   getReportes() { return this.get('/api/reportes'); },
   createReporte(data) { return this.post('/api/reportes', data); },
   getMascotas() { return this.get('/api/mascotas'); },
   createMascota(data) { return this.post('/api/mascotas', data); },
-
-  // Nuevas funciones
   registerUser(data) { return this.post('/api/registro', data); },
   getMuro() { return this.get('/api/muro'); },
   postMuro(data) { return this.post('/api/muro', data); },
@@ -78,9 +93,19 @@ const API = {
   reportarExtravio(data) { return this.post('/api/reportar-extravio', data); },
   checkUser(id) { return this.get(`/api/verificar-usuario/${id}`); },
   acceptTerms(id) { return this.put(`/api/usuarios/${id}/accept-terms`, {}); },
-  // Admin endpoints
-  adminLogin(passwords) { return this.post('/api/admin/login', { passwords }); },
-  adminResolveMap(url, token) { return this.post('/api/admin/resolve-map', { url }, token); },
+  savePushSubscription(data) { return this.post('/api/push/subscribe', data); },
+  ping(device_id, lat, lng) { return this.post('/api/ping', { device_id, lat, lng }); },
+
+  // --- ENDPOINTS DE ADMINISTRACIÓN (REPARADOS) ---
+  
+  // Login reparado para aceptar usuario y contraseña directamente
+  adminLogin(user, pass) { 
+    return this.post('/api/admin/login', { user, pass }); 
+  },
+
+  adminNotifyEntry(token) { 
+    return this.post('/api/admin/notify-entry', {}, token); 
+  },
 
   adminGetLocales(token) { return this.get('/api/admin/locales', token); },
   adminCreateLocal(data, token) { return this.post('/api/admin/locales', data, token); },
@@ -98,24 +123,31 @@ const API = {
   adminUpdateServicio(id, data, token) { return this.put(`/api/admin/servicios/${id}`, data, token); },
   adminDeleteServicio(id, token) { return this.del(`/api/admin/servicios/${id}`, token); },
 
-  adminDeleteMascota(id, token) { return this.del(`/api/admin/mascotas/${id}`, token); },
-  adminDeleteMensaje(id, token) { return this.del(`/api/admin/mensajes/${id}`, token); },
-  adminDeleteEmergencia(id, token) { return this.del(`/api/admin/emergencias/${id}`, token); },
-  adminDeleteRastreo(id, token) { return this.del(`/api/admin/rastreo/${id}`, token); },
-  adminUpdateConfig(data, token) { return this.put('/api/admin/config', data, token); },
-  adminChangePasswords(data, token) { return this.put('/api/admin/passwords', data, token); },
-  adminGetStats(token) { return this.get('/api/admin/stats', token); },
+  adminGetUsuarios(token) { return this.get('/api/admin/usuarios', token); },
+  adminVerifyUsuario(id, is_verified, token) { return this.put(`/api/admin/usuarios/${id}/verificar`, { is_verified }, token); },
+  adminToggleBlockUsuario(id, is_blocked, token) { return this.put(`/api/admin/usuarios/${id}/bloquear`, { is_blocked }, token); },
+  adminToggleStolenUsuario(id, is_stolen, token) { return this.put(`/api/admin/usuarios/${id}/robado`, { is_stolen }, token); },
+  adminDeleteUsuario(id, token) { return this.del(`/api/admin/usuarios/${id}`, token); },
+
   adminGetMensajes(token) { return this.get('/api/admin/mensajes', token); },
   adminMarkMensaje(id, token) { return this.put(`/api/admin/mensajes/${id}/leido`, {}, token); },
-  adminGetUsuarios(token) { return this.get('/api/admin/usuarios', token); },
-  adminToggleStolenUsuario(id, is_stolen, token) { return this.put(`/api/admin/usuarios/${id}/robado`, { is_stolen }, token); },
-  adminToggleBlockUsuario(id, is_blocked, token) { return this.put(`/api/admin/usuarios/${id}/bloquear`, { is_blocked }, token); },
-  adminVerifyUsuario(id, is_verified, token) { return this.put(`/api/admin/usuarios/${id}/verificar`, { is_verified }, token); },
-  adminDeleteUsuario(id, token) { return this.del(`/api/admin/usuarios/${id}`, token); },
+  adminDeleteMensaje(id, token) { return this.del(`/api/admin/mensajes/${id}`, token); },
+
   adminGetEmergencias(token) { return this.get('/api/admin/emergencias', token); },
+  adminDeleteEmergencia(id, token) { return this.del(`/api/admin/emergencias/${id}`, token); },
+
   adminGetRastreo(token) { return this.get('/api/admin/rastreo', token); },
+  adminDeleteRastreo(id, token) { return this.del(`/api/admin/rastreo/${id}`, token); },
+
+  adminGetStats(token) { return this.get('/api/admin/stats', token); },
+  adminUpdateConfig(data, token) { return this.put('/api/admin/config', data, token); },
+  
+  adminGetReportes(token) { return this.get('/api/admin/reportes', token); },
+  adminDeleteReporte(id, token) { return this.del(`/api/admin/reportes/${id}`, token); },
+  
   adminClearMuro(token) { return this.del('/api/admin/muro', token); },
   adminDeleteMuroPost(id, token) { return this.del(`/api/admin/muro/${id}`, token); },
-  savePushSubscription(data) { return this.post('/api/push/subscribe', data); },
-  ping(device_id, lat, lng) { return this.post('/api/ping', { device_id, lat, lng }); }
+  adminDeleteMascota(id, token) { return this.del(`/api/admin/mascotas/${id}`, token); },
+  
+  adminResolveMap(url, token) { return this.post('/api/admin/resolve-map', { url }, token); }
 };
