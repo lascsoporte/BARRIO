@@ -19,14 +19,14 @@
         }
         body {
             font-family: 'Nunito', sans-serif;
-            background: var(--bg);
+            background: var(--bg) !important;
             color: var(--text);
             margin: 0;
             display: flex;
-            align-items: center; 
+            align-items: center;
             justify-content: center;
             min-height: 100vh;
-            overflow: hidden;
+            overflow-x: hidden;
             padding: 10px;
         }
         .portal-container {
@@ -41,6 +41,7 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
+            z-index: 10;
         }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
@@ -113,15 +114,24 @@
             text-decoration: none;
             font-weight: bold;
         }
+        /* El root donde vive la app de React */
+        #root:not(:empty) {
+            position: absolute;
+            inset: 0;
+            z-index: 100;
+            background: white;
+        }
     </style>
 </head>
 <body>
-    <div class="portal-container">
+    <div id="root"></div>
+
+    <div class="portal-container" id="portalView">
         <h1>BARRIO</h1>
         <p class="subtitle">Selecciona tu ciudad para entrar a la red comunitaria.</p>
         
         <div class="city-grid">
-            <a href="/app.html" class="city-btn">
+            <a href="#" class="city-btn" id="btnPuertoMontt">
                 <span>📍 PUERTO MONTT</span>
                 <span>🇨🇱</span>
             </a>
@@ -139,7 +149,7 @@
 
         <div class="footer-inline">
             <div>
-                &copy; 2026 PUERTOMAS SPA | <a href="/app.html#/legal">Aviso Legal</a>
+                &copy; 2026 PUERTOMAS SPA | <a>Aviso Legal</a>
             </div>
             <div style="font-weight: bold; cursor: pointer; user-select: none;" id="versionInfo">
                 v2.0 Stable
@@ -147,39 +157,45 @@
         </div>
     </div>
 
+    <script type="module" src="/src/main.tsx"></script>
+
     <script>
-        // SISTEMA DE SELF-PING: Evita que Render duerma el servidor cada 14 min
-        function keepAlive() {
+        // Función para ocultar el portal y mostrar la app
+        function enterApp(isAdmin = false) {
+            const portal = document.getElementById('portalView');
+            if (portal) portal.style.display = 'none';
+            if (isAdmin) {
+                window.location.hash = '#/admin';
+            }
+        }
+
+        // Sistema de Self-Ping para Render (evita que el servidor se duerma)
+        function selfPing() {
             fetch(window.location.origin)
-                .then(() => console.log('Ping automático exitoso: Servidor activo.'))
-                .catch(err => console.error('Fallo en self-ping:', err));
+                .then(() => console.log('Ping OK'))
+                .catch(err => console.error('Ping Error:', err));
         }
-        // Ejecutar cada 13 minutos (780000 ms)
-        setInterval(keepAlive, 780000);
-        keepAlive(); // Ejecución inmediata al cargar
+        setInterval(selfPing, 780000); // 13 minutos
+        selfPing();
 
-        // Service Worker Registration
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').then(reg => {
-                    console.log('SW Registered', reg);
-                }).catch(err => console.error('SW Error', err));
-            });
+        // Detectar si entran directo con #/admin en la URL
+        if (window.location.hash.includes('#/admin')) {
+            enterApp();
         }
 
-        // Redirección automática si entran con #/admin en la URL raíz
-        if (window.location.hash.startsWith('#/admin')) {
-            window.location.href = '/app.html' + window.location.hash;
-        }
+        document.getElementById('btnPuertoMontt').addEventListener('click', (e) => {
+            e.preventDefault();
+            enterApp();
+        });
 
         // Acceso secreto: 5 clics en la versión para abrir el panel admin
         let clickCount = 0;
         document.getElementById('versionInfo').addEventListener('click', () => {
             clickCount++;
             if (clickCount === 5) {
-                window.location.href = '/app.html#/admin';
+                enterApp(true);
             }
-            setTimeout(() => { clickCount = 0; }, 3000); 
+            setTimeout(() => { clickCount = 0; }, 3000);
         });
     </script>
 </body>
