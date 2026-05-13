@@ -1,7 +1,55 @@
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
+const http = require('http');
 const https = require('https');
+const { URL } = require('url');
+
+/** GET con redirecciones (sin depender de fetch; compatible Node 16 en Render). */
+function httpGetWithRedirects(targetUrl, maxRedirects = 5) {
+  return new Promise((resolve, reject) => {
+    const follow = (u, left) => {
+      let parsed;
+      try {
+        parsed = new URL(u);
+      } catch (e) {
+        return reject(new Error('URL inválida'));
+      }
+      const isHttps = parsed.protocol === 'https:';
+      const lib = isHttps ? https : http;
+      const opts = {
+        hostname: parsed.hostname,
+        port: parsed.port || (isHttps ? 443 : 80),
+        path: parsed.pathname + parsed.search,
+        method: 'GET',
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      };
+      const req = lib.request(opts, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && left > 0) {
+          res.resume();
+          const next = new URL(res.headers.location, u).href;
+          return follow(next, left - 1);
+        }
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => {
+          resolve({
+            statusCode: res.statusCode,
+            finalUrl: u,
+            body: Buffer.concat(chunks).toString('utf8'),
+          });
+        });
+      });
+      req.on('error', reject);
+      req.setTimeout(25000, () => {
+        req.destroy();
+        reject(new Error('Timeout al obtener URL'));
+      });
+      req.end();
+    };
+    follow(targetUrl, maxRedirects);
+  });
+}
 const { initDatabase, cleanupMascotas, cleanupReportes, isUsingMysql, ...dbHelper } = require('./database');
 const nodemailer = require('nodemailer');
 const webpush = require('web-push');
@@ -388,9 +436,9 @@ app.post('/api/admin/resolve-map', authMw, async (req, res) => {
     return res.json({ ...coords, address });
   }
   try {
-    const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
-    const finalUrl = response.url;
-    const html = await response.text();
+    const response = await httpGetWithRedirects(url);
+    const finalUrl = response.finalUrl;
+    const html = response.body;
     coords = extractCoords(finalUrl) || extractCoords(html);
     if (!coords) {
       const jsonCoords = html.match(/\[null,null,([-\d.]+),([-\d.]+)\]/);
@@ -637,14 +685,11 @@ function scheduleRenderKeepAlive() {
   const pingUrl = `${base}/api/ping`;
   const scheduleNext = () => {
     const delay = minMs + Math.floor(Math.random() * (maxMs - minMs));
-    setTimeout(async () => {
-      try {
-        const r = await fetch(pingUrl, { method: 'GET' });
-        console.log(`[Anti-Sleep] GET ${pingUrl} → ${r.status}`);
-      } catch (e) {
-        console.error('[Anti-Sleep]', e.message);
-      }
-      scheduleNext();
+    setTimeout(() => {
+      httpGetWithRedirects(pingUrl)
+        .then((r) => console.log(`[Anti-Sleep] GET ${pingUrl} → ${r.statusCode}`))
+        .catch((e) => console.error('[Anti-Sleep]', e.message))
+        .finally(() => scheduleNext());
     }, delay);
   };
   scheduleNext();
