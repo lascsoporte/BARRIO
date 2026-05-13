@@ -20,6 +20,15 @@ const Admin = {
     return t.length <= n ? t : t.slice(0, n) + '…';
   },
 
+  toast(msg) {
+    const el = document.createElement('div');
+    el.textContent = msg;
+    el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:12px 24px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  },
+  },
+
   yn(v) {
     if (v === 1 || v === true || v === '1') return 'Sí';
     if (v === 0 || v === false || v === '0') return 'No';
@@ -327,7 +336,7 @@ const Admin = {
           </div>
           ${this.chartBlock('Altas de usuarios por día (últimos 30 días)')}
           <div class="admin-table-wrap"><table class="admin-table"><thead><tr>
-            <th>ID</th><th>Nombre</th><th>Nick</th><th>Tel</th><th>Email</th><th>Verif.</th><th>Bloq.</th><th>Extravío</th><th>Términos</th><th>Última ubicación</th><th>Registro</th><th>Device</th>
+            <th>ID</th><th>Nombre</th><th>Nick</th><th>Tel</th><th>Email</th><th>Verif.</th><th>Bloq.</th><th>Extravío</th><th>Términos</th><th>Última ubicación</th><th>Registro</th><th>Device</th><th>Acciones</th>
           </tr></thead><tbody>
           ${data
             .map(
@@ -344,12 +353,83 @@ const Admin = {
             <td>${this.mapBtn(u.last_lat, u.last_lng)}</td>
             <td>${this.esc(u.created_at)}</td>
             <td class="admin-muted">${this.esc((u.device_id || '').slice(0, 24))}</td>
+            <td style="white-space:nowrap;">
+              <button class="admin-action-btn btn-verify" data-id="${u.id}" data-val="${u.is_verified ? 1 : 0}" title="${u.is_verified ? 'Quitar verificación' : 'Verificar usuario'}" style="background:${u.is_verified ? '#4CAF50' : '#9E9E9E'};color:white;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem;margin:2px;">
+                ${u.is_verified ? '✅ Verif.' : '⏳ Verificar'}
+              </button>
+              <button class="admin-action-btn btn-block" data-id="${u.id}" data-val="${u.is_blocked ? 1 : 0}" title="${u.is_blocked ? 'Desbloquear' : 'Bloquear usuario'}" style="background:${u.is_blocked ? '#FF9800' : '#607D8B'};color:white;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem;margin:2px;">
+                ${u.is_blocked ? '🔓 Desbloquear' : '🔒 Bloquear'}
+              </button>
+              <button class="admin-action-btn btn-stolen" data-id="${u.id}" data-val="${u.is_stolen ? 1 : 0}" title="${u.is_stolen ? 'Quitar extravío' : 'Marcar extraviado'}" style="background:${u.is_stolen ? '#E53935' : '#78909C'};color:white;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem;margin:2px;">
+                ${u.is_stolen ? '🚨 Extraviado' : '📱 Normal'}
+              </button>
+              <button class="admin-action-btn btn-delete" data-id="${u.id}" data-nombre="${this.esc(u.nickname || u.nombre)}" title="Eliminar usuario permanentemente" style="background:#D32F2F;color:white;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem;margin:2px;">
+                🗑️ Eliminar
+              </button>
+            </td>
           </tr>`
             )
             .join('')}
           </tbody></table></div>`;
         box.innerHTML = html;
         this.bindDownloads(box);
+
+        // ── Botones de acción de usuarios ──
+        box.querySelectorAll('.btn-verify').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            const current = parseInt(btn.dataset.val);
+            const nuevo = current ? 0 : 1;
+            const accion = nuevo ? 'VERIFICAR' : 'QUITAR verificación de';
+            if (!confirm(`¿${accion} este usuario?`)) return;
+            try {
+              await API.adminVerifyUsuario(id, nuevo, this.token);
+              this.loadTab();
+            } catch(e) { alert('Error: ' + e.message); }
+          });
+        });
+
+        box.querySelectorAll('.btn-block').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            const current = parseInt(btn.dataset.val);
+            const nuevo = current ? 0 : 1;
+            const accion = nuevo ? 'BLOQUEAR' : 'DESBLOQUEAR';
+            if (!confirm(`¿${accion} este usuario?`)) return;
+            try {
+              await API.adminToggleBlockUsuario(id, nuevo, this.token);
+              this.loadTab();
+            } catch(e) { alert('Error: ' + e.message); }
+          });
+        });
+
+        box.querySelectorAll('.btn-stolen').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            const current = parseInt(btn.dataset.val);
+            const nuevo = current ? 0 : 1;
+            const accion = nuevo ? 'marcar como EXTRAVIADO' : 'marcar como NORMAL';
+            if (!confirm(`¿Deseas ${accion} el dispositivo de este usuario?`)) return;
+            try {
+              await API.adminToggleStolenUsuario(id, nuevo, this.token);
+              this.loadTab();
+            } catch(e) { alert('Error: ' + e.message); }
+          });
+        });
+
+        box.querySelectorAll('.btn-delete').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            const nombre = btn.dataset.nombre;
+            if (!confirm(`⚠️ ¿Eliminar PERMANENTEMENTE al usuario "${nombre}" (ID: ${id})?\n\nEsta acción no se puede deshacer.`)) return;
+            try {
+              await API.adminDeleteUsuario(id, this.token);
+              this.toast(`Usuario "${nombre}" eliminado.`);
+              this.loadTab();
+            } catch(e) { alert('Error al eliminar: ' + e.message); }
+          });
+        });
+
         await this.drawChart('adminChartCanvas', this.lineChart('Usuarios / día', analytics.registrosDia, '#2EC4B6', 'rgba(46,196,182,0.12)'));
         return;
       }
