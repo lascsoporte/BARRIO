@@ -1,7 +1,148 @@
-// Admin Panel - BARRIO
+// Admin Panel - BARRIO (extendido: tablas, gráficas, mapas, planillas CSV)
 const Admin = {
   token: localStorage.getItem('barrio_admin_token') || null,
-  currentTab: 'locales',
+  currentTab: 'resumen',
+  _chart: null,
+  _chart2: null,
+  _chartJsPromise: null,
+
+  esc(t) {
+    if (t == null || t === '') return '';
+    return String(t)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  },
+
+  trunc(s, n = 120) {
+    const t = s == null ? '' : String(s);
+    return t.length <= n ? t : t.slice(0, n) + '…';
+  },
+
+  yn(v) {
+    if (v === 1 || v === true || v === '1') return 'Sí';
+    if (v === 0 || v === false || v === '0') return 'No';
+    return '—';
+  },
+
+  mapBtn(lat, lng) {
+    if (lat == null || lng == null || lat === '' || lng === '') return '<span class="admin-muted">—</span>';
+    const u = `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}`;
+    return `<a href="${this.esc(u)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline" style="padding:4px 10px;font-size:11px;">🗺️ Ver mapa</a>`;
+  },
+
+  exportBtn(path, filename, label = 'Descargar planilla CSV') {
+    const L = label || 'Descargar planilla CSV';
+    return `<button type="button" class="btn btn-sm btn-primary" data-export="${this.esc(path)}" data-filename="${this.esc(filename)}" style="margin:2px 0;">📥 ${this.esc(L)}</button>`;
+  },
+
+  bindDownloads(box) {
+    box.querySelectorAll('[data-export]').forEach((btn) => {
+      btn.onclick = async () => {
+        const path = btn.getAttribute('data-export');
+        const file = btn.getAttribute('data-filename');
+        try {
+          await API.adminDownloadBlob(path, this.token, file);
+        } catch (e) {
+          alert('No se pudo descargar: ' + e.message);
+        }
+      };
+    });
+  },
+
+  ensureChartJs() {
+    if (window.Chart) return Promise.resolve();
+    if (this._chartJsPromise) return this._chartJsPromise;
+    this._chartJsPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('No se pudo cargar Chart.js'));
+      document.head.appendChild(s);
+    });
+    return this._chartJsPromise;
+  },
+
+  destroyChart() {
+    [this._chart, this._chart2].forEach((c) => {
+      if (c) {
+        try {
+          c.destroy();
+        } catch (e) {
+          /* ignore */
+        }
+      }
+    });
+    this._chart = null;
+    this._chart2 = null;
+  },
+
+  async drawChart(canvasId, config) {
+    await this.ensureChartJs();
+    this.destroyChart();
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !window.Chart) return;
+    this._chart = new Chart(canvas.getContext('2d'), config);
+  },
+
+  lineChart(title, series, color = '#FF6B35', fillColor = 'rgba(255,107,53,0.12)') {
+    const labels = (series || []).map((x) => String(x.dia || '').slice(0, 10));
+    const data = (series || []).map((x) => Number(x.n) || 0);
+    return {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: title,
+            data,
+            fill: true,
+            tension: 0.25,
+            borderColor: color,
+            backgroundColor: fillColor,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: true, labels: { font: { size: 10 } } } },
+        scales: {
+          x: { ticks: { maxRotation: 45, font: { size: 9 } } },
+          y: { beginAtZero: true, ticks: { precision: 0 } },
+        },
+      },
+    };
+  },
+
+  barChart(title, items, keyLabel = 'nombre', keyValue = 'n', horizontal = false) {
+    const labels = (items || []).map((x) => String(x[keyLabel] ?? '').slice(0, 22));
+    const data = (items || []).map((x) => Number(x[keyValue]) || 0);
+    return {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{ label: title, data, backgroundColor: 'rgba(46,196,182,0.55)', borderColor: '#2EC4B6', borderWidth: 1 }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: horizontal ? 'y' : 'x',
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: true, ticks: { font: { size: 9 } } },
+          y: { ticks: { font: { size: 9 } } },
+        },
+      },
+    };
+  },
+
+  chartBlock(title) {
+    return `
+      <h4 style="margin:16px 0 8px;font-size:0.95rem;color:#444;">${title}</h4>
+      <div class="admin-chart-box"><canvas id="adminChartCanvas"></canvas></div>`;
+  },
 
   route(container) {
     if (!this.token) return this.renderLogin(container);
@@ -12,26 +153,18 @@ const Admin = {
     container.innerHTML = `
       <div class="admin-login fade-in" style="max-width:400px; margin:50px auto; padding:20px; text-align:center; background:white; border-radius:15px; box-shadow:0 10px 25px rgba(0,0,0,0.1);">
         <div style="font-size:3rem; margin-bottom:10px;">🔐</div>
-        <h2>Panel Administrativo</h2>
+        <h2>Panel administrativo</h2>
         <p style="color:#666; font-size:0.9rem; margin-bottom:20px;">Ingresa las 3 llaves de seguridad</p>
-        
         <input type="password" id="p1" placeholder="Llave 1" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;">
         <input type="password" id="p2" placeholder="Llave 2" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;">
         <input type="password" id="p3" placeholder="Llave 3" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;">
-        
-        <button id="btnLogin" class="btn btn-primary" style="width:100%; padding:15px; font-weight:bold; margin-top:10px;">ACCEDER</button>
+        <button type="button" id="btnLogin" class="btn btn-primary" style="width:100%; padding:15px; font-weight:bold; margin-top:10px;">ACCEDER</button>
         <p id="errMsg" style="color:red; display:none; margin-top:15px; font-weight:bold;"></p>
-        <button onclick="location.assign('/')" style="background:none; border:none; color:#999; margin-top:20px; cursor:pointer;">⬅ Volver al inicio</button>
-      </div>
-    `;
+        <button type="button" onclick="location.assign('/')" style="background:none; border:none; color:#999; margin-top:20px; cursor:pointer;">⬅ Volver al inicio</button>
+      </div>`;
 
     document.getElementById('btnLogin').onclick = async () => {
-      const keys = [
-        document.getElementById('p1').value,
-        document.getElementById('p2').value,
-        document.getElementById('p3').value
-      ];
-      
+      const keys = [document.getElementById('p1').value, document.getElementById('p2').value, document.getElementById('p3').value];
       try {
         const res = await API.adminLogin(keys);
         this.token = res.token;
@@ -39,82 +172,369 @@ const Admin = {
         this.renderPanel(container);
       } catch (e) {
         const err = document.getElementById('errMsg');
-        err.textContent = "❌ Llaves incorrectas";
-        err.style.display = "block";
+        err.textContent = '❌ Llaves incorrectas';
+        err.style.display = 'block';
       }
     };
   },
 
   async renderPanel(container) {
     container.innerHTML = `
-      <div class="fade-in" style="padding:15px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:15px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.05); margin-bottom:20px;">
-          <h2 style="margin:0; font-size:1.2rem; color:var(--primary);">🔧 Administración</h2>
-          <button id="btnLogout" class="btn btn-sm btn-outline" style="width:auto;">Salir</button>
+      <style>
+        .admin-wrap { padding:12px; max-width:1280px; margin:0 auto; }
+        .admin-table-wrap { overflow-x:auto; margin-top:10px; border:1px solid #eee; border-radius:10px; }
+        .admin-table { width:100%; border-collapse:collapse; font-size:11px; min-width:900px; }
+        .admin-table th { background:#fff3e0; text-align:left; padding:8px 6px; border-bottom:2px solid #FF6B35; white-space:nowrap; position:sticky; top:0; z-index:1; }
+        .admin-table td { padding:7px 6px; border-bottom:1px solid #eee; vertical-align:top; }
+        .admin-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+        .admin-chart-box { height:220px; margin:4px 0 12px; position:relative; }
+        .admin-muted { color:#999; font-size:11px; }
+        .admin-tabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:8px; margin-bottom:8px; flex-wrap:wrap; }
+        .admin-tab { flex-shrink:0; padding:9px 12px; border-radius:10px; border:1px solid #ddd; background:#fafafa; cursor:pointer; font-weight:800; font-size:11px; }
+        .admin-tab.active { background:var(--primary,#FF6B35); color:#fff; border-color:var(--primary,#FF6B35); }
+      </style>
+      <div class="admin-wrap fade-in">
+        <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:14px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.06); margin-bottom:10px;">
+          <h2 style="margin:0; font-size:1.1rem; color:var(--primary,#FF6B35);">🔧 Administración BARRIO</h2>
+          <button type="button" id="btnLogout" class="btn btn-sm btn-outline">Salir</button>
         </div>
-
-        <div class="admin-tabs" style="display:flex; gap:10px; overflow-x:auto; padding-bottom:10px; margin-bottom:20px;">
-          <button class="admin-tab active" data-tab="locales">🏪 Locales</button>
-          <button class="admin-tab" data-tab="usuarios">👥 Usuarios</button>
-          <button class="admin-tab" data-tab="stats">📊 Stats</button>
-          <button class="admin-tab" data-tab="reportes">📢 Reportes</button>
+        <div class="admin-tabs">
+          <button type="button" class="admin-tab active" data-tab="resumen">📊 Resumen</button>
+          <button type="button" class="admin-tab" data-tab="locales">🏪 Locales</button>
+          <button type="button" class="admin-tab" data-tab="productos">📦 Productos</button>
+          <button type="button" class="admin-tab" data-tab="usuarios">👥 Usuarios</button>
+          <button type="button" class="admin-tab" data-tab="muro">💬 Muro</button>
+          <button type="button" class="admin-tab" data-tab="buzon">📬 Buzón</button>
+          <button type="button" class="admin-tab" data-tab="rastreo">📍 Rastreo</button>
+          <button type="button" class="admin-tab" data-tab="reportes">📢 Reportes</button>
+          <button type="button" class="admin-tab" data-tab="emergencias">🚨 Emergencias</button>
         </div>
-
-        <div id="adminContent" style="background:white; padding:20px; border-radius:12px; min-height:300px; box-shadow:0 4px 10px rgba(0,0,0,0.05);">
-          <div class="spinner"></div>
-        </div>
-      </div>
-    `;
+        <div id="adminContent" style="background:white; padding:14px; border-radius:12px; min-height:300px; box-shadow:0 4px 10px rgba(0,0,0,0.05);"></div>
+      </div>`;
 
     document.getElementById('btnLogout').onclick = () => {
       localStorage.removeItem('barrio_admin_token');
       location.reload();
     };
 
-    container.querySelectorAll('.admin-tab').forEach(tab => {
+    container.querySelectorAll('.admin-tab').forEach((tab) => {
       tab.onclick = () => {
-        container.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+        container.querySelectorAll('.admin-tab').forEach((t) => t.classList.remove('active'));
         tab.classList.add('active');
         this.currentTab = tab.dataset.tab;
         this.loadTab();
       };
     });
 
+    this.currentTab = 'resumen';
     this.loadTab();
   },
 
   async loadTab() {
     const box = document.getElementById('adminContent');
-    box.innerHTML = '<p style="text-align:center; color:#999;">Cargando información...</p>';
-    
+    this.destroyChart();
+    box.innerHTML = '<p style="text-align:center;color:#888;">Cargando…</p>';
+
     try {
+      const analytics = await API.adminGetAnalytics(this.token);
+      let html = '';
+
+      if (this.currentTab === 'resumen') {
+        const st = await API.adminGetStats(this.token);
+        html = `
+          <p><b>Visitas totales:</b> ${st.totalVisitas ?? 0} · <b>Hoy:</b> ${st.visitasHoy ?? 0} · <b>Usuarios:</b> ${st.uniqueUsers ?? 0} · <b>Mascotas:</b> ${st.totalMascotas ?? 0}</p>
+          <h4 style="margin:12px 0 4px;font-size:0.95rem;">Visitas por día (14 días)</h4>
+          <div class="admin-chart-box"><canvas id="adminChartCanvas"></canvas></div>
+          <h4 style="margin:12px 0 4px;font-size:0.95rem;">Reportes por tipo</h4>
+          <div class="admin-chart-box"><canvas id="adminChartCanvas2"></canvas></div>`;
+        box.innerHTML = html;
+        this.bindDownloads(box);
+        await this.ensureChartJs();
+        this.destroyChart();
+        const c1 = document.getElementById('adminChartCanvas');
+        const c2 = document.getElementById('adminChartCanvas2');
+        if (c1 && window.Chart) this._chart = new Chart(c1.getContext('2d'), this.lineChart('Visitas', analytics.visitasDia, '#FF6B35', 'rgba(255,107,53,0.12)'));
+        if (c2 && window.Chart) this._chart2 = new Chart(c2.getContext('2d'), this.barChart('Cantidad', analytics.reportesTipo, 'tipo', 'n', true));
+        return;
+      }
+
       if (this.currentTab === 'locales') {
         const data = await API.adminGetLocales(this.token);
-        box.innerHTML = `<h3>Locales (${data.length})</h3>` + data.map(l => `<div style="padding:10px; border-bottom:1px solid #eee;"><b>${l.nombre}</b><br><small>${l.direccion}</small></div>`).join('');
-      } else if (this.currentTab === 'usuarios') {
+        html = `
+          <div class="admin-toolbar">
+            ${this.exportBtn('/api/admin/export/locales', 'planilla_locales.csv', 'Planilla de locales (.csv)')}
+          </div>
+          ${this.chartBlock('Productos registrados por local (top 15)')}
+          <div class="admin-table-wrap"><table class="admin-table"><thead><tr>
+            <th>ID</th><th>Nombre</th><th>Dirección</th><th>Lat</th><th>Lng</th><th>Horario</th><th>Mapa</th>
+          </tr></thead><tbody>
+          ${data
+            .map(
+              (l) => `<tr>
+            <td>${this.esc(l.id)}</td>
+            <td><b>${this.esc(l.nombre)}</b></td>
+            <td>${this.esc(l.direccion)}</td>
+            <td>${this.esc(l.latitud)}</td>
+            <td>${this.esc(l.longitud)}</td>
+            <td>${this.esc(l.horario_apertura)}–${this.esc(l.horario_cierre)} ${this.esc(l.dias_atencion || '')}</td>
+            <td>${this.mapBtn(l.latitud, l.longitud)}</td>
+          </tr>`
+            )
+            .join('')}
+          </tbody></table></div>`;
+        box.innerHTML = html;
+        this.bindDownloads(box);
+        await this.drawChart('adminChartCanvas', this.barChart('Productos por local', analytics.productosLocal, 'nombre', 'n', true));
+        return;
+      }
+
+      if (this.currentTab === 'productos') {
+        const data = await API.adminGetProductos(this.token);
+        html = `
+          <div class="admin-toolbar">
+            ${this.exportBtn('/api/admin/export/productos', 'planilla_productos.csv', 'Planilla de productos (.csv)')}
+          </div>
+          ${this.chartBlock('Cantidad de productos por local (mismo criterio que Locales)')}
+          <div class="admin-table-wrap"><table class="admin-table"><thead><tr>
+            <th>ID</th><th>Local</th><th>Producto</th><th>Marca</th><th>Precio</th><th>Stock</th><th>Unidad</th><th>Alta</th>
+          </tr></thead><tbody>
+          ${data
+            .map(
+              (p) => `<tr>
+            <td>${this.esc(p.id)}</td>
+            <td>${this.esc(p.local_nombre)}</td>
+            <td>${this.esc(p.nombre)}</td>
+            <td>${this.esc(p.marca)}</td>
+            <td>${this.esc(p.precio)}</td>
+            <td>${this.yn(p.en_stock)}</td>
+            <td>${this.esc(p.unidad)}</td>
+            <td>${this.esc(p.created_at)}</td>
+          </tr>`
+            )
+            .join('')}
+          </tbody></table></div>`;
+        box.innerHTML = html;
+        this.bindDownloads(box);
+        await this.drawChart('adminChartCanvas', this.barChart('Productos por local', analytics.productosLocal, 'nombre', 'n', true));
+        return;
+      }
+
+      if (this.currentTab === 'usuarios') {
         const data = await API.adminGetUsuarios(this.token);
-        box.innerHTML = `<h3>Usuarios (${data.length})</h3>` + data.map(u => `<div style="padding:10px; border-bottom:1px solid #eee;">${u.nombre || '—'} (@${u.nickname || 'sin nick'}) — tel ${u.telefono || '—'}</div>`).join('');
-      } else if (this.currentTab === 'stats') {
-        const data = await API.adminGetStats(this.token);
-        const top = (data.topLocales || []).map(l => `<li>${l.nombre}: ${l.calif_count || 0} calif. (media ${l.avg_estrellas != null ? Number(l.avg_estrellas).toFixed(1) : '—'})</li>`).join('');
-        box.innerHTML = `
-          <h3>Estadísticas</h3>
-          <p>Visitas registradas: <b>${data.totalVisitas ?? 0}</b></p>
-          <p>Visitas hoy: <b>${data.visitasHoy ?? 0}</b></p>
-          <p>Usuarios: <b>${data.uniqueUsers ?? 0}</b></p>
-          <p>Mascotas reportadas: <b>${data.totalMascotas ?? 0}</b></p>
-          <h4>Locales con más calificaciones</h4>
-          <ul style="padding-left:18px;">${top || '<li>Sin datos</li>'}</ul>`;
-      } else if (this.currentTab === 'reportes') {
+        html = `
+          <div class="admin-toolbar">
+            ${this.exportBtn('/api/admin/export/usuarios', 'planilla_usuarios.csv', 'Planilla de usuarios (.csv)')}
+          </div>
+          ${this.chartBlock('Altas de usuarios por día (últimos 30 días)')}
+          <div class="admin-table-wrap"><table class="admin-table"><thead><tr>
+            <th>ID</th><th>Nombre</th><th>Nick</th><th>Tel</th><th>Email</th><th>Verif.</th><th>Bloq.</th><th>Extravío</th><th>Términos</th><th>Última ubicación</th><th>Registro</th><th>Device</th>
+          </tr></thead><tbody>
+          ${data
+            .map(
+              (u) => `<tr>
+            <td>${this.esc(u.id)}</td>
+            <td>${this.esc(u.nombre)}</td>
+            <td>${this.esc(u.nickname)}</td>
+            <td>${this.esc(u.telefono)}</td>
+            <td>${this.esc(u.email)}</td>
+            <td>${this.yn(u.is_verified)}</td>
+            <td>${this.yn(u.is_blocked)}</td>
+            <td>${this.yn(u.is_stolen)}</td>
+            <td>${this.yn(u.terms_accepted)}</td>
+            <td>${this.mapBtn(u.last_lat, u.last_lng)}</td>
+            <td>${this.esc(u.created_at)}</td>
+            <td class="admin-muted">${this.esc((u.device_id || '').slice(0, 24))}</td>
+          </tr>`
+            )
+            .join('')}
+          </tbody></table></div>`;
+        box.innerHTML = html;
+        this.bindDownloads(box);
+        await this.drawChart('adminChartCanvas', this.lineChart('Usuarios / día', analytics.registrosDia, '#2EC4B6', 'rgba(46,196,182,0.12)'));
+        return;
+      }
+
+      if (this.currentTab === 'muro') {
+        const data = await API.adminGetMuro(this.token);
+        html = `
+          <div class="admin-toolbar">
+            ${this.exportBtn('/api/admin/export/muro', 'planilla_muro_comunitario.csv', 'Planilla del muro (.csv)')}
+          </div>
+          ${this.chartBlock('Publicaciones en el muro por día (14 días)')}
+          <div class="admin-table-wrap"><table class="admin-table"><thead><tr>
+            <th>ID</th><th>Fecha</th><th>Autor</th><th>Tel</th><th>Contenido</th>
+          </tr></thead><tbody>
+          ${data
+            .map(
+              (m) => `<tr>
+            <td>${this.esc(m.id)}</td>
+            <td>${this.esc(m.created_at)}</td>
+            <td>${this.esc(m.autor)}</td>
+            <td>${this.esc(m.autor_telefono)}</td>
+            <td>${this.esc(this.trunc(m.contenido, 200))}</td>
+          </tr>`
+            )
+            .join('')}
+          </tbody></table></div>`;
+        box.innerHTML = html;
+        this.bindDownloads(box);
+        await this.drawChart('adminChartCanvas', this.lineChart('Posts / día', analytics.muroDia, '#673AB7', 'rgba(103,58,183,0.12)'));
+        return;
+      }
+
+      if (this.currentTab === 'buzon') {
+        const data = await API.adminGetMensajes(this.token);
+        html = `
+          <div class="admin-toolbar">
+            ${this.exportBtn('/api/admin/export/mensajes', 'planilla_buzon_mensajes.csv', 'Planilla buzón (.csv)')}
+          </div>
+          ${this.chartBlock('Mensajes al buzón por día (14 días)')}
+          <div class="admin-table-wrap"><table class="admin-table"><thead><tr>
+            <th>ID</th><th>Fecha</th><th>Usuario</th><th>Tel</th><th>Leído</th><th>Mensaje</th>
+          </tr></thead><tbody>
+          ${data
+            .map(
+              (m) => `<tr>
+            <td>${this.esc(m.id)}</td>
+            <td>${this.esc(m.created_at)}</td>
+            <td>${this.esc(m.nombre)}</td>
+            <td>${this.esc(m.telefono)}</td>
+            <td>${this.yn(m.leido)}</td>
+            <td>${this.esc(this.trunc(m.mensaje, 240))}</td>
+          </tr>`
+            )
+            .join('')}
+          </tbody></table></div>`;
+        box.innerHTML = html;
+        this.bindDownloads(box);
+        await this.drawChart('adminChartCanvas', this.lineChart('Mensajes / día', analytics.buzonDia, '#1976D2', 'rgba(25,118,210,0.12)'));
+        return;
+      }
+
+      if (this.currentTab === 'rastreo') {
+        const data = await API.adminGetRastreo(this.token);
+        html = `
+          <div class="admin-toolbar">
+            ${this.exportBtn('/api/admin/export/rastreo', 'planilla_rastreo_extravios.csv', 'Planilla rastreo (.csv)')}
+          </div>
+          ${this.chartBlock('Puntos de rastreo registrados por día (14 días)')}
+          <div class="admin-table-wrap"><table class="admin-table"><thead><tr>
+            <th>ID</th><th>Fecha</th><th>Usuario</th><th>Tel</th><th>Lat</th><th>Lng</th><th>Mapa</th>
+          </tr></thead><tbody>
+          ${data
+            .map(
+              (r) => `<tr>
+            <td>${this.esc(r.id)}</td>
+            <td>${this.esc(r.created_at)}</td>
+            <td>${this.esc(r.nombre)}</td>
+            <td>${this.esc(r.telefono)}</td>
+            <td>${this.esc(r.latitud)}</td>
+            <td>${this.esc(r.longitud)}</td>
+            <td>${this.mapBtn(r.latitud, r.longitud)}</td>
+          </tr>`
+            )
+            .join('')}
+          </tbody></table></div>`;
+        box.innerHTML = html;
+        this.bindDownloads(box);
+        await this.drawChart('adminChartCanvas', this.lineChart('Rastreos / día', analytics.rastreoDia, '#E65100', 'rgba(230,81,0,0.12)'));
+        return;
+      }
+
+      if (this.currentTab === 'reportes') {
         const data = await API.adminGetReportes(this.token);
-        box.innerHTML = `<h3>Reportes (${data.length})</h3>` + data.map(r => `<div style="padding:10px; border-bottom:1px solid #eee;"><b>${r.tipo_reporte || '—'}</b>: ${r.detalles || '—'}<br><small>${r.nombre || ''} ${r.telefono || ''}</small></div>`).join('');
+        html = `
+          <div class="admin-toolbar">
+            ${this.exportBtn('/api/admin/export/reportes', 'planilla_reportes_ciudadanos.csv', 'Planilla reportes (.csv)')}
+          </div>
+          <h4 style="margin:12px 0 4px;font-size:0.95rem;">Reportes por día (14 días)</h4>
+          <div class="admin-chart-box"><canvas id="adminChartCanvas"></canvas></div>
+          <h4 style="margin:12px 0 4px;font-size:0.95rem;">Por tipo</h4>
+          <div class="admin-chart-box"><canvas id="adminChartCanvas2"></canvas></div>
+          <div class="admin-table-wrap"><table class="admin-table"><thead><tr>
+            <th>ID</th><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Ubicación texto</th><th>Lat</th><th>Lng</th><th>Mapa</th><th>Contacto</th><th>Tel</th>
+          </tr></thead><tbody>
+          ${data
+            .map(
+              (r) => `<tr>
+            <td>${this.esc(r.id)}</td>
+            <td>${this.esc(r.created_at)}</td>
+            <td>${this.esc(r.tipo_reporte)}</td>
+            <td>${this.esc(this.trunc(r.detalles, 120))}</td>
+            <td>${this.esc(this.trunc(r.ubicacion_texto, 80))}</td>
+            <td>${this.esc(r.latitud)}</td>
+            <td>${this.esc(r.longitud)}</td>
+            <td>${this.mapBtn(r.latitud, r.longitud)}</td>
+            <td>${this.esc(r.nombre_contacto)}</td>
+            <td>${this.esc(r.telefono)}</td>
+          </tr>`
+            )
+            .join('')}
+          </tbody></table></div>`;
+        box.innerHTML = html;
+        this.bindDownloads(box);
+        await this.ensureChartJs();
+        this.destroyChart();
+        const c1 = document.getElementById('adminChartCanvas');
+        const c2 = document.getElementById('adminChartCanvas2');
+        if (c1 && window.Chart) {
+          this._chart = new Chart(c1.getContext('2d'), this.lineChart('Reportes / día', analytics.reportesDia, '#FF6B35', 'rgba(255,107,53,0.12)'));
+        }
+        if (c2 && window.Chart) {
+          this._chart2 = new Chart(c2.getContext('2d'), this.barChart('Por tipo', analytics.reportesTipo, 'tipo', 'n', true));
+        }
+        return;
+      }
+
+      if (this.currentTab === 'emergencias') {
+        const data = await API.adminGetEmergencias(this.token);
+        html = `
+          <div class="admin-toolbar">
+            ${this.exportBtn('/api/admin/export/emergencias', 'planilla_emergencias.csv', 'Planilla emergencias (.csv)')}
+          </div>
+          <h4 style="margin:12px 0 4px;font-size:0.95rem;">Emergencias por día (14 días)</h4>
+          <div class="admin-chart-box"><canvas id="adminChartCanvas"></canvas></div>
+          <h4 style="margin:12px 0 4px;font-size:0.95rem;">Por institución</h4>
+          <div class="admin-chart-box"><canvas id="adminChartCanvas2"></canvas></div>
+          <div class="admin-table-wrap"><table class="admin-table"><thead><tr>
+            <th>ID</th><th>Fecha</th><th>Usuario</th><th>Tel</th><th>Institución</th><th>Lat</th><th>Lng</th><th>Mapa</th>
+          </tr></thead><tbody>
+          ${data
+            .map(
+              (e) => `<tr>
+            <td>${this.esc(e.id)}</td>
+            <td>${this.esc(e.created_at)}</td>
+            <td>${this.esc(e.nombre)}</td>
+            <td>${this.esc(e.telefono)}</td>
+            <td><b>${this.esc(e.institucion)}</b></td>
+            <td>${this.esc(e.latitud)}</td>
+            <td>${this.esc(e.longitud)}</td>
+            <td>${this.mapBtn(e.latitud, e.longitud)}</td>
+          </tr>`
+            )
+            .join('')}
+          </tbody></table></div>`;
+        box.innerHTML = html;
+        this.bindDownloads(box);
+        await this.ensureChartJs();
+        this.destroyChart();
+        const c1 = document.getElementById('adminChartCanvas');
+        const c2 = document.getElementById('adminChartCanvas2');
+        if (c1 && window.Chart) {
+          this._chart = new Chart(c1.getContext('2d'), this.lineChart('Emergencias / día', analytics.emergenciasDia, '#D32F2F', 'rgba(211,47,47,0.12)'));
+        }
+        if (c2 && window.Chart) {
+          this._chart2 = new Chart(c2.getContext('2d'), this.barChart('Por institución', analytics.emergInst, 'institucion', 'n', true));
+        }
+        return;
       }
     } catch (e) {
-      if (e.message.indexOf('401') !== -1 || e.message.indexOf('Sesión') !== -1) {
+      if (String(e.message).includes('401')) {
         localStorage.removeItem('barrio_admin_token');
         location.reload();
+        return;
       }
-      box.innerHTML = `<p style="color:red; text-align:center;">Error: ${e.message}</p>`;
+      box.innerHTML = `<p style="color:red;text-align:center;">Error: ${this.esc(e.message)}</p>`;
     }
-  }
+  },
 };

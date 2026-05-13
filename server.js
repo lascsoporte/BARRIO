@@ -160,6 +160,23 @@ function isLocalOpen(ha, hc, dias) {
   return od.includes(day) && ct >= ha && ct <= hc;
 }
 
+function csvCell(v) {
+  if (v === undefined || v === null) return '';
+  const s = String(v);
+  if (/[;\r\n"]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function sendCsvDownload(res, filename, headerLabels, keys, rows) {
+  let csv = '\ufeff' + headerLabels.join(';') + '\n';
+  for (const row of rows) {
+    csv += keys.map((k) => csvCell(row[k])).join(';') + '\n';
+  }
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${String(filename).replace(/"/g, '')}"`);
+  res.send(csv);
+}
+
 const adminTokens = new Set();
 // Token persistente basado en las claves (para que no expire si el servidor se reinicia)
 const getPersistentToken = () => Buffer.from(ADMIN_PASSWORDS.join(':')).toString('base64');
@@ -522,6 +539,16 @@ app.delete('/api/admin/usuarios/:id', authMw, async (req, res) => {
 
 app.get('/api/admin/mensajes', authMw, async (req, res) => res.json(await queryAll('SELECT m.*, u.nombre, u.telefono FROM mensajes_admin m JOIN usuarios u ON m.usuario_id = u.id ORDER BY m.created_at DESC')));
 
+app.get('/api/admin/muro', authMw, async (req, res) => {
+  res.json(await queryAll(`
+    SELECT m.*, COALESCE(u.nickname, u.nombre) as autor, u.telefono as autor_telefono
+    FROM muro_comunitario m
+    JOIN usuarios u ON m.usuario_id = u.id
+    ORDER BY m.created_at DESC
+    LIMIT 500
+  `));
+});
+
 app.put('/api/admin/mensajes/:id/leido', authMw, async (req, res) => {
   await runSql('UPDATE mensajes_admin SET leido = 1 WHERE id = ?', [req.params.id]);
   sendTelegramAlert(`🛠️ <b>ADMIN: MENSAJE LEÍDO</b>\nID: ${req.params.id}`);
@@ -664,11 +691,120 @@ app.delete('/api/admin/servicios/:id', authMw, async (req, res) => {
 
 app.get('/api/admin/export/reportes', authMw, async (req, res) => {
   const reports = await queryAll('SELECT r.*, u.nombre FROM reportes_ciudadanos r LEFT JOIN usuarios u ON r.usuario_id = u.id');
-  sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN DE DATOS</b>\nReporte CSV generado.`);
-  let csv = 'ID;Fecha;Tipo;Denunciante\n';
-  reports.forEach(r => csv += `${r.id};${r.created_at};${r.tipo_reporte};${r.nombre}\n`);
-  res.setHeader('Content-Type', 'text/csv'); res.setHeader('Content-Disposition', 'attachment; filename=reportes.csv');
+  sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla reportes ciudadanos.`);
+  let csv = '\ufeffID;Fecha;Tipo;Ubicacion_texto;Detalles;Lat;Lng;Usuario_nombre;Nombre_contacto;Telefono\n';
+  reports.forEach((r) => {
+    csv += [r.id, r.created_at, r.tipo_reporte, r.ubicacion_texto, r.detalles, r.latitud, r.longitud, r.nombre, r.nombre_contacto, r.telefono]
+      .map((x) => csvCell(x)).join(';') + '\n';
+  });
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename=planilla_reportes_ciudadanos.csv');
   res.send(csv);
+});
+
+app.get('/api/admin/export/usuarios', authMw, async (req, res) => {
+  const rows = await queryAll('SELECT * FROM usuarios ORDER BY created_at DESC');
+  sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla usuarios.`);
+  sendCsvDownload(res, 'planilla_usuarios.csv',
+    ['id', 'nombre', 'nickname', 'telefono', 'email', 'direccion', 'device_id', 'is_verified', 'is_blocked', 'is_stolen', 'terms_accepted', 'home_lat', 'home_lng', 'last_lat', 'last_lng', 'created_at'],
+    ['id', 'nombre', 'nickname', 'telefono', 'email', 'direccion', 'device_id', 'is_verified', 'is_blocked', 'is_stolen', 'terms_accepted', 'home_lat', 'home_lng', 'last_lat', 'last_lng', 'created_at'],
+    rows);
+});
+
+app.get('/api/admin/export/locales', authMw, async (req, res) => {
+  const rows = await queryAll('SELECT * FROM locales ORDER BY nombre');
+  sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla locales.`);
+  sendCsvDownload(res, 'planilla_locales.csv',
+    ['id', 'nombre', 'direccion', 'latitud', 'longitud', 'horario_apertura', 'horario_cierre', 'dias_atencion', 'acepta_efectivo', 'acepta_tarjeta', 'created_at'],
+    ['id', 'nombre', 'direccion', 'latitud', 'longitud', 'horario_apertura', 'horario_cierre', 'dias_atencion', 'acepta_efectivo', 'acepta_tarjeta', 'created_at'],
+    rows);
+});
+
+app.get('/api/admin/export/productos', authMw, async (req, res) => {
+  const rows = await queryAll('SELECT p.id, p.local_id, l.nombre as local_nombre, p.nombre, p.marca, p.precio, p.en_stock, p.unidad, p.created_at FROM productos p JOIN locales l ON p.local_id = l.id ORDER BY l.nombre, p.nombre');
+  sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla productos.`);
+  sendCsvDownload(res, 'planilla_productos.csv',
+    ['id', 'local_id', 'local_nombre', 'nombre', 'marca', 'precio', 'en_stock', 'unidad', 'created_at'],
+    ['id', 'local_id', 'local_nombre', 'nombre', 'marca', 'precio', 'en_stock', 'unidad', 'created_at'],
+    rows);
+});
+
+app.get('/api/admin/export/muro', authMw, async (req, res) => {
+  const rows = await queryAll(`
+    SELECT m.id, m.usuario_id, m.contenido, m.created_at, COALESCE(u.nickname, u.nombre) as autor, u.telefono
+    FROM muro_comunitario m JOIN usuarios u ON m.usuario_id = u.id ORDER BY m.created_at DESC
+  `);
+  sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla muro.`);
+  sendCsvDownload(res, 'planilla_muro_comunitario.csv',
+    ['id', 'usuario_id', 'autor', 'telefono', 'contenido', 'created_at'],
+    ['id', 'usuario_id', 'autor', 'telefono', 'contenido', 'created_at'],
+    rows);
+});
+
+app.get('/api/admin/export/mensajes', authMw, async (req, res) => {
+  const rows = await queryAll('SELECT m.*, u.nombre, u.telefono as usuario_tel FROM mensajes_admin m JOIN usuarios u ON m.usuario_id = u.id ORDER BY m.created_at DESC');
+  sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla buzón.`);
+  sendCsvDownload(res, 'planilla_buzon_mensajes.csv',
+    ['id', 'usuario_id', 'nombre_usuario', 'telefono_usuario', 'mensaje', 'leido', 'created_at'],
+    ['id', 'usuario_id', 'nombre', 'usuario_tel', 'mensaje', 'leido', 'created_at'],
+    rows);
+});
+
+app.get('/api/admin/export/rastreo', authMw, async (req, res) => {
+  const rows = await queryAll('SELECT r.*, u.nombre, u.telefono FROM rastreo_robos r JOIN usuarios u ON r.usuario_id = u.id ORDER BY r.created_at DESC');
+  sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla rastreo.`);
+  sendCsvDownload(res, 'planilla_rastreo_extravios.csv',
+    ['id', 'usuario_id', 'nombre', 'telefono', 'latitud', 'longitud', 'created_at'],
+    ['id', 'usuario_id', 'nombre', 'telefono', 'latitud', 'longitud', 'created_at'],
+    rows);
+});
+
+app.get('/api/admin/export/emergencias', authMw, async (req, res) => {
+  const rows = await queryAll('SELECT e.*, u.nombre, u.telefono FROM registro_emergencias e JOIN usuarios u ON e.usuario_id = u.id ORDER BY e.created_at DESC');
+  sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla emergencias.`);
+  sendCsvDownload(res, 'planilla_emergencias.csv',
+    ['id', 'usuario_id', 'nombre', 'telefono', 'institucion', 'latitud', 'longitud', 'created_at'],
+    ['id', 'usuario_id', 'nombre', 'telefono', 'institucion', 'latitud', 'longitud', 'created_at'],
+    rows);
+});
+
+app.get('/api/admin/analytics', authMw, async (req, res) => {
+  const mysql = isUsingMysql();
+  let visitasDia;
+  let registrosDia;
+  let muroDia;
+  let buzonDia;
+  let rastreoDia;
+  if (mysql) {
+    visitasDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM visitas WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
+    registrosDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM usuarios WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
+    muroDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM muro_comunitario WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
+    buzonDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM mensajes_admin WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
+    rastreoDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM rastreo_robos WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
+  } else {
+    visitasDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM visitas WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
+    registrosDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM usuarios WHERE date(created_at) >= date('now', '-30 days') GROUP BY date(created_at) ORDER BY dia`);
+    muroDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM muro_comunitario WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
+    buzonDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM mensajes_admin WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
+    rastreoDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM rastreo_robos WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
+  }
+  const reportesTipo = await queryAll('SELECT tipo_reporte as tipo, COUNT(*) as n FROM reportes_ciudadanos GROUP BY tipo_reporte ORDER BY n DESC');
+  const emergInst = await queryAll('SELECT institucion, COUNT(*) as n FROM registro_emergencias GROUP BY institucion ORDER BY n DESC');
+  const reportesDia = mysql
+    ? await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM reportes_ciudadanos WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`)
+    : await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM reportes_ciudadanos WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
+  const emergenciasDia = mysql
+    ? await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM registro_emergencias WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`)
+    : await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM registro_emergencias WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
+  const productosLocal = await queryAll(`
+    SELECT l.nombre as nombre, COUNT(p.id) as n
+    FROM locales l LEFT JOIN productos p ON p.local_id = l.id
+    GROUP BY l.id, l.nombre ORDER BY n DESC LIMIT 15
+  `);
+  res.json({
+    visitasDia, registrosDia, muroDia, buzonDia, rastreoDia, reportesDia, emergenciasDia,
+    reportesTipo, emergInst, productosLocal,
+  });
 });
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));

@@ -121,6 +121,24 @@ const API = {
   adminDeleteUsuario(id, token) { return this.del(`/api/admin/usuarios/${id}`, token); },
   adminGetEmergencias(token) { return this.get('/api/admin/emergencias', token); },
   adminGetRastreo(token) { return this.get('/api/admin/rastreo', token); },
+  adminGetMuro(token) { return this.get('/api/admin/muro', token); },
+  adminGetAnalytics(token) { return this.get('/api/admin/analytics', token); },
+  async adminDownloadBlob(path, token, filename) {
+    const res = await fetch(this.base + path, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('401-EXPIRADO');
+      throw new Error(`Error ${res.status}`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'export.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
   adminClearMuro(token) { return this.del('/api/admin/muro', token); },
   adminDeleteMuroPost(id, token) { return this.del(`/api/admin/muro/${id}`, token); },
   savePushSubscription(data) { return this.post('/api/push/subscribe', data); },
