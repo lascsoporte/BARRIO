@@ -96,6 +96,14 @@ const App = {
  }
 
   window.addEventListener('hashchange', () => this.route());
+
+  // Mantener el servicio despierto en Render (solo con la pestaña abierta): ping ligero cada ~8 min
+  if (!window.__barrioRenderKeepAlive) {
+    window.__barrioRenderKeepAlive = true;
+    setInterval(() => {
+      fetch('/api/ping', { method: 'GET' }).catch(() => {});
+    }, 8 * 60 * 1000);
+  }
   
   // Actualizar ubicación para geofencing de push
   setInterval(() => {

@@ -144,6 +144,18 @@ async function createCloudTables() {
     }
   }
 
+  for (const servCol of [
+    'ALTER TABLE servicios ADD COLUMN latitud DOUBLE NULL',
+    'ALTER TABLE servicios ADD COLUMN longitud DOUBLE NULL'
+  ]) {
+    try {
+      await mysqlPool.execute(servCol);
+      console.log(`✅ Servicios: ${servCol}`);
+    } catch (e) {
+      /* ya existe */
+    }
+  }
+
   const configs = [
     ['admin_whatsapp', '56987606517'],
     ['tel_carabineros', '133'],

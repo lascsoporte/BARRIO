@@ -93,13 +93,21 @@ const Admin = {
         box.innerHTML = `<h3>Locales (${data.length})</h3>` + data.map(l => `<div style="padding:10px; border-bottom:1px solid #eee;"><b>${l.nombre}</b><br><small>${l.direccion}</small></div>`).join('');
       } else if (this.currentTab === 'usuarios') {
         const data = await API.adminGetUsuarios(this.token);
-        box.innerHTML = `<h3>Usuarios (${data.length})</h3>` + data.map(u => `<div style="padding:10px; border-bottom:1px solid #eee;">${u.nombre} (@${u.nickname})</div>`).join('');
+        box.innerHTML = `<h3>Usuarios (${data.length})</h3>` + data.map(u => `<div style="padding:10px; border-bottom:1px solid #eee;">${u.nombre || '—'} (@${u.nickname || 'sin nick'}) — tel ${u.telefono || '—'}</div>`).join('');
       } else if (this.currentTab === 'stats') {
         const data = await API.adminGetStats(this.token);
-        box.innerHTML = `<h3>Estadísticas</h3><p>Visitas: ${data.totalVisitas}</p><p>Usuarios: ${data.uniqueUsers}</p>`;
+        const top = (data.topLocales || []).map(l => `<li>${l.nombre}: ${l.calif_count || 0} calif. (media ${l.avg_estrellas != null ? Number(l.avg_estrellas).toFixed(1) : '—'})</li>`).join('');
+        box.innerHTML = `
+          <h3>Estadísticas</h3>
+          <p>Visitas registradas: <b>${data.totalVisitas ?? 0}</b></p>
+          <p>Visitas hoy: <b>${data.visitasHoy ?? 0}</b></p>
+          <p>Usuarios: <b>${data.uniqueUsers ?? 0}</b></p>
+          <p>Mascotas reportadas: <b>${data.totalMascotas ?? 0}</b></p>
+          <h4>Locales con más calificaciones</h4>
+          <ul style="padding-left:18px;">${top || '<li>Sin datos</li>'}</ul>`;
       } else if (this.currentTab === 'reportes') {
-        const data = await API.getReportes(this.token);
-        box.innerHTML = `<h3>Reportes</h3>` + data.map(r => `<div style="padding:10px; border-bottom:1px solid #eee;"><b>${r.tipo_reporte}</b>: ${r.detalles}</div>`).join('');
+        const data = await API.adminGetReportes(this.token);
+        box.innerHTML = `<h3>Reportes (${data.length})</h3>` + data.map(r => `<div style="padding:10px; border-bottom:1px solid #eee;"><b>${r.tipo_reporte || '—'}</b>: ${r.detalles || '—'}<br><small>${r.nombre || ''} ${r.telefono || ''}</small></div>`).join('');
       }
     } catch (e) {
       if (e.message.indexOf('401') !== -1 || e.message.indexOf('Sesión') !== -1) {
