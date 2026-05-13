@@ -53,7 +53,6 @@ const App = {
 
   this.requireAuth((user) => {
   this.continueInit(user);
-  this.setupPushNotifications(user);
   }, true);
  },
 
@@ -78,7 +77,6 @@ const App = {
     API.ping(this.deviceId, Geo.userLat, Geo.userLng).then(res => {
      if (res.status === 'stolen' && !isTrackingStarted) {
        isTrackingStarted = true;
-       // Obligar al sensor GPS a darnos coordenadas reales cada 10 segundos
        setInterval(() => {
          Geo.getUserLocation(true).then(() => {
            API.logStolenLocation({ device_id: this.deviceId, latitud: Geo.userLat, longitud: Geo.userLng }).catch(()=>{});
@@ -87,9 +85,8 @@ const App = {
      }
    }).catch(() => {});
  };
-
- checkExtravio(); // Consultar al inicio
- setInterval(checkExtravio, 60000); // Consultar cada 60 segundos silenciosamente
+ checkExtravio();
+ setInterval(checkExtravio, 60000);
 
  } catch(e) { 
  console.warn('Error al verificar usuario o cargar config', e);
@@ -101,7 +98,6 @@ const App = {
 
   window.addEventListener('hashchange', () => this.route());
 
-  // Mantener el servicio despierto en Render (solo con la pestaña abierta): ping ligero cada ~8 min
   if (!window.__barrioRenderKeepAlive) {
     window.__barrioRenderKeepAlive = true;
     setInterval(() => {
@@ -109,18 +105,206 @@ const App = {
     }, 8 * 60 * 1000);
   }
   
-  // Actualizar ubicación para geofencing de push
   setInterval(() => {
     if (Geo.userLat) API.ping(this.deviceId, Geo.userLat, Geo.userLng).catch(()=>{});
-  }, 300000); // Cada 5 minutos si está la app abierta
+  }, 300000);
  
- setTimeout(() => {
- if (!Geo.userLat && !localStorage.getItem('barrio_gps_dismissed')) {
- this.showGpsModal();
- }
- }, 2000);
- 
- this.route();
+  // Renderizar la pantalla principal PRIMERO
+  this.route();
+
+  // Luego mostrar ventanas en secuencia: GPS → Push → Instalar
+  this._runOnboardingSequence(user);
+ },
+
+ // Muestra las ventanas emergentes post-registro en orden, una a la vez
+ _runOnboardingSequence(user) {
+  const steps = [];
+
+  // Paso 1: GPS (si no está activado ni descartado)
+  if (!Geo.userLat && !localStorage.getItem('barrio_gps_dismissed')) {
+    steps.push(() => new Promise(resolve => {
+      this._showOnboardingGps(resolve);
+    }));
+  }
+
+  // Paso 2: Push notifications (si no se ha decidido aún)
+  if (!localStorage.getItem('barrio_push_enabled') && ('serviceWorker' in navigator) && ('PushManager' in window)) {
+    steps.push(() => new Promise(resolve => {
+      this._showOnboardingPush(user, resolve);
+    }));
+  }
+
+  // Paso 3: Instalar app (si el navegador lo permite y no fue descartado)
+  if (!localStorage.getItem('barrio_install_dismissed')) {
+    steps.push(() => new Promise(resolve => {
+      this._showOnboardingInstall(resolve);
+    }));
+  }
+
+  // Ejecutar secuencialmente
+  steps.reduce((chain, step) => chain.then(step), Promise.resolve());
+ },
+
+ _showOnboardingGps(done) {
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML = `
+    <div style="background:white;border-radius:20px;padding:30px 25px;max-width:360px;width:100%;text-align:center;border-top:6px solid var(--primary);">
+      <div style="font-size:3.5rem;margin-bottom:12px;">📍</div>
+      <h2 style="color:var(--primary);font-weight:900;margin-bottom:10px;">Activa el GPS</h2>
+      <p style="color:#555;font-size:0.9rem;line-height:1.5;margin-bottom:20px;">Para que el botón de EMERGENCIA funcione correctamente y puedas ver alertas cercanas, necesitamos tu ubicación.</p>
+      <button id="btnGpsOnboardingAllow" class="btn btn-primary" style="width:100%;margin-bottom:10px;font-weight:900;">ACTIVAR AHORA</button>
+      <button id="btnGpsOnboardingSkip" style="background:transparent;border:none;color:#999;font-size:0.85rem;cursor:pointer;width:100%;padding:8px;">Omitir por ahora</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  document.getElementById('btnGpsOnboardingAllow').addEventListener('click', async () => {
+    const btn = document.getElementById('btnGpsOnboardingAllow');
+    btn.textContent = 'Solicitando...'; btn.disabled = true;
+    
+    // Timeout de seguridad: si en 8s no responde, continuar
+    const safetyTimeout = setTimeout(() => {
+      App.toast('No se pudo activar el GPS. Puedes intentarlo desde el menú.');
+      localStorage.setItem('barrio_gps_dismissed', '1');
+      modal.remove(); done();
+    }, 8000);
+
+    try {
+      await Geo.getUserLocation();
+      clearTimeout(safetyTimeout);
+      App.toast('GPS Activado ✅');
+      modal.remove(); done();
+    } catch(e) {
+      clearTimeout(safetyTimeout);
+      App.toast('GPS denegado o no disponible');
+      localStorage.setItem('barrio_gps_dismissed', '1');
+      modal.remove(); done();
+    }
+  });
+
+  document.getElementById('btnGpsOnboardingSkip').addEventListener('click', () => {
+    localStorage.setItem('barrio_gps_dismissed', '1');
+    modal.remove(); done();
+  });
+ },
+
+ _showOnboardingPush(user, done) {
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML = `
+    <div style="background:white;border-radius:20px;padding:30px 25px;max-width:360px;width:100%;text-align:center;border-top:6px solid var(--primary);">
+      <div style="font-size:3.5rem;margin-bottom:12px;">🔔</div>
+      <h2 style="color:var(--primary);font-weight:900;margin-bottom:10px;">¡Mantente Alerta!</h2>
+      <p style="color:#555;font-size:0.9rem;line-height:1.5;margin-bottom:20px;">¿Deseas recibir avisos de seguridad (robos, incendios, sospechosos) que ocurran a menos de 500m de tu ubicación?</p>
+      <button id="btnPushOnboardingAccept" class="btn btn-primary" style="width:100%;margin-bottom:10px;font-weight:900;height:50px;">SÍ, ACTIVAR ALERTAS</button>
+      <button id="btnPushOnboardingDeny" style="background:transparent;border:none;color:#999;font-size:0.85rem;cursor:pointer;width:100%;padding:8px;">Ahora no, gracias</button>
+      <p style="font-size:0.75rem;color:#AAA;margin-top:10px;">Tu privacidad está protegida. Podrás desactivarlas cuando quieras.</p>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  document.getElementById('btnPushOnboardingDeny').onclick = () => {
+    localStorage.setItem('barrio_push_enabled', 'denied_temp');
+    modal.remove(); done();
+  };
+
+  document.getElementById('btnPushOnboardingAccept').onclick = async () => {
+    const btn = document.getElementById('btnPushOnboardingAccept');
+    btn.disabled = true; btn.textContent = 'Activando...';
+    
+    // Timeout de seguridad: si en 10s no responde, cerrar y continuar
+    const safetyTimeout = setTimeout(() => {
+      App.toast('No se pudo activar. Puedes intentarlo más tarde.');
+      localStorage.setItem('barrio_push_enabled', 'denied_temp');
+      modal.remove(); done();
+    }, 10000);
+
+    try {
+      const permission = await Notification.requestPermission();
+      clearTimeout(safetyTimeout);
+      if (permission === 'granted') {
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: this.urlBase64ToUint8Array('BPfYyug0EiK_oS0FRF8w-k2WpxoDs79-DZjjFI505RsAeUrzi5e88XPgsj8Pp2YV6pZfMtnb-IXiYN8tJ9mgrFc')
+          });
+          const res = await API.savePushSubscription({ userId: user.id, subscription });
+          if (res.ok) {
+            localStorage.setItem('barrio_push_enabled', 'true');
+            App.toast('✅ Alertas activadas correctamente');
+          } else {
+            throw new Error('Error al guardar en servidor');
+          }
+        } catch(e) {
+          App.toast('No se pudieron activar las alertas');
+          localStorage.setItem('barrio_push_enabled', 'denied_temp');
+        }
+      } else {
+        localStorage.setItem('barrio_push_enabled', 'denied_perm');
+        App.toast('Permiso de notificaciones denegado');
+      }
+    } catch(e) {
+      clearTimeout(safetyTimeout);
+      App.toast('Error al activar alertas');
+      localStorage.setItem('barrio_push_enabled', 'denied_temp');
+    }
+    modal.remove(); done();
+  };
+ },
+
+ _showOnboardingInstall(done) {
+  // Si ya está instalada como PWA, saltar
+  if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+    done(); return;
+  }
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML = `
+    <div style="background:white;border-radius:20px;padding:30px 25px;max-width:360px;width:100%;text-align:center;border-top:6px solid #FF6B35;">
+      <div style="font-size:3.5rem;margin-bottom:12px;">📲</div>
+      <h2 style="color:#FF6B35;font-weight:900;margin-bottom:10px;">¡Instala BARRIO!</h2>
+      <p style="color:#555;font-size:0.9rem;line-height:1.5;margin-bottom:8px;">Agrega la app a la pantalla de inicio de tu teléfono para acceder rápidamente sin abrir el navegador.</p>
+      <p style="font-size:0.8rem;color:#888;margin-bottom:20px;">Solo toma un segundo y no ocupa casi espacio.</p>
+      <button id="btnInstallOnboarding" class="btn btn-primary" style="width:100%;margin-bottom:10px;font-weight:900;background:#FF6B35;height:50px;" ${App.deferredPrompt ? '' : 'style="display:none"'}>INSTALAR EN MI TELÉFONO</button>
+      <div id="installManualHint" style="${App.deferredPrompt ? 'display:none' : ''}background:#FFF8F5;border-radius:12px;padding:12px;margin-bottom:15px;font-size:0.82rem;color:#555;text-align:left;">
+        <strong>¿Cómo instalar?</strong><br>
+        • <b>Android/Chrome:</b> Menú ⋮ → "Añadir a pantalla de inicio"<br>
+        • <b>iPhone/Safari:</b> Botón compartir □↑ → "Añadir a inicio"
+      </div>
+      <button id="btnInstallOnboardingSkip" style="background:transparent;border:none;color:#999;font-size:0.85rem;cursor:pointer;width:100%;padding:8px;">Ahora no</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const btnInstall = modal.querySelector('#btnInstallOnboarding');
+  const manualHint = modal.querySelector('#installManualHint');
+
+  // Mostrar el botón correcto según si hay prompt disponible
+  if (App.deferredPrompt) {
+    btnInstall.style.display = 'block';
+    manualHint.style.display = 'none';
+  } else {
+    btnInstall.style.display = 'none';
+    manualHint.style.display = 'block';
+  }
+
+  btnInstall.addEventListener('click', async () => {
+    if (!App.deferredPrompt) return;
+    App.deferredPrompt.prompt();
+    const { outcome } = await App.deferredPrompt.userChoice;
+    App.deferredPrompt = null;
+    if (outcome === 'accepted') App.toast('✅ App instalada correctamente');
+    localStorage.setItem('barrio_install_dismissed', '1');
+    modal.remove(); done();
+  });
+
+  document.getElementById('btnInstallOnboardingSkip').addEventListener('click', () => {
+    localStorage.setItem('barrio_install_dismissed', '1');
+    modal.remove(); done();
+  });
  },
 
  async requestLocation() {
@@ -287,6 +471,14 @@ const App = {
         });
       } catch(e) {}
     }, 500);
+
+    // Si ya capturamos beforeinstallprompt, mostrar el banner ahora
+    setTimeout(() => {
+      if (App.deferredPrompt && !localStorage.getItem('barrio_install_dismissed')) {
+        const banner = document.getElementById('installBanner');
+        if (banner) banner.style.display = 'block';
+      }
+    }, 800);
   },
 
   showEmergencyMenu(fromHash = false) { 
@@ -1131,7 +1323,13 @@ const App = {
       } catch (err) {
         btn.disabled = false;
         btn.textContent = 'Registrarme AHORA';
-        this.toast(err.message || 'Error al registrar');
+        
+        // Mostrar mensaje específico de geofencing
+        if (err.message && err.message.includes('FUERA_DE_COBERTURA')) {
+          alert('⚠️ Ubicación fuera del área de cobertura\n\nPor favor, marca tu casa dentro de Puerto Montt en el mapa. Esta app solo funciona para residentes de Puerto Montt y alrededores.');
+        } else {
+          this.toast(err.message || 'Error al registrar');
+        }
       }
     });
 

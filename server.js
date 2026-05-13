@@ -95,17 +95,43 @@ function sendTelegramAlert(message) {
 }
 
 const mailTransporter = nodemailer.createTransport({
-  host: 'mail.puertomas.cl', port: 465, secure: true,
-  auth: { user: 'contacto@puertomas.cl', pass: 'TU_PASSWORD_AQUI' }
+  host: process.env.MAIL_HOST || 'mail.puertomas.cl',
+  port: parseInt(process.env.MAIL_PORT) || 465,
+  secure: true,
+  auth: {
+    user: process.env.MAIL_USER || 'contacto@puertomas.cl',
+    pass: process.env.MAIL_PASS || 'TU_PASSWORD_AQUI' // ⚠️ CAMBIAR: configurar MAIL_PASS en variables de entorno
+  }
 });
 
 function sendEmailPin(to, nickname, pin) {
   const mailOptions = {
-    from: '"BARRIO Seguridad" <no-reply@puertomas.cl>', to,
-    subject: 'Tu PIN de Seguridad - BARRIO',
-    html: `<h2>Hola ${nickname}!</h2><p>Tu PIN es: <b>${pin}</b></p>`
+    from: `"BARRIO Seguridad" <${process.env.MAIL_USER || 'contacto@puertomas.cl'}>`,
+    to,
+    subject: '🔐 Tu PIN de Seguridad - BARRIO Puerto Montt',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f9f9f9;">
+        <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <h2 style="color: #673AB7; margin-bottom: 20px;">¡Bienvenido/a a BARRIO! 🏘️</h2>
+          <p style="font-size: 16px; color: #333; line-height: 1.6;">Hola <strong>${nickname}</strong>,</p>
+          <p style="font-size: 16px; color: #333; line-height: 1.6;">Tu registro fue exitoso. Este es tu <strong>PIN de Seguridad</strong> para acceder a funciones especiales:</p>
+          <div style="background: #673AB7; color: white; font-size: 32px; font-weight: bold; text-align: center; padding: 20px; border-radius: 8px; margin: 25px 0; letter-spacing: 8px;">
+            ${pin}
+          </div>
+          <p style="font-size: 14px; color: #666; line-height: 1.6;"><strong>⚠️ Importante:</strong> Guarda este PIN en un lugar seguro. Lo necesitarás para validar acciones importantes en la app.</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;">
+          <p style="font-size: 13px; color: #999; text-align: center;">BARRIO Puerto Montt - Seguridad Ciudadana</p>
+        </div>
+      </div>
+    `
   };
-  mailTransporter.sendMail(mailOptions).catch(e => console.error('Mail Error:', e));
+  mailTransporter.sendMail(mailOptions, (err, info) => {
+    if (err) {
+      console.error('❌ Error enviando email:', err.message);
+    } else {
+      console.log('✅ Email PIN enviado a:', to);
+    }
+  });
 }
 
 async function queryAll(sql, params = []) { return await dbHelper.queryAll(sql, params); }
@@ -279,6 +305,31 @@ app.post('/api/reportes', async (req, res) => {
 
 app.post('/api/registro', async (req, res) => {
   const { nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion } = req.body;
+  
+  // GEOFENCING: Validar que la ubicación esté dentro de Puerto Montt
+  if (home_lat && home_lng) {
+    const PM_CENTER_LAT = -41.4693;
+    const PM_CENTER_LNG = -72.9423;
+    const MAX_RADIUS_KM = 25; // Radio máximo desde el centro (Puerto Montt + alrededores)
+    
+    // Calcular distancia usando fórmula Haversine
+    const R = 6371; // Radio de la Tierra en km
+    const dLat = (home_lat - PM_CENTER_LAT) * Math.PI / 180;
+    const dLng = (home_lng - PM_CENTER_LNG) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(PM_CENTER_LAT * Math.PI / 180) * Math.cos(home_lat * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    
+    if (distance > MAX_RADIUS_KM) {
+      return res.status(400).json({
+        error: 'FUERA_DE_COBERTURA',
+        message: `Tu ubicación está fuera del área de cobertura de BARRIO Puerto Montt. Por favor, marca tu casa en el mapa dentro de Puerto Montt y alrededores.`
+      });
+    }
+  }
+  
   let user = await queryOne('SELECT * FROM usuarios WHERE telefono = ?', [telefono]);
   if (!user) {
     const r = await runSql('INSERT INTO usuarios (nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion, is_verified) VALUES (?,?,?,?,?,?,?,?,?,1)', [nombre, telefono, email||'', nickname||'', pin_seguridad||'', device_id||'', home_lat||null, home_lng||null, direccion||'']);
