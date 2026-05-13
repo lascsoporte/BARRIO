@@ -27,7 +27,6 @@ const Admin = {
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 3000);
   },
-  },
 
   yn(v) {
     if (v === 1 || v === true || v === '1') return 'Sí';
