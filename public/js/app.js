@@ -43,7 +43,11 @@ const App = {
     }
     } catch(e) {
       console.warn('Sesión no verificada:', e.message);
-      // No recargamos para evitar bucles. Si el usuario no existe, requireAuth lo manejará.
+      // Si el usuario fue eliminado por el admin (404), limpiar todo y reiniciar como nuevo
+      if (e.message && e.message.includes('404')) {
+        App._fullReset();
+        return;
+      }
     }
   }
 
@@ -90,8 +94,8 @@ const App = {
  } catch(e) { 
  console.warn('Error al verificar usuario o cargar config', e);
  if (e.message && e.message.includes('404')) {
- localStorage.removeItem('barrio_user');
- location.reload();
+ App._fullReset();
+ return;
  }
  }
 
@@ -186,6 +190,18 @@ const App = {
       <div style="margin-top:20px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px;">
         <p style="font-size:0.8rem; color:var(--text-light); margin-bottom:0;">📍 <b>Georreferencia activa</b> para seguridad ciudadana.</p>
         <button onclick="App.showShareMenu()" style="background:#673AB7; color:white; border:none; padding:10px 25px; border-radius:25px; font-weight:900; font-size:0.9rem; cursor:pointer; width:80%; max-width:250px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">COMPARTIR APP</button>
+        <div id="installBanner" style="display:none; width:100%; max-width:400px; background:linear-gradient(135deg,#FF6B35,#E55A25); border-radius:16px; padding:14px 18px; box-shadow:0 4px 15px rgba(255,107,53,0.35); text-align:left;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <div>
+              <div style="color:white; font-weight:900; font-size:1rem;">📲 ¡Instala BARRIO!</div>
+              <div style="color:rgba(255,255,255,0.85); font-size:0.78rem; margin-top:3px;">Agrégala a tu pantalla de inicio para acceso rápido.</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px; flex-shrink:0;">
+              <button onclick="App.installPWA()" style="background:white; color:#FF6B35; border:none; padding:8px 16px; border-radius:20px; font-weight:900; font-size:0.85rem; cursor:pointer; white-space:nowrap;">INSTALAR</button>
+              <button onclick="document.getElementById('installBanner').style.display='none'; localStorage.setItem('barrio_install_dismissed','1');" style="background:transparent; color:rgba(255,255,255,0.7); border:none; font-size:0.75rem; cursor:pointer; text-align:center;">Ahora no</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       ${this.footerHtml()}
@@ -1343,6 +1359,27 @@ const App = {
  container.appendChild(f);
  },
 
+ // Limpia TODOS los datos del usuario y reinicia como primera instalación
+ _fullReset() {
+  console.log('App: Usuario eliminado por admin. Reiniciando como nueva instalación...');
+  // Preservar solo el device_id para trazabilidad
+  const deviceId = localStorage.getItem('barrio_device_id');
+  localStorage.clear();
+  if (deviceId) localStorage.setItem('barrio_device_id', deviceId);
+  // Mostrar aviso antes de reiniciar
+  const aviso = document.createElement('div');
+  aviso.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  aviso.innerHTML = `
+    <div style="background:white;border-radius:20px;padding:30px 25px;max-width:360px;width:100%;text-align:center;border-top:6px solid #D32F2F;">
+      <div style="font-size:3rem;margin-bottom:15px;">⚠️</div>
+      <h2 style="color:#D32F2F;font-size:1.3rem;font-weight:900;margin-bottom:12px;">Cuenta no encontrada</h2>
+      <p style="color:#555;font-size:0.9rem;line-height:1.5;margin-bottom:20px;">Tu cuenta ha sido eliminada del sistema o esta instalación ya no está registrada.<br><br>Deberás registrarte nuevamente para acceder a BARRIO.</p>
+      <button onclick="location.reload()" style="background:#D32F2F;color:white;border:none;padding:14px 30px;border-radius:25px;font-weight:900;font-size:1rem;cursor:pointer;width:100%;">ENTENDIDO, CONTINUAR</button>
+    </div>
+  `;
+  document.body.appendChild(aviso);
+ },
+
  showGpsModal() {
  const modal = document.createElement('div');
  modal.className = 'gps-modal-overlay';
@@ -1387,8 +1424,16 @@ const App = {
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   App.deferredPrompt = e;
+  if (!localStorage.getItem('barrio_install_dismissed')) {
+    const banner = document.getElementById('installBanner');
+    if (banner) banner.style.display = 'block';
+  }
+});
+
+window.addEventListener('appinstalled', () => {
   const banner = document.getElementById('installBanner');
-  if (banner) banner.style.display = 'block';
+  if (banner) banner.style.display = 'none';
+  App.deferredPrompt = null;
 });
 
 if (document.readyState === 'loading') {
