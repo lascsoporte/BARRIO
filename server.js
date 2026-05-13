@@ -281,7 +281,7 @@ app.post('/api/registro', async (req, res) => {
   const { nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion } = req.body;
   let user = await queryOne('SELECT * FROM usuarios WHERE telefono = ?', [telefono]);
   if (!user) {
-    const r = await runSql('INSERT INTO usuarios (nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion) VALUES (?,?,?,?,?,?,?,?,?)', [nombre, telefono, email||'', nickname||'', pin_seguridad||'', device_id||'', home_lat||null, home_lng||null, direccion||'']);
+    const r = await runSql('INSERT INTO usuarios (nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion, is_verified) VALUES (?,?,?,?,?,?,?,?,?,1)', [nombre, telefono, email||'', nickname||'', pin_seguridad||'', device_id||'', home_lat||null, home_lng||null, direccion||'']);
     user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [r.insertId]);
     sendTelegramAlert(`🆕 <b>NUEVO REGISTRO</b>\nNombre: ${nombre}\nNick: ${nickname}\nTel: ${telefono}`);
     if (email && pin_seguridad) sendEmailPin(email, nickname||nombre, pin_seguridad);

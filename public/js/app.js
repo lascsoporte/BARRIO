@@ -206,7 +206,7 @@ const App = {
           <a href="tel:134" onclick="App.logLlamada('134 - PDI')" class="emg-btn" style="background:#0D47A1;">PDI (134)</a>
           <a href="tel:1529" onclick="App.logLlamada('1529 - SEGURIDAD CIUDADANA PUERTO MONTT')" class="emg-btn" style="background:#F57C00;">SEGURIDAD CIUDADANA PUERTO MONTT (1529)</a>
           <div style="margin-top:15px; border-top:1px solid #EEE; padding-top:15px;">
-            <button onclick="location.hash='#/legal'" class="btn btn-sm" style="background:#673AB7; color:white; width:100%; justify-content:center; font-weight:900;">REPORTAR TELÉFONO EXTRAVIADO</button>
+            <button onclick="App.hideEmergencyMenu(); App.iniciarReporteExtravio();" class="btn btn-sm" style="background:#673AB7; color:white; width:100%; justify-content:center; font-weight:900;">REPORTAR TELÉFONO EXTRAVIADO</button>
           </div>
         </div>
       </div>
@@ -981,20 +981,45 @@ const App = {
  });
  },
 
+  async iniciarReporteExtravio() {
+    const num = prompt('Por seguridad, ingresa el NÚMERO DE TELÉFONO que extraviaste (Formato: +569XXXXXXXX):');
+    if (!num) return;
+    const phoneRegex = /^\+\d{11}$/;
+    if (!phoneRegex.test(num.replace(/\s+/g, ''))) {
+      return alert('Formato inválido. Debe comenzar con + y tener 11 números (Ej: +56912345678)');
+    }
+    this.requireAuth(async (user) => {
+      try {
+        await Geo.getUserLocation().catch(() => {});
+        const lat = Geo.userLat;
+        const lng = Geo.userLng;
+        if (lat && lng) API.ping(this.deviceId, lat, lng).catch(() => {});
+        const refGps = (lat && lng)
+          ? `\n📍 Ubicación del Denunciante: https://maps.google.com/?q=${lat},${lng}`
+          : '\n📍 Ubicación del Denunciante: No disponible (GPS desactivado)';
+        await API.reportarExtravio({
+          reporting_user_id: user.id,
+          reported_phone: num,
+          mensaje_extra: refGps
+        });
+        alert('✅ Teléfono marcado como EXTRAVIADO. El rastreo se activará al abrir la app en ese equipo y la ubicación se mostrará en el mapa del administrador.');
+      } catch(e) {
+        this.toast('Error al reportar extravío: ' + (e.message || ''));
+      }
+    });
+  },
+
  async logLlamada(institucion) {
- // Intentar obtener ubicación fresca antes de loguear
- await Geo.getUserLocation().catch(() => {});
- 
- this.requireAuth((user) => {
- const data = { 
- usuario_id: user.id, 
- institucion: institucion,
- latitud: Geo.userLat || null,
- longitud: Geo.userLng || null
- };
- API.logEmergencia(data).catch(() => {});
- });
- },
+    // Obtener ubicación fresca antes de loguear
+    await Geo.getUserLocation().catch(() => {});
+    this.requireAuth((user) => {
+      const lat = Geo.userLat || null;
+      const lng = Geo.userLng || null;
+      // Actualizar last_lat/last_lng para que aparezca en el mapa del admin
+      if (lat && lng) API.ping(this.deviceId, lat, lng).catch(() => {});
+      API.logEmergencia({ usuario_id: user.id, institucion, latitud: lat, longitud: lng }).catch(() => {});
+    });
+  },
 
  // ===== AUTH & NEW FEATURES =====
   requireAuth(callback, mandatory = false) {
@@ -1054,6 +1079,10 @@ const App = {
     `;
     document.body.appendChild(modal);
 
+    // Declarar ANTES del listener para que el click siempre pueda leer los valores
+    let homeLat = null, homeLng = null;
+    let homeMarker = null;
+
     document.getElementById('authSubmit').addEventListener('click', async () => {
       const nombre = document.getElementById('authNombre').value.trim();
       const nickname = document.getElementById('authNickname').value.trim();
@@ -1076,10 +1105,13 @@ const App = {
           direccion, device_id: this.deviceId, terms_accepted: termsAccepted,
           home_lat: homeLat, home_lng: homeLng
         });
-        localStorage.setItem('barrio_user', JSON.stringify(res.user));
-        this.toast('¡Registro enviado! Revisa tu correo por tu PIN.');
+        // Guardar usuario y acceder directamente (is_verified=1 automático)
+        const savedUser = res.user;
+        localStorage.setItem('barrio_user', JSON.stringify(savedUser));
+        this.toast(`¡Bienvenido/a ${nickname}! Registro completado.`);
         modal.remove();
-        this.showPendingVerification();
+        // Ingresar a la app directamente sin esperar verificación manual
+        this.continueInit(savedUser);
       } catch (err) {
         btn.disabled = false;
         btn.textContent = 'Registrarme AHORA';
@@ -1088,8 +1120,6 @@ const App = {
     });
 
     // Iniciar mapa de hogar
-    let homeLat = null, homeLng = null;
-    let homeMarker = null;
     setTimeout(() => {
       try {
         const hMap = L.map('homeSelectMap').setView([-41.4693, -72.9423], 13);
