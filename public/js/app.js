@@ -1618,25 +1618,70 @@ const App = {
     `;
 
     document.getElementById('btnReportarRobo').addEventListener('click', () => {
-      const num = prompt("Ingresa el NÚMERO que extraviaste (+569XXXXXXXX):");
-      if (!num) return;
-      const phoneRegex = /^\+\d{11}$/;
-      if (!phoneRegex.test(num.replace(/\s+/g, ''))) return alert("Formato inválido (+56912345678)");
-      
-      this.requireAuth(async (user) => {
-        const btn = document.getElementById('btnReportarRobo');
-        btn.disabled = true; btn.textContent = 'Procesando...';
+      // Modal que pide número de teléfono + PIN
+      const mExt = document.createElement('div');
+      mExt.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+      mExt.innerHTML = `
+        <div style="background:white;border-radius:20px;padding:28px 22px;max-width:360px;width:100%;text-align:center;border-top:6px solid #673AB7;">
+          <div style="font-size:2.5rem;margin-bottom:10px;">📱</div>
+          <h2 style="color:#673AB7;font-weight:900;margin-bottom:8px;">Reportar Extravío</h2>
+          <p style="color:#555;font-size:0.85rem;line-height:1.4;margin-bottom:18px;">Ingresa el número del teléfono extraviado y tu PIN de seguridad para confirmar que eres el dueño.</p>
+          <input id="extNumero" type="tel" placeholder="Número extraviado (+56912345678)" style="width:100%;padding:12px;border-radius:10px;border:2px solid #ddd;margin-bottom:10px;font-size:0.95rem;box-sizing:border-box;outline:none;">
+          <input id="extPin" type="number" placeholder="Tu PIN de 4 dígitos" maxlength="4" style="width:100%;padding:12px;border-radius:10px;border:2px solid #ddd;margin-bottom:16px;font-size:1.1rem;letter-spacing:6px;text-align:center;box-sizing:border-box;outline:none;">
+          <p id="extError" style="color:#D32F2F;font-size:0.85rem;margin-bottom:10px;display:none;"></p>
+          <button id="extEnviar" style="width:100%;background:#673AB7;color:white;border:none;padding:14px;border-radius:12px;font-weight:900;font-size:1rem;cursor:pointer;margin-bottom:10px;">REPORTAR EXTRAVÍO</button>
+          <button id="extCancelar" style="width:100%;background:transparent;border:none;color:#999;font-size:0.9rem;cursor:pointer;padding:8px;">Cancelar</button>
+        </div>`;
+      document.body.appendChild(mExt);
+      document.body.classList.add('modal-open');
+
+      mExt.querySelector('#extCancelar').onclick = () => {
+        mExt.remove(); document.body.classList.remove('modal-open');
+      };
+
+      mExt.querySelector('#extEnviar').onclick = async () => {
+        const num = mExt.querySelector('#extNumero').value.trim().replace(/\s+/g, '');
+        const pin = mExt.querySelector('#extPin').value.trim();
+        const errEl = mExt.querySelector('#extError');
+        const btnEnv = mExt.querySelector('#extEnviar');
+
+        // Validaciones
+        if (!num) { errEl.textContent = 'Ingresa el número de teléfono.'; errEl.style.display = 'block'; return; }
+        if (!/^\+\d{11}$/.test(num)) { errEl.textContent = 'Formato inválido. Ejemplo: +56912345678'; errEl.style.display = 'block'; return; }
+        if (!pin || pin.length !== 4) { errEl.textContent = 'El PIN debe ser de exactamente 4 dígitos.'; errEl.style.display = 'block'; return; }
+
+        errEl.style.display = 'none';
+        btnEnv.disabled = true;
+        btnEnv.textContent = 'Procesando...';
+
         try {
           await Geo.getUserLocation().catch(() => {});
-          await API.reportarExtravio({ 
-            reporting_user_id: user.id, 
-            reported_phone: num,
-            mensaje_extra: (Geo.userLat) ? `\n📍 Ubicación reporte: https://maps.google.com/?q=${Geo.userLat},${Geo.userLng}` : ""
+          const resp = await fetch('/api/reportar-extravio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              reported_phone: num,
+              pin: pin
+            })
           });
-          alert("Teléfono marcado como EXTRAVIADO. El rastreo se activará al abrir la app en ese equipo.");
-        } catch(e) { this.toast('Error al reportar'); }
-        finally { btn.disabled = false; btn.textContent = "Reportar Teléfono Extraviado"; }
-      });
+          const data = await resp.json();
+          if (!resp.ok) {
+            errEl.textContent = data.error === 'PIN incorrecto' ? '❌ PIN incorrecto. Verifica tu PIN de seguridad.' : '❌ Error al reportar. Intenta de nuevo.';
+            errEl.style.display = 'block';
+            btnEnv.disabled = false;
+            btnEnv.textContent = 'REPORTAR EXTRAVÍO';
+            return;
+          }
+          mExt.remove();
+          document.body.classList.remove('modal-open');
+          this.toast('✅ Teléfono marcado como EXTRAVIADO. El rastreo se activará al encender ese equipo.');
+        } catch(e) {
+          errEl.textContent = 'Error de conexión. Intenta de nuevo.';
+          errEl.style.display = 'block';
+          btnEnv.disabled = false;
+          btnEnv.textContent = 'REPORTAR EXTRAVÍO';
+        }
+      };
     });
 
     // ---- Botón ELIMINARME DE LA APP ----
