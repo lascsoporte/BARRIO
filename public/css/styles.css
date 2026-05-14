@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
 
 :root {
   --primary: #FF6B35;
@@ -1053,3 +1053,21 @@ body {
   transition: transform 0.3s ease;
 }
 .modal-overlay.active .modal-content { transform: translateY(0); }
+
+/* ===== SEARCH MODAL - Anclado arriba para no quedar tapado por el teclado ===== */
+#searchModal {
+  bottom: auto;
+  top: 0;
+  border-radius: 0 0 24px 24px;
+  transform: translateY(-100%);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+}
+#searchModal.active {
+  transform: translateY(0);
+}
+#searchModal .sheet-content {
+  padding: 20px 20px 24px;
+}
+#searchModal .sheet-header h3 {
+  font-size: 1.1rem;
+}
