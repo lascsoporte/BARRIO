@@ -710,8 +710,15 @@ const App = {
  }
  });
  } catch (err) {
- container.innerHTML += `<div class="empty-state"><p>Error al buscar. Intenta nuevamente.</p></div>`;
- }
+  // No mostramos error al usuario — simplemente no hay resultados disponibles
+  container.innerHTML = `
+  <h2 class="section-title">🔍 Resultados para "${q}"</h2>
+  <div class="empty-state">
+    <div class="empty-icon">🤷</div>
+    <p>No se encontraron resultados para "<strong>${q}</strong>" cerca de ti.</p>
+    <p style="margin-top:8px;font-size:0.85rem;color:#999;">Intenta con otra palabra o consulta más tarde.</p>
+    <button class="btn btn-primary" style="margin-top:16px;" onclick="history.back()">← Volver</button>
+  </div>`;
  },
 
  // ===== MASCOTAS PERDIDAS =====

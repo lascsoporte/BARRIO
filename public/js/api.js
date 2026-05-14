@@ -5,12 +5,22 @@ const API = {
   async get(url, token) {
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    const res = await fetch(this.base + url, { headers });
-    if (!res.ok) {
-      if (res.status === 401) throw new Error('401-EXPIRADO');
-      throw new Error(`Error ${res.status}`);
+    // Timeout de 8 segundos — evita esperar al servidor dormido
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(this.base + url, { headers, signal: controller.signal });
+      clearTimeout(timer);
+      if (!res.ok) {
+        if (res.status === 401) throw new Error('401-EXPIRADO');
+        throw new Error(`Error ${res.status}`);
+      }
+      return res.json();
+    } catch(e) {
+      clearTimeout(timer);
+      if (e.name === 'AbortError') throw new Error('TIMEOUT');
+      throw e;
     }
-    return res.json();
   },
 
   async post(url, data, token) {
