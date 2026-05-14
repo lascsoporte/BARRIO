@@ -126,7 +126,7 @@ async function createCloudTables() {
       id INT AUTO_INCREMENT PRIMARY KEY, usuario_id INT NOT NULL, institucion VARCHAR(100) NOT NULL,
       latitud DOUBLE, longitud DOUBLE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
-    `CREATE TABLE IF NOT EXISTS rastreo_robos (
+    `CREATE TABLE IF NOT EXISTS registro_extravios (
       id INT AUTO_INCREMENT PRIMARY KEY, usuario_id INT NOT NULL, latitud DOUBLE NOT NULL,
       longitud DOUBLE NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
@@ -374,7 +374,7 @@ function initSqliteTables() {
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS rastreo_robos (
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS registro_extravios (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     usuario_id INTEGER NOT NULL,
     latitud REAL NOT NULL,

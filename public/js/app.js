@@ -498,7 +498,7 @@ const App = {
         API.getReportes().then(reports => {
           reports.forEach(r => {
             if (r.latitud && r.longitud) {
-              const icons = { 'robo': '🚨', 'incendio': '🔥', 'accidente': '🚗', 'sospechoso': '👤', 'mascota': '🐶', 'otros': '📍' };
+              const icons = { 'extravío': '🚨', 'incendio': '🔥', 'accidente': '🚗', 'sospechoso': '👤', 'mascota': '🐶', 'otros': '📍' };
               const marker = L.marker([r.latitud, r.longitud], {
                 icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px; background:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2); border:2px solid var(--primary);">${icons[r.tipo_reporte] || '📍'}</div>`})
               }).addTo(map);
@@ -734,7 +734,7 @@ const App = {
     <p style="font-size:0.85rem; color:#666; margin-bottom:15px;">Fija el punto en el mapa y selecciona el tipo de reporte. <b>Tu identidad pública será protegida con tu Nickname.</b></p>
     
     <div class="report-grid">
-      <button class="report-opt" data-tipo="robo">🚨 Robo</button>
+      <button class="report-opt" data-tipo="extravío">🚨 Extravío</button>
       <button class="report-opt" data-tipo="accidente">🚗 Choque</button>
       <button class="report-opt" data-tipo="incendio">🔥 Incendio</button>
       <button class="report-opt" data-tipo="sospechoso">👤 Sospechoso</button>
@@ -776,7 +776,7 @@ const App = {
         API.getReportes().then(reports => {
           reports.forEach(r => {
             if (r.latitud && r.longitud) {
-              const icons = { 'robo': '🚨', 'incendio': '🔥', 'accidente': '🚗', 'sospechoso': '👤', 'mascota': '🐶', 'otros': '📍' };
+              const icons = { 'extravío': '🚨', 'incendio': '🔥', 'accidente': '🚗', 'sospechoso': '👤', 'mascota': '🐶', 'otros': '📍' };
               const m = L.marker([r.latitud, r.longitud], {
                 icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px; background:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2); border:2px solid #BBB;">${icons[r.tipo_reporte] || '📍'}</div>`})
               }).addTo(map);
@@ -807,7 +807,7 @@ const App = {
     
     // Duraciones predeterminadas por tipo
     const duracionesPorTipo = {
-      'robo': 24,        // 24 horas
+      'extravío': 24,        // 24 horas
       'accidente': 4,    // 4 horas
       'incendio': 4,     // 4 horas
       'sospechoso': 5,   // 5 horas
