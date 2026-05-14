@@ -20,13 +20,17 @@ const DB_PATH = path.join(__dirname, 'barrio.db');
 const BACKUP_PATH = path.join(__dirname, 'barrio_backup.db');
 
 async function migrarBaseDatos() {
-  console.log('🔧 INICIANDO MIGRACIÓN DE BASE DE DATOS...\n');
+  console.log('🔧 INICIANDO MIGRACIÓN SEGURA DE BASE DE DATOS...\n');
 
-  // 1. Crear backup de seguridad
+  // 1. Crear backup de seguridad SIEMPRE
   if (fs.existsSync(DB_PATH)) {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const backupPath = path.join(__dirname, `barrio_backup_${timestamp}.db`);
     console.log('📦 Creando backup de seguridad...');
-    fs.copyFileSync(DB_PATH, BACKUP_PATH);
-    console.log(`✅ Backup creado: ${BACKUP_PATH}\n`);
+    fs.copyFileSync(DB_PATH, backupPath);
+    console.log(`✅ Backup creado: ${backupPath}\n`);
+  } else {
+    console.log('ℹ️  No existe base de datos, se creará una nueva.\n');
   }
 
   const SQL = await initSqlJs();
@@ -40,109 +44,91 @@ async function migrarBaseDatos() {
   }
 
   try {
-    // 2. Verificar si la tabla usuarios existe y tiene la estructura incorrecta
+    // 2. Verificar si la tabla usuarios existe
     console.log('🔍 Verificando estructura actual...');
-    const tableInfo = db.exec("PRAGMA table_info(usuarios)");
+    let tableInfo;
+    try {
+      tableInfo = db.exec("PRAGMA table_info(usuarios)");
+    } catch (e) {
+      tableInfo = [];
+    }
     
     if (tableInfo.length === 0) {
-      console.log('ℹ️  Tabla usuarios no existe, se creará desde cero.');
+      console.log('ℹ️  Tabla usuarios no existe, se creará desde cero.\n');
+      
+      // Crear tabla completa
+      db.run(`CREATE TABLE usuarios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        telefono TEXT NOT NULL UNIQUE,
+        direccion TEXT,
+        ip TEXT,
+        device_id TEXT,
+        is_blocked INTEGER DEFAULT 0,
+        is_stolen INTEGER DEFAULT 0,
+        is_verified INTEGER DEFAULT 1,
+        terms_accepted INTEGER DEFAULT 0,
+        nickname TEXT,
+        email TEXT,
+        pin_seguridad TEXT,
+        push_enabled INTEGER DEFAULT 0,
+        last_lat REAL,
+        last_lng REAL,
+        home_lat REAL,
+        home_lng REAL,
+        baja_solicitada INTEGER DEFAULT 0,
+        baja_fecha TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )`);
+      console.log('✅ Tabla usuarios creada\n');
+      
     } else {
-      const columns = tableInfo[0].values.map(row => row[1]); // Obtener nombres de columnas
-      console.log(`📋 Columnas actuales: ${columns.join(', ')}`);
+      // Tabla existe - agregar columnas faltantes sin borrar datos
+      const columns = tableInfo[0].values.map(row => row[1]);
+      console.log(`📋 Columnas actuales: ${columns.join(', ')}\n`);
       
       const requiredColumns = [
-        'nickname', 'email', 'pin_seguridad', 'device_id', 
-        'home_lat', 'home_lng', 'is_verified', 'direccion'
+        { name: 'nickname', type: 'TEXT' },
+        { name: 'email', type: 'TEXT' },
+        { name: 'pin_seguridad', type: 'TEXT' },
+        { name: 'device_id', type: 'TEXT' },
+        { name: 'home_lat', type: 'REAL' },
+        { name: 'home_lng', type: 'REAL' },
+        { name: 'is_verified', type: 'INTEGER DEFAULT 1' },
+        { name: 'direccion', type: 'TEXT' },
+        { name: 'ip', type: 'TEXT' },
+        { name: 'is_blocked', type: 'INTEGER DEFAULT 0' },
+        { name: 'is_stolen', type: 'INTEGER DEFAULT 0' },
+        { name: 'push_enabled', type: 'INTEGER DEFAULT 0' },
+        { name: 'last_lat', type: 'REAL' },
+        { name: 'last_lng', type: 'REAL' },
+        { name: 'baja_solicitada', type: 'INTEGER DEFAULT 0' },
+        { name: 'baja_fecha', type: 'TEXT' }
       ];
       
-      const missingColumns = requiredColumns.filter(col => !columns.includes(col));
-      
-      if (missingColumns.length > 0) {
-        console.log(`\n⚠️  COLUMNAS FALTANTES DETECTADAS: ${missingColumns.join(', ')}\n`);
-        
-        // 3. Guardar datos existentes
-        console.log('💾 Guardando usuarios existentes...');
-        const existingUsers = db.exec("SELECT * FROM usuarios");
-        let usersData = [];
-        
-        if (existingUsers.length > 0 && existingUsers[0].values.length > 0) {
-          const cols = existingUsers[0].columns;
-          usersData = existingUsers[0].values.map(row => {
-            const user = {};
-            cols.forEach((col, idx) => {
-              user[col] = row[idx];
-            });
-            return user;
-          });
-          console.log(`✅ ${usersData.length} usuario(s) encontrado(s)\n`);
-        }
-
-        // 4. Eliminar tabla antigua
-        console.log('🗑️  Eliminando tabla antigua...');
-        db.run("DROP TABLE IF EXISTS usuarios");
-        console.log('✅ Tabla eliminada\n');
-
-        // 5. Crear tabla nueva completa
-        console.log('🏗️  Creando tabla nueva con estructura completa...');
-        db.run(`CREATE TABLE usuarios (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          nombre TEXT NOT NULL,
-          telefono TEXT NOT NULL UNIQUE,
-          direccion TEXT,
-          ip TEXT,
-          device_id TEXT,
-          is_blocked INTEGER DEFAULT 0,
-          is_stolen INTEGER DEFAULT 0,
-          is_verified INTEGER DEFAULT 1,
-          terms_accepted INTEGER DEFAULT 0,
-          nickname TEXT,
-          email TEXT,
-          pin_seguridad TEXT,
-          push_enabled INTEGER DEFAULT 0,
-          last_lat REAL,
-          last_lng REAL,
-          home_lat REAL,
-          home_lng REAL,
-          baja_solicitada INTEGER DEFAULT 0,
-          baja_fecha TEXT,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )`);
-        console.log('✅ Tabla creada con TODAS las columnas\n');
-
-        // 6. Restaurar usuarios con valores por defecto para columnas faltantes
-        if (usersData.length > 0) {
-          console.log('♻️  Restaurando usuarios con valores actualizados...');
-          for (const user of usersData) {
-            db.run(`INSERT INTO usuarios (
-              id, nombre, telefono, terms_accepted,
-              nickname, email, pin_seguridad, device_id,
-              home_lat, home_lng, direccion, is_verified,
-              is_blocked, is_stolen, push_enabled,
-              created_at
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
-              user.id,
-              user.nombre,
-              user.telefono,
-              user.terms_accepted || 0,
-              user.nickname || user.nombre, // Usar nombre como nickname si no existe
-              user.email || '',
-              user.pin_seguridad || '0000', // PIN por defecto
-              user.device_id || '',
-              user.home_lat || null,
-              user.home_lng || null,
-              user.direccion || '',
-              1, // is_verified = 1 (verificado por defecto)
-              user.is_blocked || 0,
-              user.is_stolen || 0,
-              user.push_enabled || 0,
-              user.created_at || new Date().toISOString()
-            ]);
+      let columnsAdded = 0;
+      for (const col of requiredColumns) {
+        if (!columns.includes(col.name)) {
+          try {
+            db.run(`ALTER TABLE usuarios ADD COLUMN ${col.name} ${col.type}`);
+            console.log(`✅ Columna agregada: ${col.name}`);
+            columnsAdded++;
+          } catch (e) {
+            console.log(`⚠️  No se pudo agregar ${col.name}: ${e.message}`);
           }
-          console.log(`✅ ${usersData.length} usuario(s) restaurado(s) exitosamente\n`);
         }
-      } else {
-        console.log('✅ La tabla usuarios ya tiene todas las columnas necesarias\n');
       }
+      
+      if (columnsAdded > 0) {
+        console.log(`\n✅ ${columnsAdded} columna(s) agregada(s)`);
+      } else {
+        console.log('\n✅ La tabla ya tiene todas las columnas necesarias');
+      }
+      
+      // Verificar datos existentes
+      const userCount = db.exec("SELECT COUNT(*) as total FROM usuarios");
+      const total = userCount[0]?.values[0][0] || 0;
+      console.log(`👥 Usuarios en la base de datos: ${total}\n`);
     }
 
     // 7. Verificar tablas adicionales

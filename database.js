@@ -22,29 +22,48 @@ const mysqlConfig = {
 let useMysql = false;
 
 async function initDatabase() {
-  console.log('🔄 Conectando a Base de Datos en la Nube...');
+  console.log('🔄 Iniciando Base de Datos...');
   
+  // Intentar MySQL primero, pero con timeout corto
   try {
-    mysqlPool = mysql.createPool(mysqlConfig);
-    // Prueba de conexión
-    await mysqlPool.query('SELECT 1');
+    console.log('⏱️  Probando conexión a la nube (timeout 5s)...');
+    mysqlPool = mysql.createPool({
+      ...mysqlConfig,
+      connectTimeout: 5000, // 5 segundos máximo
+      acquireTimeout: 5000
+    });
+    
+    // Prueba de conexión con timeout
+    const testConnection = await Promise.race([
+      mysqlPool.query('SELECT 1'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+    ]);
+    
     useMysql = true;
     console.log('✅ ¡CONECTADO A CLEVER CLOUD! (Persistencia Activa)');
     
     // Crear tablas en la nube si no existen
     await createCloudTables();
   } catch (e) {
-    console.warn('⚠️ Error conectando a la nube, usando SQLite local:', e.message);
+    console.warn('⚠️ No se pudo conectar a la nube (usando SQLite local):', e.message);
     useMysql = false;
+    if (mysqlPool) {
+      try { await mysqlPool.end(); } catch(err) {}
+      mysqlPool = null;
+    }
   }
 
+  // Si no hay MySQL, usar SQLite
   if (!useMysql) {
+    console.log('📂 Iniciando SQLite local...');
     const SQL = await initSqlJs();
     if (fs.existsSync(DB_PATH)) {
       const buf = fs.readFileSync(DB_PATH);
       sqliteDb = new SQL.Database(buf);
+      console.log('✅ Base de datos SQLite cargada desde archivo');
     } else {
       sqliteDb = new SQL.Database();
+      console.log('✅ Nueva base de datos SQLite creada');
     }
     initSqliteTables();
     console.log('✅ Usando SQLite (Local)');
