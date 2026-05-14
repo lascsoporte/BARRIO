@@ -1,4 +1,4 @@
-// BARRIO - Main Application
+﻿// BARRIO - Main Application
 const App = {
  deviceId: null,
  deferredPrompt: null,
@@ -212,47 +212,54 @@ const App = {
   document.getElementById('btnPushOnboardingAccept').onclick = async () => {
     const btn = document.getElementById('btnPushOnboardingAccept');
     btn.disabled = true; btn.textContent = 'Activando...';
-    
+
+    // Flag para evitar doble cierre si el timeout ya disparó
+    let alreadyClosed = false;
+    const closeAndContinue = () => {
+      if (alreadyClosed) return;
+      alreadyClosed = true;
+      clearTimeout(safetyTimeout);
+      console.log('🔚 Cerrando modal push (finally)');
+      modal.remove();
+      done();
+    };
+
     // Timeout de seguridad: si en 15s no responde, cerrar y continuar
     const safetyTimeout = setTimeout(() => {
       console.warn('⏱️ Timeout: Push notifications tomaron más de 15s');
       App.toast('No se pudo activar. Puedes intentarlo más tarde.');
       localStorage.setItem('barrio_push_enabled', 'denied_temp');
-      modal.remove(); done();
+      closeAndContinue();
     }, 15000);
 
     try {
       console.log('🔔 Solicitando permiso de notificaciones...');
       const permission = await Notification.requestPermission();
       console.log('🔔 Permiso:', permission);
-      
-      clearTimeout(safetyTimeout);
-      
+
       if (permission === 'granted') {
         try {
           console.log('⏳ Esperando service worker...');
-          
-          // Verificar que el service worker esté disponible
+
           if (!('serviceWorker' in navigator)) {
             throw new Error('Service Worker no soportado');
           }
-          
+
           const registration = await navigator.serviceWorker.ready;
           console.log('✅ Service worker listo');
-          
+
           console.log('📲 Suscribiendo a push...');
           const subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: App.urlBase64ToUint8Array('BPfYyug0EiK_oS0FRF8w-k2WpxoDs79-DZjjFI505RsAeUrzi5e88XPgsj8Pp2YV6pZfMtnb-IXiYN8tJ9mgrFc')
           });
           console.log('✅ Suscripción creada');
-          
+
           console.log('💾 Guardando en servidor...');
-          const res = await API.savePushSubscription({ userId: user.id, subscription });
-          console.log('✅ Respuesta servidor:', res);
-          
-          localStorage.setItem('barrio_push_enabled', 'true');
+          await API.savePushSubscription({ userId: user.id, subscription });
           console.log('✅ Alertas activadas correctamente');
+
+          localStorage.setItem('barrio_push_enabled', 'true');
           App.toast('✅ Alertas activadas correctamente');
         } catch(e) {
           console.error('❌ Error suscripción push:', e);
@@ -265,14 +272,13 @@ const App = {
         App.toast('Permiso de notificaciones denegado');
       }
     } catch(e) {
-      clearTimeout(safetyTimeout);
       console.error('❌ Error al pedir permisos:', e);
       App.toast('Error al activar alertas');
       localStorage.setItem('barrio_push_enabled', 'denied_temp');
+    } finally {
+      // ✅ SIEMPRE se ejecuta — garantiza que el flujo avanza sin importar qué pasó
+      closeAndContinue();
     }
-    
-    console.log('🔚 Cerrando modal push');
-    modal.remove(); done();
   };
  },
 
@@ -494,13 +500,27 @@ const App = {
       } catch(e) {}
     }, 500);
 
-    // Si ya capturamos beforeinstallprompt, mostrar el banner ahora
+    // Mostrar banner de instalación si corresponde
     setTimeout(() => {
-      if (App.deferredPrompt && !localStorage.getItem('barrio_install_dismissed')) {
-        const banner = document.getElementById('installBanner');
-        if (banner) banner.style.display = 'block';
+      const dismissed = localStorage.getItem('barrio_install_dismissed');
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+      if (dismissed || isStandalone) return;
+      const banner = document.getElementById('installBanner');
+      if (!banner) return;
+      // Si hay prompt nativo (Android/Chrome), mostrar botón
+      if (App.deferredPrompt) {
+        banner.style.display = 'block';
+      } else {
+        // iOS/Safari u otros: mostrar instrucciones manuales en el banner
+        banner.style.display = 'block';
+        const installBtn = banner.querySelector('button[onclick*="installPWA"]');
+        const nowBtn = banner.querySelector('button[onclick*="install_dismissed"]');
+        if (installBtn) {
+          installBtn.textContent = 'Ver cómo instalar';
+          installBtn.setAttribute('onclick', 'App._showInstallHelp()');
+        }
       }
-    }, 800);
+    }, 1000);
   },
 
   showEmergencyMenu(fromHash = false) { 
@@ -806,7 +826,7 @@ const App = {
  &copy; 2026 BARRIO - PUERTOMAS SPA | 
  <a href="#/legal" style="color:var(--primary); text-decoration:underline; cursor:pointer;">Aviso Legal</a>
  </p>
- <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); margin-top: 5px; text-align: right;">v2.0 Stable</div>
+ <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); margin-top: 5px; text-align: right;">v2.1 Stable</div>
  </footer>
  `;
  },
@@ -1360,13 +1380,33 @@ const App = {
       try {
         const hMap = L.map('homeSelectMap').setView([-41.4693, -72.9423], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(hMap);
-        hMap.on('click', (e) => {
+        hMap.on('click', async (e) => {
           homeLat = e.latlng.lat;
           homeLng = e.latlng.lng;
           if (homeMarker) hMap.removeLayer(homeMarker);
           homeMarker = L.marker([homeLat, homeLng], {
             icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px; background:var(--primary); color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.4); border:2px solid white;">🏠</div>`})
           }).addTo(hMap);
+          // Autorellenar campo Sector/Población con reverse geocoding
+          const dirInput = document.getElementById('authDireccion');
+          if (dirInput) {
+            dirInput.value = '📍 Obteniendo nombre del sector...';
+            dirInput.style.color = '#999';
+            try {
+              const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${homeLat}&lon=${homeLng}&format=json&accept-language=es`, { headers: { 'Accept-Language': 'es' } });
+              const geoData = await geoRes.json();
+              const addr = geoData.address || {};
+              const sector = addr.suburb || addr.neighbourhood || addr.quarter || addr.village || addr.hamlet || '';
+              const calle = addr.road || addr.pedestrian || '';
+              const ciudad = addr.city || addr.town || 'Puerto Montt';
+              const partes = [sector, calle].filter(Boolean);
+              dirInput.value = partes.length > 0 ? partes.join(', ') + ', ' + ciudad : ciudad;
+              dirInput.style.color = '';
+            } catch(geoErr) {
+              dirInput.value = `Sector ${homeLat.toFixed(4)}, ${homeLng.toFixed(4)}`;
+              dirInput.style.color = '';
+            }
+          }
         });
         if (Geo.userLat) hMap.setView([Geo.userLat, Geo.userLng], 16);
       } catch(e) { console.error("Error al cargar mapa de hogar"); }
@@ -1598,6 +1638,30 @@ const App = {
     </div>
   `;
   document.body.appendChild(aviso);
+ },
+
+ _showInstallHelp() {
+   const modal = document.createElement('div');
+   modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;';
+   modal.innerHTML = `
+     <div style="background:white;border-radius:20px;padding:30px 25px;max-width:360px;width:100%;text-align:center;border-top:6px solid #FF6B35;">
+       <div style="font-size:3rem;margin-bottom:12px;">📲</div>
+       <h2 style="color:#FF6B35;font-weight:900;margin-bottom:15px;">Instalar BARRIO</h2>
+       <div style="background:#FFF8F5;border-radius:12px;padding:15px;text-align:left;font-size:0.88rem;color:#444;line-height:1.7;margin-bottom:20px;">
+         <p style="font-weight:900;margin-bottom:10px;">📱 Android / Chrome:</p>
+         <p>1. Pulsa el menú <b>⋮</b> (arriba a la derecha)</p>
+         <p>2. Selecciona <b>"Añadir a pantalla de inicio"</b></p>
+         <p>3. Confirma con <b>"Añadir"</b></p>
+         <hr style="margin:12px 0;border:0;border-top:1px solid #EEE;">
+         <p style="font-weight:900;margin-bottom:10px;">🍎 iPhone / Safari:</p>
+         <p>1. Pulsa el botón <b>□↑ Compartir</b> (abajo)</p>
+         <p>2. Desliza y toca <b>"Añadir a inicio"</b></p>
+         <p>3. Confirma con <b>"Añadir"</b></p>
+       </div>
+       <button onclick="this.parentElement.parentElement.remove(); localStorage.setItem('barrio_install_dismissed','1');" style="background:#FF6B35;color:white;border:none;padding:12px 30px;border-radius:25px;font-weight:900;font-size:1rem;cursor:pointer;width:100%;">Entendido</button>
+     </div>
+   `;
+   document.body.appendChild(modal);
  },
 
  showGpsModal() {
