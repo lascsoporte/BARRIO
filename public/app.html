@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -55,11 +55,9 @@
       return false;
     };
 
-    // Limpieza de Service Worker para asegurar que cargue la nueva versión
+    // Registrar Service Worker (necesario para PWA y push notifications)
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(registrations => {
-        for(let reg of registrations) { reg.unregister(); console.log('SW Purged'); }
-      });
+      navigator.serviceWorker.register('/sw.js').catch(e => console.warn('SW error:', e));
     }
 
     // Manejador de errores global
@@ -73,6 +71,6 @@
     };
   </script>
   
-  <script src="/js/app.js?v=9"></script>
+  <script src="/js/app.js?v=10"></script>
 </body>
 </html>
