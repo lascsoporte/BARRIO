@@ -1,4 +1,4 @@
-﻿// BARRIO - Main Application
+// BARRIO - Main Application
 const App = {
  deviceId: null,
  deferredPrompt: null,
@@ -101,6 +101,14 @@ const App = {
  }
 
   window.addEventListener('hashchange', () => this.route());
+
+  // Botón Atrás del celular: si el modal de búsqueda está abierto, cerrarlo
+  window.addEventListener('popstate', () => {
+    const searchModal = document.getElementById('searchModal');
+    if (searchModal && searchModal.classList.contains('active')) {
+      searchModal.classList.remove('active');
+    }
+  });
 
   if (!window.__barrioRenderKeepAlive) {
     window.__barrioRenderKeepAlive = true;
@@ -601,18 +609,25 @@ const App = {
   },
   showSearchModal() { 
     document.getElementById('searchModal').classList.add('active');
+    history.pushState({ modal: 'search' }, ''); // Para que el botón Atrás cierre el modal
     setTimeout(() => {
       const input = document.getElementById('searchInputModal');
-      input.focus();
+      // NO focus automático — el teclado no se abre solo en celular
       input.onkeypress = (e) => { if (e.key === 'Enter') this.doSearchModal(); };
     }, 300);
   },
-  hideSearchModal() { document.getElementById('searchModal').classList.remove('active'); },
+  hideSearchModal() {
+    document.getElementById('searchModal').classList.remove('active');
+  },
   doSearchModal() {
     const q = document.getElementById('searchInputModal').value.trim();
     if (q) {
       this.hideSearchModal();
       location.hash = `#/buscar?q=${encodeURIComponent(q)}`;
+    } else {
+      // Si no escribió nada, cerrar y volver al home
+      this.hideSearchModal();
+      location.hash = '#/';
     }
   },
   showShareMenu(fromHash = false) { 
