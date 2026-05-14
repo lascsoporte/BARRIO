@@ -1,0 +1,402 @@
+# 🖼️ GUÍA VISUAL - PASO A PASO CON IMÁGENES
+
+## 📦 PASO 1: Descargar y Extraer
+
+### 1.1 Descargar el archivo
+```
+Archivo descargado: BARRIO_COMPLETO.zip
+Ubicación: Carpeta de Descargas
+```
+
+### 1.2 Extraer el contenido
+- **Windows:** Clic derecho → "Extraer todo" → Elegir Escritorio
+- **Mac:** Doble clic sobre el ZIP → Se extrae automáticamente
+
+### 1.3 Resultado
+```
+📁 Escritorio/
+   └── 📁 BARRIO_CORREGIDO/
+        ├── 📄 LEEME_PRIMERO.txt ← Lee esto primero
+        ├── 📄 database.js (CORREGIDO)
+        ├── 📄 fix_database.js (NUEVO)
+        ├── 📄 server.js
+        ├── 📄 package.json
+        └── 📁 public/
+             ├── 📄 index.html
+             ├── 📄 app.html
+             └── 📁 js/
+                  ├── 📄 app.js
+                  ├── 📄 api.js
+                  └── 📄 admin.js
+```
+
+---
+
+## 🔄 PASO 2: Reemplazar tu carpeta antigua
+
+### 2.1 Hacer backup de seguridad
+```
+ANTES de eliminar nada:
+
+📁 Escritorio/
+   ├── 📁 BARRIO (antigua)  ← Copia esta carpeta
+   
+DESPUÉS del backup:
+
+📁 Escritorio/
+   ├── 📁 BARRIO (antigua)
+   └── 📁 BARRIO_BACKUP_ANTIGUO (copia de seguridad) ✅
+```
+
+### 2.2 Eliminar carpeta antigua
+```
+📁 Escritorio/
+   ├── 📁 BARRIO (antigua) ← Elimina esta
+   └── 📁 BARRIO_BACKUP_ANTIGUO ✅
+```
+
+### 2.3 Renombrar carpeta nueva
+```
+📁 Escritorio/
+   ├── 📁 BARRIO_CORREGIDO ← Renombra a "BARRIO"
+   └── 📁 BARRIO_BACKUP_ANTIGUO ✅
+
+RESULTADO FINAL:
+
+📁 Escritorio/
+   ├── 📁 BARRIO (corregida) ✅
+   └── 📁 BARRIO_BACKUP_ANTIGUO ✅
+```
+
+---
+
+## 💻 PASO 3: Abrir la Terminal
+
+### En Windows:
+1. Presiona la tecla `Windows` + `R`
+2. Escribe: `cmd`
+3. Presiona Enter
+
+```
+┌─────────────────────────────────────┐
+│ C:\Users\TuUsuario>_               │ ← Terminal abierta
+└─────────────────────────────────────┘
+```
+
+### En Mac:
+1. Presiona `Command` + `Espacio`
+2. Escribe: `Terminal`
+3. Presiona Enter
+
+```
+┌─────────────────────────────────────┐
+│ usuario@Mac ~ %_                    │ ← Terminal abierta
+└─────────────────────────────────────┘
+```
+
+---
+
+## 📂 PASO 4: Ir a la carpeta BARRIO
+
+### Comando para escribir:
+```bash
+cd Escritorio/BARRIO
+```
+
+### Presiona Enter
+
+### Lo que verás:
+```
+┌─────────────────────────────────────────────┐
+│ C:\Users\TuUsuario> cd Escritorio\BARRIO   │
+│ C:\Users\TuUsuario\Escritorio\BARRIO>_     │ ← Estás dentro
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 📥 PASO 5: Instalar dependencias
+
+### Comando para escribir:
+```bash
+npm install
+```
+
+### Presiona Enter
+
+### Lo que verás (esto toma 1-2 minutos):
+```
+┌─────────────────────────────────────────────┐
+│ npm install                                  │
+│                                              │
+│ added 245 packages in 48s                   │
+│                                              │
+│ 18 packages are looking for funding        │
+│   run `npm fund` for details               │
+│                                              │
+│ found 0 vulnerabilities                     │
+│                                              │
+│ C:\Users\TuUsuario\Escritorio\BARRIO>_     │
+└─────────────────────────────────────────────┘
+```
+
+✅ Cuando veas el cursor de nuevo, está listo
+
+---
+
+## 🔧 PASO 6: Reparar la base de datos
+
+### Comando para escribir:
+```bash
+node fix_database.js
+```
+
+### Presiona Enter
+
+### Lo que verás:
+```
+┌──────────────────────────────────────────────────┐
+│ 🔧 INICIANDO MIGRACIÓN DE BASE DE DATOS...      │
+│                                                   │
+│ 📦 Creando backup de seguridad...               │
+│ ✅ Backup creado: barrio_backup.db              │
+│                                                   │
+│ 🔍 Verificando estructura actual...             │
+│ ⚠️  COLUMNAS FALTANTES DETECTADAS: nickname,    │
+│     email, pin_seguridad, device_id...          │
+│                                                   │
+│ 💾 Guardando usuarios existentes...             │
+│ ✅ 3 usuario(s) encontrado(s)                   │
+│                                                   │
+│ 🗑️  Eliminando tabla antigua...                 │
+│ ✅ Tabla eliminada                               │
+│                                                   │
+│ 🏗️  Creando tabla nueva con estructura          │
+│     completa...                                  │
+│ ✅ Tabla creada con TODAS las columnas          │
+│                                                   │
+│ ♻️  Restaurando usuarios con valores            │
+│     actualizados...                              │
+│ ✅ 3 usuario(s) restaurado(s) exitosamente      │
+│                                                   │
+│ 💾 Guardando cambios en disco...                │
+│ ✅ Cambios guardados                             │
+│                                                   │
+│ 🔍 Verificando migración...                     │
+│ 📋 Columnas finales (21): id, nombre,           │
+│     telefono, direccion...                       │
+│                                                   │
+│ 👥 Total de usuarios en la base de datos: 3     │
+│                                                   │
+│ ✅ ¡MIGRACIÓN COMPLETADA EXITOSAMENTE!          │
+│                                                   │
+│ 📝 RESUMEN:                                      │
+│    ✓ Base de datos actualizada                  │
+│    ✓ Usuarios preservados                       │
+│    ✓ Todas las columnas añadidas                │
+│    ✓ Configuración inicializada                 │
+│    ✓ Backup guardado                            │
+│                                                   │
+│ 🚀 Puedes reiniciar el servidor ahora.          │
+│                                                   │
+│ C:\Users\TuUsuario\Escritorio\BARRIO>_         │
+└──────────────────────────────────────────────────┘
+```
+
+✅ Si ves esto, la reparación fue exitosa
+
+---
+
+## 🚀 PASO 7: Iniciar el servidor
+
+### Comando para escribir:
+```bash
+node server.js
+```
+
+### Presiona Enter
+
+### Lo que verás:
+```
+┌──────────────────────────────────────────────────┐
+│ 🔄 Conectando a Base de Datos en la Nube...     │
+│ ✅ ¡CONECTADO A CLEVER CLOUD!                   │
+│    (Persistencia Activa)                         │
+│ Servidor escuchando en puerto 3000              │
+│ ✅ ¡SISTEMA BARRIO INICIADO!                    │
+│ 🚀 Servidor online y base de datos lista.       │
+│                                                   │
+│ [Anti-Sleep] Activo → intervalo 7–10 min        │
+│                                                   │
+│ (El cursor ya NO aparece - está corriendo)     │
+└──────────────────────────────────────────────────┘
+```
+
+✅ ¡El servidor está corriendo!
+
+⚠️ NO CIERRES esta ventana mientras uses la app
+
+---
+
+## 🌐 PASO 8: Abrir la aplicación
+
+### Opción A: En tu computadora
+
+1. Abre tu navegador (Chrome, Firefox, Safari)
+2. En la barra de direcciones escribe:
+```
+http://localhost:3000
+```
+3. Presiona Enter
+
+### Lo que verás:
+```
+┌───────────────────────────────────────┐
+│  🏘️ BARRIO                            │
+│                                        │
+│  Selecciona tu ciudad para entrar     │
+│  a la red comunitaria.                │
+│                                        │
+│  ┌──────────────────────────────┐    │
+│  │ 📍 PUERTO MONTT          🇨🇱 │    │
+│  └──────────────────────────────┘    │
+│                                        │
+│  ¿Eres Cliente Delivery o             │
+│  comerciante?                          │
+│  [PUERTOMAS DELIVERY]                 │
+└───────────────────────────────────────┘
+```
+
+### Opción B: En tu celular (misma WiFi)
+
+1. En la terminal, busca tu dirección IP:
+   - **Windows:** escribe `ipconfig`
+   - **Mac:** escribe `ifconfig`
+   
+2. Busca algo como:
+   ```
+   IPv4: 192.168.1.100
+   ```
+
+3. En tu celular, abre el navegador y escribe:
+   ```
+   http://192.168.1.100:3000
+   ```
+
+---
+
+## ✅ VERIFICAR QUE TODO FUNCIONA
+
+### Checklist:
+
+- [ ] ✅ El servidor está corriendo (ves los mensajes en la terminal)
+- [ ] ✅ La página abre en el navegador
+- [ ] ✅ NO te pide crear cuenta nueva
+- [ ] ✅ Puedes entrar con tu usuario anterior
+- [ ] ✅ Ves tus datos guardados
+- [ ] ✅ Todas las secciones funcionan
+
+---
+
+## 🛑 DETENER EL SERVIDOR
+
+Cuando termines de usar la aplicación:
+
+1. Ve a la ventana de la Terminal
+2. Presiona `Ctrl` + `C`
+3. Verás que el cursor vuelve a aparecer
+
+```
+┌──────────────────────────────────────────────────┐
+│ ^C                                                │
+│ Servidor detenido                                 │
+│                                                   │
+│ C:\Users\TuUsuario\Escritorio\BARRIO>_          │
+└──────────────────────────────────────────────────┘
+```
+
+✅ El servidor se detuvo correctamente
+
+---
+
+## 🔄 INICIAR DE NUEVO (Días siguientes)
+
+Los siguientes días que quieras usar la app:
+
+1. Abre la Terminal
+2. Escribe:
+```bash
+cd Escritorio/BARRIO
+node server.js
+```
+3. Abre el navegador en `http://localhost:3000`
+
+⚠️ **NO necesitas volver a hacer npm install ni fix_database.js**  
+Solo se hacen una vez la primera vez.
+
+---
+
+## 📁 ARCHIVOS EN TU CARPETA BARRIO
+
+```
+📁 BARRIO/
+├── 📄 LEEME_PRIMERO.txt        ← Instrucciones simples
+├── 📄 REPARACION_USUARIOS.md   ← Detalles técnicos
+├── 📄 server.js                ← Servidor principal
+├── 📄 database.js              ← Base de datos (CORREGIDO) ✅
+├── 📄 fix_database.js          ← Script de reparación (NUEVO) ✅
+├── 📄 package.json             ← Dependencias
+├── 📄 barrio.db                ← Base de datos SQLite
+├── 📄 barrio_backup.db         ← Backup automático ✅
+└── 📁 public/                  ← Archivos web
+     ├── 📄 index.html
+     ├── 📄 app.html
+     └── 📁 js/
+          ├── 📄 app.js
+          ├── 📄 api.js
+          └── 📄 admin.js
+```
+
+---
+
+## 🆘 PROBLEMAS COMUNES
+
+### "npm: comando no encontrado"
+```
+Solución:
+1. Descarga Node.js de: https://nodejs.org
+2. Instala la versión LTS (recomendada)
+3. Reinicia la Terminal
+4. Vuelve al PASO 5
+```
+
+### "Puerto 3000 ya está en uso"
+```
+Solución:
+1. Presiona Ctrl+C en todas las terminales abiertas
+2. Cierra todas las ventanas de Terminal
+3. Abre una nueva Terminal
+4. Vuelve al PASO 7
+```
+
+### "Cannot find module"
+```
+Solución:
+1. Asegúrate de estar en la carpeta BARRIO
+2. Ejecuta: npm install
+3. Espera a que termine
+4. Vuelve al PASO 7
+```
+
+### "Base de datos bloqueada"
+```
+Solución:
+1. Cierra todas las aplicaciones que usen la base de datos
+2. Detén el servidor (Ctrl+C)
+3. Espera 5 segundos
+4. Vuelve al PASO 7
+```
+
+---
+
+**¡Listo! Tu aplicación BARRIO está corregida y funcionando** 🎉

@@ -225,9 +225,175 @@ function saveSqlite() {
 }
 
 function initSqliteTables() {
-  // Mantener lógica de SQLite para fallback local
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, telefono TEXT UNIQUE, terms_accepted INTEGER DEFAULT 0)`);
-  // ... (simplificado para fallback)
+  // Tabla completa de usuarios con TODAS las columnas necesarias
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS usuarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL,
+    telefono TEXT NOT NULL UNIQUE,
+    direccion TEXT,
+    ip TEXT,
+    device_id TEXT,
+    is_blocked INTEGER DEFAULT 0,
+    is_stolen INTEGER DEFAULT 0,
+    is_verified INTEGER DEFAULT 0,
+    terms_accepted INTEGER DEFAULT 0,
+    nickname TEXT,
+    email TEXT,
+    pin_seguridad TEXT,
+    push_enabled INTEGER DEFAULT 0,
+    last_lat REAL,
+    last_lng REAL,
+    home_lat REAL,
+    home_lng REAL,
+    baja_solicitada INTEGER DEFAULT 0,
+    baja_fecha TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS reportes_ciudadanos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id INTEGER,
+    nombre_contacto TEXT NOT NULL,
+    telefono TEXT NOT NULL,
+    tipo_reporte TEXT DEFAULT 'otros',
+    ubicacion_texto TEXT,
+    foto_base64 TEXT,
+    detalles TEXT,
+    latitud REAL,
+    longitud REAL,
+    fecha_expiracion TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS locales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL,
+    direccion TEXT,
+    horario_apertura TEXT DEFAULT '08:00',
+    horario_cierre TEXT DEFAULT '20:00',
+    dias_atencion TEXT DEFAULT 'lun-sab',
+    acepta_efectivo INTEGER DEFAULT 1,
+    acepta_tarjeta INTEGER DEFAULT 0,
+    latitud REAL NOT NULL,
+    longitud REAL NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS productos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    local_id INTEGER NOT NULL,
+    nombre TEXT NOT NULL,
+    marca TEXT,
+    precio REAL NOT NULL,
+    en_stock INTEGER DEFAULT 1,
+    unidad TEXT DEFAULT 'kg',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS servicios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tipo TEXT NOT NULL,
+    nombre_prestador TEXT NOT NULL,
+    telefono TEXT,
+    latitud REAL,
+    longitud REAL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS calificaciones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    local_id INTEGER NOT NULL,
+    estrellas INTEGER NOT NULL,
+    comentario TEXT,
+    device_id TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS mascotas_perdidas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre_contacto TEXT NOT NULL,
+    telefono TEXT NOT NULL,
+    ubicacion_extravio TEXT,
+    direccion TEXT,
+    foto_base64 TEXT,
+    tipo_animal TEXT,
+    caracteristicas TEXT,
+    nombre_mascota TEXT,
+    comentarios TEXT,
+    latitud REAL,
+    longitud REAL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS visitas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS mensajes_admin (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id INTEGER NOT NULL,
+    mensaje TEXT NOT NULL,
+    leido INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS muro_comunitario (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id INTEGER NOT NULL,
+    contenido TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS registro_emergencias (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id INTEGER NOT NULL,
+    institucion TEXT NOT NULL,
+    latitud REAL,
+    longitud REAL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS rastreo_robos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id INTEGER NOT NULL,
+    latitud REAL NOT NULL,
+    longitud REAL NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id INTEGER NOT NULL,
+    subscription_json TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  sqliteDb.run(`CREATE TABLE IF NOT EXISTS configuracion (
+    clave TEXT PRIMARY KEY,
+    valor TEXT
+  )`);
+
+  // Insertar configuraciones por defecto
+  const configs = [
+    ['admin_whatsapp', '56987606517'],
+    ['tel_carabineros', '133'],
+    ['tel_bomberos', '132'],
+    ['tel_pdi', '134'],
+    ['tel_ambulancia', '131'],
+    ['tel_seguridad', '1529'],
+    ['push_radius', '500'],
+    ['admin_pass1', 'barrio2025'],
+    ['admin_pass2', 'admin2025'],
+    ['admin_pass3', 'seguridad2025']
+  ];
+
+  for (let [clave, valor] of configs) {
+    sqliteDb.run('INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?, ?)', [clave, valor]);
+  }
+
+  saveSqlite();
 }
 
 async function cleanupMascotas() {
