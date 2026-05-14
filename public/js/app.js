@@ -1,4 +1,4 @@
-// BARRIO - Main Application
+﻿// BARRIO - Main Application
 const App = {
  deviceId: null,
  deferredPrompt: null,
@@ -719,6 +719,7 @@ const App = {
     <p style="margin-top:8px;font-size:0.85rem;color:#999;">Intenta con otra palabra o consulta más tarde.</p>
     <button class="btn btn-primary" style="margin-top:16px;" onclick="history.back()">← Volver</button>
   </div>`;
+ }
  },
 
  // ===== MASCOTAS PERDIDAS =====
