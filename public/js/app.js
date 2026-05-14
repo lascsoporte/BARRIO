@@ -356,6 +356,12 @@ const App = {
     const hash = location.hash || '#/';
     const app = document.getElementById('app');
 
+    // ✅ Siempre volver al inicio de la pantalla al cambiar de vista
+    window.scrollTo(0, 0);
+    document.getElementById('app').scrollTop = 0;
+    // Liberar bloqueo de scroll si quedó de algún modal anterior
+    document.body.classList.remove('modal-open');
+
     // Show lateral buttons only on home page
     const lateralBtns = document.querySelectorAll('.lateral-btn');
     const isHome = (hash === '#/' || hash === '');
@@ -534,10 +540,12 @@ const App = {
 
   showEmergencyMenu(fromHash = false) { 
     if (!fromHash) { location.hash = '#/emergencia-menu'; return; }
-    document.getElementById('emergencyMenu').classList.add('active'); 
+    document.getElementById('emergencyMenu').classList.add('active');
+    document.body.classList.add('modal-open');
   },
   hideEmergencyMenu() { 
     document.getElementById('emergencyMenu').classList.remove('active');
+    document.body.classList.remove('modal-open');
     if (location.hash === '#/emergencia-menu') history.back();
   },
 
@@ -609,6 +617,7 @@ const App = {
   },
   showSearchModal() { 
     document.getElementById('searchModal').classList.add('active');
+    document.body.classList.add('modal-open');
     history.pushState({ modal: 'search' }, ''); // Para que el botón Atrás cierre el modal
     setTimeout(() => {
       const input = document.getElementById('searchInputModal');
@@ -618,6 +627,7 @@ const App = {
   },
   hideSearchModal() {
     document.getElementById('searchModal').classList.remove('active');
+    document.body.classList.remove('modal-open');
   },
   doSearchModal() {
     const q = document.getElementById('searchInputModal').value.trim();
@@ -632,10 +642,12 @@ const App = {
   },
   showShareMenu(fromHash = false) { 
     if (!fromHash) { location.hash = '#/compartir'; return; }
-    document.getElementById('shareModal').classList.add('active'); 
+    document.getElementById('shareModal').classList.add('active');
+    document.body.classList.add('modal-open');
   },
   hideShareMenu() { 
     document.getElementById('shareModal').classList.remove('active');
+    document.body.classList.remove('modal-open');
     if (location.hash === '#/compartir') history.back();
   },
 

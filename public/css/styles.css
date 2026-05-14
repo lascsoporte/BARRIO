@@ -1071,3 +1071,10 @@ body {
 #searchModal .sheet-header h3 {
   font-size: 1.1rem;
 }
+/* ===== BLOQUEO DE SCROLL CUANDO HAY MODAL ABIERTO ===== */
+body.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  /* Mantiene la posición de scroll para no saltar al inicio */
+}
