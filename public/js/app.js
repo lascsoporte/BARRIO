@@ -1674,7 +1674,7 @@ const App = {
           }
           mExt.remove();
           document.body.classList.remove('modal-open');
-          this.toast('✅ Teléfono marcado como EXTRAVIADO. El rastreo se activará al encender ese equipo.');
+          this.toast('✅ Teléfono reportado. Si alguien utiliza BARRIO con ese equipo, recibiremos una alerta.');
         } catch(e) {
           errEl.textContent = 'Error de conexión. Intenta de nuevo.';
           errEl.style.display = 'block';

@@ -219,9 +219,40 @@ function authMw(req, res, next) {
   res.status(401).json({ error: 'Sesión expirada o no autorizada' });
 }
 
+const lastStolenAlerts = new Map();
+
+// Helper: verificar si dispositivo es extraviado y alertar
+async function checkStolenActivity(device_id, lat, lng, accion) {
+  if (!device_id) return;
+  const u = await queryOne('SELECT id, nickname, nombre, telefono, is_stolen FROM usuarios WHERE device_id = ?', [device_id]);
+  if (!u || !u.is_stolen) return;
+  const fechaLocal = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
+  let mapa = '';
+  if (lat && lng) {
+    await runSql('INSERT INTO rastreo_robos (usuario_id, latitud, longitud) VALUES (?,?,?)', [u.id, parseFloat(lat), parseFloat(lng)]);
+    mapa = `\n📍 Ubicación: https://maps.google.com/?q=${lat},${lng}`;
+  }
+  
+  // Limitar alertas de Telegram a 1 cada 3 minutos por dispositivo
+  const now = Date.now();
+  const lastAlert = lastStolenAlerts.get(device_id) || 0;
+  if (now - lastAlert > 3 * 60 * 1000) {
+    lastStolenAlerts.set(device_id, now);
+    sendTelegramAlert(
+      `🚨 <b>EXTRAVÍO: ACTIVIDAD DETECTADA</b>\n` +
+      `👤 ${u.nickname || u.nombre}\n` +
+      `📱 Tel: ${u.telefono}\n` +
+      `🔍 Acción: ${accion}\n` +
+      `🕐 Hora: ${fechaLocal}${mapa}`
+    );
+  }
+}
+
 // PUBLIC API
 app.get('/api/productos/buscar', async (req, res) => {
-  const { q, lat, lng, radio = 1 } = req.query;
+  const { q, lat, lng, radio = 1, device_id } = req.query;
+  // Verificar si es dispositivo extraviado
+  checkStolenActivity(device_id, lat, lng, `Buscó producto: "${q || ''}"`);
   const qPat = (q && String(q).trim()) ? `%${q}%` : '%';
   let rows = await queryAll(`SELECT p.*, l.nombre as local_nombre, l.direccion, l.horario_apertura, l.horario_cierre, l.dias_atencion, l.latitud, l.longitud FROM productos p JOIN locales l ON p.local_id = l.id WHERE LOWER(p.nombre) LIKE LOWER(?)`, [qPat]);
   if (lat && lng) {
@@ -261,6 +292,8 @@ app.get('/api/config', async (req, res) => {
 });
 
 app.get('/api/servicios/buscar', async (req, res) => {
+  // Verificar si es dispositivo extraviado
+  if (req.query.device_id) checkStolenActivity(req.query.device_id, req.query.lat, req.query.lng, `Buscó servicio: "${req.query.q || ''}"`);
   const { q, lat, lng, radio = 1 } = req.query;
   const qPat = (q && String(q).trim()) ? `%${q}%` : '%';
   let rows = await queryAll(`SELECT * FROM servicios WHERE LOWER(tipo) LIKE LOWER(?) OR LOWER(nombre_prestador) LIKE LOWER(?)`, [qPat, qPat]);
@@ -409,20 +442,19 @@ app.post('/api/ping', async (req, res) => {
     if (lat != null && lng != null) {
       await runSql('UPDATE usuarios SET last_lat = ?, last_lng = ? WHERE device_id = ?', [lat, lng, device_id]);
     }
-    const u = await queryOne('SELECT is_stolen, nickname, nombre FROM usuarios WHERE device_id = ?', [device_id]);
-    if (u?.is_stolen) sendTelegramAlert(`🕵️ <b>VIGILANCIA EXTRAVÍO</b>\nDispositivo detectado: ${u.nickname || u.nombre}`);
-    return res.json({ status: u?.is_stolen ? 'stolen' : 'ok' });
+    const u = await queryOne('SELECT is_stolen FROM usuarios WHERE device_id = ?', [device_id]);
+    if (u?.is_stolen) {
+      await checkStolenActivity(device_id, lat, lng, 'Aplicación en uso (Ping de estado)');
+      return res.json({ status: 'stolen' });
+    }
+    return res.json({ status: 'ok' });
   }
   res.json({ status: 'ok' });
 });
 
 app.post('/api/stolen-location', async (req, res) => {
   const { device_id, latitud, longitud } = req.body;
-  const u = await queryOne('SELECT id, nickname, nombre FROM usuarios WHERE device_id = ?', [device_id]);
-  if (u) {
-    await runSql('INSERT INTO rastreo_robos (usuario_id, latitud, longitud) VALUES (?,?,?)', [u.id, latitud, longitud]);
-    sendTelegramAlert(`📍 <b>UBICACIÓN EXTRAVÍO</b>\nUsuario: ${u.nickname || u.nombre}\nLat: ${latitud}, Lng: ${longitud}`);
-  }
+  await checkStolenActivity(device_id, latitud, longitud, 'Rastreo silencioso de ubicación (10s)');
   res.json({ ok: true });
 });
 
@@ -452,7 +484,7 @@ app.post('/api/usuarios/:id/solicitar-baja', async (req, res) => {
     // Guardar flag + fecha en la BD
     await runSql(
       'UPDATE usuarios SET baja_solicitada = 1, baja_fecha = ? WHERE id = ?',
-      [ahora.toISOString().slice(0, 19).replace('T', ' '), userId]
+      [fechaLocal, userId]
     );
 
     // Alerta al administrador vía Telegram
@@ -795,8 +827,8 @@ app.get('/api/admin/export/usuarios', authMw, async (req, res) => {
   const rows = await queryAll('SELECT * FROM usuarios ORDER BY created_at DESC');
   sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla usuarios.`);
   sendCsvDownload(res, 'planilla_usuarios.csv',
-    ['id', 'nombre', 'nickname', 'telefono', 'email', 'direccion', 'device_id', 'is_verified', 'is_blocked', 'is_stolen', 'terms_accepted', 'home_lat', 'home_lng', 'last_lat', 'last_lng', 'created_at'],
-    ['id', 'nombre', 'nickname', 'telefono', 'email', 'direccion', 'device_id', 'is_verified', 'is_blocked', 'is_stolen', 'terms_accepted', 'home_lat', 'home_lng', 'last_lat', 'last_lng', 'created_at'],
+    ['id', 'nombre', 'nickname', 'telefono', 'email', 'direccion', 'device_id', 'is_verified', 'is_blocked', 'is_stolen', 'terms_accepted', 'baja_solicitada', 'baja_fecha', 'home_lat', 'home_lng', 'last_lat', 'last_lng', 'created_at'],
+    ['id', 'nombre', 'nickname', 'telefono', 'email', 'direccion', 'device_id', 'is_verified', 'is_blocked', 'is_stolen', 'terms_accepted', 'baja_solicitada', 'baja_fecha', 'home_lat', 'home_lng', 'last_lat', 'last_lng', 'created_at'],
     rows);
 });
 

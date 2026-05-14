@@ -61,7 +61,8 @@ const API = {
 
   // Public endpoints
   searchProducts(q, lat, lng, radio = 1) {
-    let url = `/api/productos/buscar?q=${encodeURIComponent(q)}`;
+    const did = localStorage.getItem('barrio_device_id') || '';
+    let url = `/api/productos/buscar?q=${encodeURIComponent(q)}&device_id=${encodeURIComponent(did)}`;
     if (lat && lng) url += `&lat=${lat}&lng=${lng}&radio=${radio}`;
     return this.get(url);
   },
@@ -69,7 +70,8 @@ const API = {
   getStore(id) { return this.get(`/api/locales/${id}`); },
 
   searchServices(q, lat, lng, radio = 1) {
-    let url = `/api/servicios/buscar?q=${encodeURIComponent(q || '')}`;
+    const did = localStorage.getItem('barrio_device_id') || '';
+    let url = `/api/servicios/buscar?q=${encodeURIComponent(q || '')}&device_id=${encodeURIComponent(did)}`;
     if (lat && lng) url += `&lat=${lat}&lng=${lng}&radio=${radio}`;
     return this.get(url);
   },
