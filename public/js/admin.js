@@ -15,6 +15,17 @@ const Admin = {
       .replace(/"/g, '&quot;');
   },
 
+  formatDate(d) {
+    if (!d) return '—';
+    try {
+      const date = new Date(d);
+      if (isNaN(date)) return this.esc(d); // Si no es fecha válida, devolver tal cual
+      return date.toLocaleString('es-CL', { timeZone: 'America/Santiago' });
+    } catch(e) {
+      return this.esc(d);
+    }
+  },
+
   trunc(s, n = 120) {
     const t = s == null ? '' : String(s);
     return t.length <= n ? t : t.slice(0, n) + '…';
@@ -316,7 +327,7 @@ const Admin = {
             <td>${this.esc(p.precio)}</td>
             <td>${this.yn(p.en_stock)}</td>
             <td>${this.esc(p.unidad)}</td>
-            <td>${this.esc(p.created_at)}</td>
+            <td>${this.formatDate(p.created_at)}</td>
           </tr>`
             )
             .join('')}
@@ -350,9 +361,9 @@ const Admin = {
             <td>${this.yn(u.is_stolen)}</td>
             <td>${this.yn(u.terms_accepted)}</td>
             <td>${this.mapBtn(u.last_lat, u.last_lng)}</td>
-            <td>${this.esc(u.created_at)}</td>
+            <td>${this.formatDate(u.created_at)}</td>
             <td style="${u.baja_solicitada ? 'background:#FFEBEE;color:#D32F2F;font-weight:900;' : ''}">${u.baja_solicitada ? '⚠️ SÍ' : 'No'}</td>
-            <td style="${u.baja_solicitada ? 'background:#FFEBEE;color:#D32F2F;font-size:11px;' : 'color:#999;font-size:11px;'}">${this.esc(u.baja_fecha || '—')}</td>
+            <td style="${u.baja_solicitada ? 'background:#FFEBEE;color:#D32F2F;font-size:11px;' : 'color:#999;font-size:11px;'}">${this.formatDate(u.baja_fecha)}</td>
             <td class="admin-muted">${this.esc((u.device_id || '').slice(0, 24))}</td>
             <td style="white-space:nowrap;">
               <button class="admin-action-btn btn-verify" data-id="${u.id}" data-val="${u.is_verified ? 1 : 0}" title="${u.is_verified ? 'Quitar verificación' : 'Verificar usuario'}" style="background:${u.is_verified ? '#4CAF50' : '#9E9E9E'};color:white;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem;margin:2px;">
@@ -449,7 +460,7 @@ const Admin = {
             .map(
               (m) => `<tr>
             <td>${this.esc(m.id)}</td>
-            <td>${this.esc(m.created_at)}</td>
+            <td>${this.formatDate(m.created_at)}</td>
             <td>${this.esc(m.autor)}</td>
             <td>${this.esc(m.autor_telefono)}</td>
             <td>${this.esc(this.trunc(m.contenido, 200))}</td>
@@ -477,7 +488,7 @@ const Admin = {
             .map(
               (m) => `<tr>
             <td>${this.esc(m.id)}</td>
-            <td>${this.esc(m.created_at)}</td>
+            <td>${this.formatDate(m.created_at)}</td>
             <td>${this.esc(m.nombre)}</td>
             <td>${this.esc(m.telefono)}</td>
             <td>${this.yn(m.leido)}</td>
@@ -506,7 +517,7 @@ const Admin = {
             .map(
               (r) => `<tr>
             <td>${this.esc(r.id)}</td>
-            <td>${this.esc(r.created_at)}</td>
+            <td>${this.formatDate(r.created_at)}</td>
             <td>${this.esc(r.nombre)}</td>
             <td>${this.esc(r.telefono)}</td>
             <td>${this.esc(r.latitud)}</td>
@@ -539,7 +550,7 @@ const Admin = {
             .map(
               (r) => `<tr>
             <td>${this.esc(r.id)}</td>
-            <td>${this.esc(r.created_at)}</td>
+            <td>${this.formatDate(r.created_at)}</td>
             <td>${this.esc(r.tipo_reporte)}</td>
             <td>${this.esc(this.trunc(r.detalles, 120))}</td>
             <td>${this.esc(this.trunc(r.ubicacion_texto, 80))}</td>
@@ -584,7 +595,7 @@ const Admin = {
             .map(
               (e) => `<tr>
             <td>${this.esc(e.id)}</td>
-            <td>${this.esc(e.created_at)}</td>
+            <td>${this.formatDate(e.created_at)}</td>
             <td>${this.esc(e.nombre)}</td>
             <td>${this.esc(e.telefono)}</td>
             <td><b>${this.esc(e.institucion)}</b></td>
