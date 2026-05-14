@@ -102,12 +102,46 @@ const App = {
 
   window.addEventListener('hashchange', () => this.route());
 
-  // Botón Atrás del celular: si el modal de búsqueda está abierto, cerrarlo
-  window.addEventListener('popstate', () => {
-    const searchModal = document.getElementById('searchModal');
-    if (searchModal && searchModal.classList.contains('active')) {
-      searchModal.classList.remove('active');
+  // Sistema de navegación con botón retroceder del celular
+  window.addEventListener('popstate', (event) => {
+    // 1. Si hay modal abierto, cerrarlo primero
+    const modals = [
+      'searchModal',
+      'emergencyMenu',
+      'shareMenu'
+    ];
+    
+    for (const modalId of modals) {
+      const modal = document.getElementById(modalId);
+      if (modal && (modal.classList.contains('active') || modal.classList.contains('open'))) {
+        modal.classList.remove('active', 'open');
+        event.preventDefault();
+        // Pushear estado para que próximo back cierre el modal, no la página
+        history.pushState({ page: location.hash }, '', location.hash);
+        return;
+      }
     }
+    
+    // 2. Si hay modal de eliminación de cuenta, cerrarlo
+    const deleteModal = document.querySelector('.auth-overlay');
+    if (deleteModal) {
+      deleteModal.remove();
+      event.preventDefault();
+      history.pushState({ page: location.hash }, '', location.hash);
+      return;
+    }
+    
+    // 3. Si NO estamos en home, ir a home
+    const currentHash = location.hash || '#/';
+    if (currentHash !== '#/' && currentHash !== '') {
+      event.preventDefault();
+      location.hash = '#/';
+      history.pushState({ page: '#/' }, '', '#/');
+      return;
+    }
+    
+    // 4. Si estamos en home, permitir salir de la app
+    // (el navegador maneja esto automáticamente)
   });
 
   if (!window.__barrioRenderKeepAlive) {
@@ -393,9 +427,9 @@ const App = {
         <div style="font-size:1.2rem; margin-top:5px;">🇨🇱</div>
       </header>
 
-      <div id="homeMap" style="height: 200px; width: 100%; border-radius: 16px; margin: 10px 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
+      <div id="homeMap" style="height: 244px; width: 100%; border-radius: 16px; margin: 10px 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
 
-      <div class="qa-grid" style="margin-top: 10px;">
+      <div class="qa-grid" style="margin-top: 5px;">
         <div class="qa-item" style="background: #D32F2F; color:white;" onclick="location.hash='#/emergencia-menu'">
           <div class="qa-icon">📞</div>
           <div class="qa-text" style="font-weight:900;">EMERGENCIA</div>
@@ -414,10 +448,10 @@ const App = {
         </div>
       </div>
 
-      <div style="margin-top:15px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px;">
-        <p style="font-size:0.8rem; color:var(--text-light); margin-bottom:0;">📍 <b>Georreferencia activa</b> para seguridad ciudadana.</p>
-        <button onclick="App.showShareMenu()" style="background:#673AB7; color:white; border:none; padding:10px 25px; border-radius:25px; font-weight:900; font-size:0.9rem; cursor:pointer; width:80%; max-width:250px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">COMPARTIR APP</button>
-        <div id="installBanner" style="display:none; width:100%; max-width:400px; background:linear-gradient(135deg,#FF6B35,#E55A25); border-radius:16px; padding:14px 18px; box-shadow:0 4px 15px rgba(255,107,53,0.35); text-align:left;">
+      <div style="margin-top:8px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:8px;">
+        <p style="font-size:0.8rem; color:var(--text-light); margin-bottom:0; padding:5px 0; line-height:1.2;">📍 <b>Georreferencia activa</b> para seguridad ciudadana.</p>
+        <button onclick="App.showShareMenu()" style="background:#673AB7; color:white; border:none; padding:6px 25px; border-radius:25px; font-weight:900; font-size:0.9rem; cursor:pointer; width:80%; max-width:250px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">COMPARTIR APP</button>
+        <div id="installBanner" style="display:none; width:100%; max-width:400px; background:linear-gradient(135deg,#FF6B35,#E55A25); border-radius:16px; padding:10px 18px; box-shadow:0 4px 15px rgba(255,107,53,0.35); text-align:left; margin-top:8px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
             <div>
               <div style="color:white; font-weight:900; font-size:1rem;">📲 ¡Instala BARRIO!</div>
@@ -734,7 +768,6 @@ const App = {
     <p style="font-size:0.85rem; color:#666; margin-bottom:15px;">Fija el punto en el mapa y selecciona el tipo de reporte. <b>Tu identidad pública será protegida con tu Nickname.</b></p>
     
     <div class="report-grid">
-      <button class="report-opt" data-tipo="extravío">🚨 Extravío</button>
       <button class="report-opt" data-tipo="accidente">🚗 Choque</button>
       <button class="report-opt" data-tipo="incendio">🔥 Incendio</button>
       <button class="report-opt" data-tipo="sospechoso">👤 Sospechoso</button>
@@ -807,7 +840,6 @@ const App = {
     
     // Duraciones predeterminadas por tipo
     const duracionesPorTipo = {
-      'extravío': 24,        // 24 horas
       'accidente': 4,    // 4 horas
       'incendio': 4,     // 4 horas
       'sospechoso': 5,   // 5 horas
@@ -889,12 +921,12 @@ const App = {
 
  footerHtml() {
  return `
- <footer class="legal-footer" style="margin-top: 15px; padding: 10px; text-align: center; border-top: 1px solid rgba(0,0,0,0.08);">
- <p style="font-size: 0.7rem; color: var(--text-light); margin: 0;">
+ <footer class="legal-footer" style="margin-top: 0px; padding: 5px 10px; text-align: center; border-top: 1px solid rgba(0,0,0,0.08); position: relative;">
+ <p style="font-size: 0.65rem; color: var(--text-light); margin: 0;">
  &copy; 2026 BARRIO - PUERTOMAS SPA | 
  <a href="#/legal" style="color:var(--primary); text-decoration:underline; cursor:pointer;">Aviso Legal</a>
  </p>
- <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); margin-top: 5px; text-align: right;">v2.1 Stable</div>
+ <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); position: absolute; right: 8px; bottom: 5px;">v2.3</div>
  </footer>
  `;
  },
@@ -972,6 +1004,7 @@ const App = {
 
    // Primera confirmación
    const modal1 = document.createElement('div');
+   modal1.className = 'auth-overlay';  // Clase para que sea detectada por popstate
    modal1.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;';
    modal1.innerHTML = `
      <div style="background:white;border-radius:20px;padding:30px 25px;max-width:360px;width:100%;text-align:center;border-top:6px solid #D32F2F;">
@@ -983,6 +1016,7 @@ const App = {
      </div>`;
    document.body.appendChild(modal1);
    document.body.classList.add('modal-open');
+   history.pushState({ modal: 'deleteAccount' }, '');  // Para que el back button cierre el modal
 
    modal1.querySelector('#btnBajaCancelar').addEventListener('click', () => {
      modal1.remove(); document.body.classList.remove('modal-open');
@@ -993,6 +1027,7 @@ const App = {
 
      // Segunda confirmación — más directa
      const modal2 = document.createElement('div');
+     modal2.className = 'auth-overlay';  // Clase para que sea detectada por popstate
      modal2.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:20001;display:flex;align-items:center;justify-content:center;padding:20px;';
      modal2.innerHTML = `
        <div style="background:white;border-radius:20px;padding:30px 25px;max-width:360px;width:100%;text-align:center;border-top:6px solid #D32F2F;">
@@ -1003,6 +1038,7 @@ const App = {
          <button id="btnBajaCancelar2" style="width:100%;background:transparent;border:none;color:#999;font-size:0.9rem;cursor:pointer;padding:8px;">No, quiero quedarme</button>
        </div>`;
      document.body.appendChild(modal2);
+     history.pushState({ modal: 'deleteAccountFinal' }, '');  // Para que el back button cierre el modal
 
      modal2.querySelector('#btnBajaCancelar2').addEventListener('click', () => {
        modal2.remove(); document.body.classList.remove('modal-open');
@@ -1372,30 +1408,82 @@ const App = {
  },
 
   async iniciarReporteExtravio() {
-    const num = prompt('Por seguridad, ingresa el NÚMERO DE TELÉFONO que extraviaste (Formato: +569XXXXXXXX):');
-    if (!num) return;
-    const phoneRegex = /^\+\d{11}$/;
-    if (!phoneRegex.test(num.replace(/\s+/g, ''))) {
-      return alert('Formato inválido. Debe comenzar con + y tener 11 números (Ej: +56912345678)');
-    }
-    this.requireAuth(async (user) => {
-      try {
-        await Geo.getUserLocation().catch(() => {});
-        const lat = Geo.userLat;
-        const lng = Geo.userLng;
-        if (lat && lng) API.ping(this.deviceId, lat, lng).catch(() => {});
-        const refGps = (lat && lng)
-          ? `\n📍 Ubicación del Denunciante: https://maps.google.com/?q=${lat},${lng}`
-          : '\n📍 Ubicación del Denunciante: No disponible (GPS desactivado)';
-        await API.reportarExtravio({
-          reporting_user_id: user.id,
-          reported_phone: num,
-          mensaje_extra: refGps
-        });
-        alert('✅ Teléfono marcado como EXTRAVIADO. El rastreo se activará al abrir la app en ese equipo y la ubicación se mostrará en el mapa del administrador.');
-      } catch(e) {
-        this.toast('Error al reportar extravío: ' + (e.message || ''));
+    // Crear modal personalizado para ingresar teléfono
+    const modal = document.createElement('div');
+    modal.className = 'auth-overlay';
+    modal.style.zIndex = '10000';
+    modal.innerHTML = `
+    <div class="auth-modal fade-in" style="max-width: 400px;">
+      <button class="auth-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
+      <div style="font-size:2.5rem; margin-bottom:10px;">📱</div>
+      <h2 style="text-transform:uppercase; letter-spacing:1px; font-size:1.3rem;">Reportar Teléfono Extraviado</h2>
+      <p style="font-size:0.85rem; color:var(--text-light); margin-bottom:15px;">Por seguridad, ingresa el número de teléfono que extraviaste.</p>
+      
+      <div class="form-group">
+        <label style="display:block; margin-bottom:5px; font-weight:bold; font-size:0.9rem;">Número de Teléfono</label>
+        <input 
+          type="tel" 
+          id="phoneExtraviado" 
+          placeholder="+56912345678"
+          autocomplete="off"
+          autocorrect="off"
+          spellcheck="false"
+          data-form-type="other"
+          inputmode="tel"
+          style="width:100%; padding:12px; border-radius:8px; border:1px solid #CCC; font-size:1rem; font-family:Nunito,sans-serif;"
+        >
+        <small style="color:#666; font-size:0.75rem;">Formato: +569XXXXXXXX (11 dígitos)</small>
+      </div>
+      
+      <button id="btnConfirmarExtravio" class="btn btn-primary" style="width:100%; margin-top:15px; background:#D32F2F; font-weight:900;">CONFIRMAR EXTRAVÍO</button>
+    </div>
+    `;
+    
+    document.body.appendChild(modal);
+    document.getElementById('phoneExtraviado').focus();
+    
+    // Permitir enviar con Enter
+    document.getElementById('phoneExtraviado').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('btnConfirmarExtravio').click();
       }
+    });
+    
+    document.getElementById('btnConfirmarExtravio').addEventListener('click', async () => {
+      const num = document.getElementById('phoneExtraviado').value.trim();
+      
+      if (!num) {
+        alert('Por favor ingresa un número de teléfono');
+        return;
+      }
+      
+      const phoneRegex = /^\+\d{11}$/;
+      if (!phoneRegex.test(num.replace(/\s+/g, ''))) {
+        alert('Formato inválido. Debe comenzar con + y tener 11 números (Ej: +56912345678)');
+        return;
+      }
+      
+      modal.remove();
+      
+      this.requireAuth(async (user) => {
+        try {
+          await Geo.getUserLocation().catch(() => {});
+          const lat = Geo.userLat;
+          const lng = Geo.userLng;
+          if (lat && lng) API.ping(this.deviceId, lat, lng).catch(() => {});
+          const refGps = (lat && lng)
+            ? `\n📍 Ubicación del Denunciante: https://maps.google.com/?q=${lat},${lng}`
+            : '\n📍 Ubicación del Denunciante: No disponible (GPS desactivado)';
+          await API.reportarExtravio({
+            reporting_user_id: user.id,
+            reported_phone: num,
+            mensaje_extra: refGps
+          });
+          alert('✅ Teléfono marcado como EXTRAVIADO. El sistema de ubicación se activará al abrir la app en ese equipo y la ubicación se mostrará en el mapa del administrador.');
+        } catch(e) {
+          this.toast('Error al reportar extravío: ' + (e.message || ''));
+        }
+      });
     });
   },
 
