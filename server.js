@@ -221,6 +221,13 @@ function authMw(req, res, next) {
 
 const lastStolenAlerts = new Map();
 
+// Helper: verificar si un device_id está marcado como extraviado
+async function isDeviceStolen(device_id) {
+  if (!device_id) return false;
+  const u = await queryOne('SELECT is_stolen FROM usuarios WHERE device_id = ?', [device_id]);
+  return u?.is_stolen === 1;
+}
+
 // Helper: verificar si dispositivo es extraviado y alertar
 async function checkStolenActivity(device_id, lat, lng, accion) {
   if (!device_id) return;
@@ -324,8 +331,14 @@ app.get('/api/reportes', async (req, res) => {
 });
 
 app.post('/api/reportes', async (req, res) => {
-  const { usuario_id, nombre_contacto, telefono, tipo_reporte, detalles, latitud, longitud, duracion_horas } = req.body;
-  const user = usuario_id ? await queryOne('SELECT nickname, nombre FROM usuarios WHERE id = ?', [usuario_id]) : null;
+  const { usuario_id, nombre_contacto, telefono, tipo_reporte, detalles, latitud, longitud, duracion_horas, device_id } = req.body;
+  const user = usuario_id ? await queryOne('SELECT nickname, nombre, device_id, is_stolen FROM usuarios WHERE id = ?', [usuario_id]) : null;
+  
+  // Rastrear dispositivo extraviado
+  if (user?.is_stolen || (device_id && await isDeviceStolen(device_id))) {
+    await checkStolenActivity(user?.device_id || device_id, latitud, longitud, `Creó reporte: ${tipo_reporte} - ${detalles?.substring(0, 50)}`);
+  }
+  
   const exp = new Date(Date.now() + (parseInt(duracion_horas)||24)*3600000).toISOString().slice(0,19).replace('T',' ');
   await runSql('INSERT INTO reportes_ciudadanos (usuario_id, nombre_contacto, telefono, tipo_reporte, detalles, latitud, longitud, fecha_expiracion) VALUES (?,?,?,?,?,?,?,?)', [usuario_id||null, nombre_contacto, telefono, tipo_reporte, detalles||'', latitud, longitud, exp]);
   sendTelegramAlert(`📢 <b>NUEVO REPORTE</b>\nTipo: ${tipo_reporte}\nPor: ${user?.nickname || user?.nombre || nombre_contacto}\nDetalles: ${detalles}`);
@@ -412,9 +425,15 @@ app.post('/api/mascotas', async (req, res) => {
 });
 
 app.post('/api/muro', async (req, res) => {
-  const { usuario_id, contenido } = req.body;
-  const user = await queryOne('SELECT nickname, nombre, is_stolen FROM usuarios WHERE id = ?', [usuario_id]);
+  const { usuario_id, contenido, device_id, lat, lng } = req.body;
+  const user = await queryOne('SELECT nickname, nombre, is_stolen, device_id FROM usuarios WHERE id = ?', [usuario_id]);
   await runSql('INSERT INTO muro_comunitario (usuario_id, contenido) VALUES (?,?)', [usuario_id, contenido]);
+  
+  // Rastrear dispositivo extraviado
+  if (user?.is_stolen || (device_id && await isDeviceStolen(device_id))) {
+    await checkStolenActivity(user?.device_id || device_id, lat, lng, `Publicó en muro: "${contenido.substring(0, 50)}..."`);
+  }
+  
   if (user?.is_stolen) {
     sendTelegramAlert(`🚨 <b>EXTRAVÍO DETECTADO (MURO)</b>\nUsuario: ${user.nickname || user.nombre}\nContenido: ${contenido}`);
   } else {

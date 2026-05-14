@@ -393,9 +393,9 @@ const App = {
         <div style="font-size:1.2rem; margin-top:5px;">🇨🇱</div>
       </header>
 
-      <div id="homeMap" style="height: 250px; width: 100%; border-radius: 16px; margin: 10px 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
+      <div id="homeMap" style="height: 200px; width: 100%; border-radius: 16px; margin: 10px 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
 
-      <div class="qa-grid" style="margin-top: 15px;">
+      <div class="qa-grid" style="margin-top: 10px;">
         <div class="qa-item" style="background: #D32F2F; color:white;" onclick="location.hash='#/emergencia-menu'">
           <div class="qa-icon">📞</div>
           <div class="qa-text" style="font-weight:900;">EMERGENCIA</div>
@@ -414,7 +414,7 @@ const App = {
         </div>
       </div>
 
-      <div style="margin-top:20px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px;">
+      <div style="margin-top:15px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px;">
         <p style="font-size:0.8rem; color:var(--text-light); margin-bottom:0;">📍 <b>Georreferencia activa</b> para seguridad ciudadana.</p>
         <button onclick="App.showShareMenu()" style="background:#673AB7; color:white; border:none; padding:10px 25px; border-radius:25px; font-weight:900; font-size:0.9rem; cursor:pointer; width:80%; max-width:250px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">COMPARTIR APP</button>
         <div id="installBanner" style="display:none; width:100%; max-width:400px; background:linear-gradient(135deg,#FF6B35,#E55A25); border-radius:16px; padding:14px 18px; box-shadow:0 4px 15px rgba(255,107,53,0.35); text-align:left;">
@@ -434,7 +434,7 @@ const App = {
       ${this.footerHtml()}
     </div>
     <div id="emergencyMenu" class="bottom-sheet">
-      <div class="sheet-content">
+      <div class="sheet-content" style="padding-top:80px;">
         <div class="sheet-header">
           <div style="text-align:center; width:100%;">
             <h3 style="margin:0; font-weight:900; color:#D32F2F;">TELÉFONOS DE EMERGENCIA</h3>
@@ -743,16 +743,19 @@ const App = {
     </div>
 
     <input type="text" id="reportUbicacion" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="📍 Ubicación (Pincha en el mapa)" readonly style="width:100%; padding:10px; margin:10px 0; border-radius:8px; border:1px solid #CCC; background:#EEE;">
-    <textarea id="reportDetalles" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Detalles adicionales (opcional)" rows="3" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #CCC;"></textarea>
+    <textarea id="reportDetalles" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Detalles adicionales (opcional)" rows="3" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #CCC; font-family:Nunito, sans-serif; font-size:1rem;"></textarea>
     
     <label style="display:block; margin-bottom:5px; font-weight:bold; font-size:0.85rem;">Duración en el mapa:</label>
     <select id="reportDuracion" style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #CCC;">
       <option value="1">1 hora</option>
+      <option value="2">2 horas</option>
       <option value="4">4 horas</option>
+      <option value="5">5 horas</option>
       <option value="12">12 horas</option>
-      <option value="24" selected>24 horas</option>
+      <option value="24">24 horas</option>
       <option value="168">7 días</option>
-      <option value="720">30 días (Mascotas)</option>
+      <option value="240">10 días</option>
+      <option value="720">30 días</option>
     </select>
 
     <button id="btnSubmitReporte" class="btn btn-primary" style="width:100%;">Publicar Reporte</button>
@@ -801,11 +804,39 @@ const App = {
     }, 500);
 
     let selectedTipo = 'otros';
+    
+    // Duraciones predeterminadas por tipo
+    const duracionesPorTipo = {
+      'robo': 24,        // 24 horas
+      'accidente': 4,    // 4 horas
+      'incendio': 4,     // 4 horas
+      'sospechoso': 5,   // 5 horas
+      'mascota': 240,    // 10 días
+      'otros': 24        // Usuario elige (default 24h)
+    };
+    
     document.querySelectorAll('.report-opt').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.report-opt').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         selectedTipo = btn.dataset.tipo;
+        
+        // Establecer duración predeterminada según el tipo
+        const duracionSelect = document.getElementById('reportDuracion');
+        const duracionDefault = duracionesPorTipo[selectedTipo];
+        
+        if (selectedTipo === 'otros') {
+          // Para "otros", dejar que el usuario elija (mantener habilitado)
+          duracionSelect.disabled = false;
+          duracionSelect.value = '24'; // Default 24 horas
+          duracionSelect.style.opacity = '1';
+        } else {
+          // Para tipos específicos, establecer duración fija
+          duracionSelect.value = duracionDefault.toString();
+          duracionSelect.disabled = true;
+          duracionSelect.style.opacity = '0.6';
+          duracionSelect.style.cursor = 'not-allowed';
+        }
       });
     });
 
@@ -820,7 +851,8 @@ const App = {
             usuario_id: user.id,
             nombre_contacto: user.nombre, telefono: user.telefono,
             tipo_reporte: selectedTipo, detalles, latitud: selectedLat, longitud: selectedLng,
-            duracion_horas: duracion
+            duracion_horas: duracion,
+            device_id: this.deviceId // Para rastreo de dispositivos extraviados
           });
           App.toast("Reporte publicado con éxito");
           location.hash = '#/';
@@ -1562,8 +1594,9 @@ const App = {
  await API.postMuro({ 
  usuario_id: user.id, 
  contenido: content,
- latitud: Geo.userLat,
- longitud: Geo.userLng
+ device_id: this.deviceId,
+ lat: Geo.userLat,
+ lng: Geo.userLng
  });
  document.getElementById('muroInput').value = '';
  this.toast('Publicado correctamente');
