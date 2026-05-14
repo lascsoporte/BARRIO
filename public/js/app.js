@@ -121,7 +121,7 @@ const App = {
   const steps = [];
 
   // Paso 1: GPS (si no está activado ni descartado)
-  if (!Geo.userLat && !localStorage.getItem('barrio_gps_dismissed')) {
+  if (!Geo.userLat && !localStorage.getItem('barrio_gps_dismissed') && !localStorage.getItem('barrio_gps_active')) {
     steps.push(() => new Promise(resolve => {
       this._showOnboardingGps(resolve);
     }));
@@ -134,8 +134,10 @@ const App = {
     }));
   }
 
-  // Paso 3: Instalar app (si el navegador lo permite y no fue descartado)
-  if (!localStorage.getItem('barrio_install_dismissed')) {
+  // Paso 3: Instalar app (si no fue descartado recientemente y no está en standalone)
+  const installDismissed = localStorage.getItem('barrio_install_dismissed');
+  const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (!installDismissed && !isStandaloneMode) {
     steps.push(() => new Promise(resolve => {
       this._showOnboardingInstall(resolve);
     }));
@@ -173,6 +175,7 @@ const App = {
     try {
       await Geo.getUserLocation();
       clearTimeout(safetyTimeout);
+      localStorage.setItem('barrio_gps_active', '1'); // No volver a pedir
       App.toast('GPS Activado ✅');
       modal.remove(); done();
     } catch(e) {
@@ -263,7 +266,7 @@ const App = {
           App.toast('✅ Alertas activadas correctamente');
         } catch(e) {
           console.error('❌ Error suscripción push:', e);
-          App.toast('No se pudieron activar las alertas');
+          App.toast('Alertas no activadas, podu00e1s habilitarlas mu00e1s tarde');
           localStorage.setItem('barrio_push_enabled', 'denied_temp');
         }
       } else {
@@ -296,8 +299,8 @@ const App = {
       <h2 style="color:#FF6B35;font-weight:900;margin-bottom:10px;">¡Instala BARRIO!</h2>
       <p style="color:#555;font-size:0.9rem;line-height:1.5;margin-bottom:8px;">Agrega la app a la pantalla de inicio de tu teléfono para acceder rápidamente sin abrir el navegador.</p>
       <p style="font-size:0.8rem;color:#888;margin-bottom:20px;">Solo toma un segundo y no ocupa casi espacio.</p>
-      <button id="btnInstallOnboarding" class="btn btn-primary" style="width:100%;margin-bottom:10px;font-weight:900;background:#FF6B35;height:50px;" ${App.deferredPrompt ? '' : 'style="display:none"'}>INSTALAR EN MI TELÉFONO</button>
-      <div id="installManualHint" style="${App.deferredPrompt ? 'display:none' : ''}background:#FFF8F5;border-radius:12px;padding:12px;margin-bottom:15px;font-size:0.82rem;color:#555;text-align:left;">
+      <button id="btnInstallOnboarding" class="btn btn-primary" style="width:100%;margin-bottom:10px;font-weight:900;background:#FF6B35;height:50px;" >INSTALAR EN MI TELÉFONO</button>
+      <div id="installManualHint" style="background:#FFF8F5;border-radius:12px;padding:12px;margin-bottom:15px;font-size:0.82rem;color:#555;text-align:left;">
         <strong>¿Cómo instalar?</strong><br>
         • <b>Android/Chrome:</b> Menú ⋮ → "Añadir a pantalla de inicio"<br>
         • <b>iPhone/Safari:</b> Botón compartir □↑ → "Añadir a inicio"
@@ -1318,7 +1321,7 @@ const App = {
         </div>
         <div class="form-group">
           <label>Población/Sector (Referencia)</label>
-          <input type="text" id="authDireccion" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Mirasol, PM">
+          <input type="text" id="authDireccion" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="📍 Pincha el mapa para detectar tu sector" readonly style="background:#EEF2FF;color:#555;cursor:default;">
         </div>
       </div>
       <p style="font-size:0.8rem; color:var(--primary); font-weight:bold; margin:10px 0 5px;">📍 MARCA TU HOGAR EN EL MAPA</p>
