@@ -1,4 +1,4 @@
-﻿// BARRIO - Main Application
+// BARRIO - Main Application
 const App = {
  deviceId: null,
  deferredPrompt: null,
@@ -292,44 +292,37 @@ const App = {
   }
 
   const modal = document.createElement('div');
-  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;';
   modal.innerHTML = `
     <div style="background:white;border-radius:20px;padding:30px 25px;max-width:360px;width:100%;text-align:center;border-top:6px solid #FF6B35;">
       <div style="font-size:3.5rem;margin-bottom:12px;">📲</div>
       <h2 style="color:#FF6B35;font-weight:900;margin-bottom:10px;">¡Instala BARRIO!</h2>
-      <p style="color:#555;font-size:0.9rem;line-height:1.5;margin-bottom:8px;">Agrega la app a la pantalla de inicio de tu teléfono para acceder rápidamente sin abrir el navegador.</p>
-      <p style="font-size:0.8rem;color:#888;margin-bottom:20px;">Solo toma un segundo y no ocupa casi espacio.</p>
-      <button id="btnInstallOnboarding" class="btn btn-primary" style="width:100%;margin-bottom:10px;font-weight:900;background:#FF6B35;height:50px;" >INSTALAR EN MI TELÉFONO</button>
-      <div id="installManualHint" style="background:#FFF8F5;border-radius:12px;padding:12px;margin-bottom:15px;font-size:0.82rem;color:#555;text-align:left;">
-        <strong>¿Cómo instalar?</strong><br>
-        • <b>Android/Chrome:</b> Menú ⋮ → "Añadir a pantalla de inicio"<br>
-        • <b>iPhone/Safari:</b> Botón compartir □↑ → "Añadir a inicio"
-      </div>
+      <p style="color:#555;font-size:0.9rem;line-height:1.5;margin-bottom:20px;">Agrega la app a la pantalla de inicio de tu teléfono para acceder rápidamente sin abrir el navegador.</p>
+      <button id="btnInstallOnboarding" class="btn btn-primary" style="width:100%;margin-bottom:12px;font-weight:900;background:#FF6B35;height:52px;font-size:1rem;">📲 INSTALAR EN MI TELÉFONO</button>
       <button id="btnInstallOnboardingSkip" style="background:transparent;border:none;color:#999;font-size:0.85rem;cursor:pointer;width:100%;padding:8px;">Ahora no</button>
     </div>
   `;
   document.body.appendChild(modal);
 
-  const btnInstall = modal.querySelector('#btnInstallOnboarding');
-  const manualHint = modal.querySelector('#installManualHint');
-
-  // Mostrar el botón correcto según si hay prompt disponible
-  if (App.deferredPrompt) {
-    btnInstall.style.display = 'block';
-    manualHint.style.display = 'none';
-  } else {
-    btnInstall.style.display = 'none';
-    manualHint.style.display = 'block';
-  }
-
-  btnInstall.addEventListener('click', async () => {
-    if (!App.deferredPrompt) return;
-    App.deferredPrompt.prompt();
-    const { outcome } = await App.deferredPrompt.userChoice;
-    App.deferredPrompt = null;
-    if (outcome === 'accepted') App.toast('✅ App instalada correctamente');
-    localStorage.setItem('barrio_install_dismissed', '1');
-    modal.remove(); done();
+  // El botón SIEMPRE es visible.
+  // Android/Chrome con prompt nativo → instala directamente.
+  // iOS/Safari sin prompt → abre modal con instrucciones paso a paso.
+  modal.querySelector('#btnInstallOnboarding').addEventListener('click', async () => {
+    if (App.deferredPrompt) {
+      // Android / Chrome: prompt nativo del sistema operativo
+      try {
+        App.deferredPrompt.prompt();
+        const { outcome } = await App.deferredPrompt.userChoice;
+        App.deferredPrompt = null;
+        if (outcome === 'accepted') App.toast('✅ App instalada correctamente');
+        localStorage.setItem('barrio_install_dismissed', '1');
+      } catch(e) { console.warn('Install prompt error:', e); }
+      modal.remove(); done();
+    } else {
+      // iOS / Safari u otros: cerrar este modal y mostrar instrucciones
+      modal.remove();
+      App._showInstallHelp(done);
+    }
   });
 
   document.getElementById('btnInstallOnboardingSkip').addEventListener('click', () => {
@@ -337,6 +330,7 @@ const App = {
     modal.remove(); done();
   });
  },
+
 
  async requestLocation() {
  try {
