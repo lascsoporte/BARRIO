@@ -132,7 +132,9 @@ async function createCloudTables() {
     'ALTER TABLE usuarios ADD COLUMN last_lat DOUBLE',
     'ALTER TABLE usuarios ADD COLUMN last_lng DOUBLE',
     'ALTER TABLE usuarios ADD COLUMN home_lat DOUBLE',
-    'ALTER TABLE usuarios ADD COLUMN home_lng DOUBLE'
+    'ALTER TABLE usuarios ADD COLUMN home_lng DOUBLE',
+    'ALTER TABLE usuarios ADD COLUMN baja_solicitada TINYINT(1) DEFAULT 0',
+    'ALTER TABLE usuarios ADD COLUMN baja_fecha DATETIME NULL'
   ];
 
   for (let col of columns) {

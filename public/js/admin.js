@@ -335,7 +335,7 @@ const Admin = {
           </div>
           ${this.chartBlock('Altas de usuarios por día (últimos 30 días)')}
           <div class="admin-table-wrap"><table class="admin-table"><thead><tr>
-            <th>ID</th><th>Nombre</th><th>Nick</th><th>Tel</th><th>Email</th><th>Verif.</th><th>Bloq.</th><th>Extravío</th><th>Términos</th><th>Última ubicación</th><th>Registro</th><th>Device</th><th>Acciones</th>
+            <th>ID</th><th>Nombre</th><th>Nick</th><th>Tel</th><th>Email</th><th>Verif.</th><th>Bloq.</th><th>Extravío</th><th>Términos</th><th>Última ubicación</th><th>Registro</th><th style="background:#FFEBEE;color:#D32F2F;">🗑️ Baja</th><th style="background:#FFEBEE;color:#D32F2F;">Fecha solicitud</th><th>Device</th><th>Acciones</th>
           </tr></thead><tbody>
           ${data
             .map(
@@ -351,6 +351,8 @@ const Admin = {
             <td>${this.yn(u.terms_accepted)}</td>
             <td>${this.mapBtn(u.last_lat, u.last_lng)}</td>
             <td>${this.esc(u.created_at)}</td>
+            <td style="${u.baja_solicitada ? 'background:#FFEBEE;color:#D32F2F;font-weight:900;' : ''}">${u.baja_solicitada ? '⚠️ SÍ' : 'No'}</td>
+            <td style="${u.baja_solicitada ? 'background:#FFEBEE;color:#D32F2F;font-size:11px;' : 'color:#999;font-size:11px;'}">${this.esc(u.baja_fecha || '—')}</td>
             <td class="admin-muted">${this.esc((u.device_id || '').slice(0, 24))}</td>
             <td style="white-space:nowrap;">
               <button class="admin-action-btn btn-verify" data-id="${u.id}" data-val="${u.is_verified ? 1 : 0}" title="${u.is_verified ? 'Quitar verificación' : 'Verificar usuario'}" style="background:${u.is_verified ? '#4CAF50' : '#9E9E9E'};color:white;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem;margin:2px;">

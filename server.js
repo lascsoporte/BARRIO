@@ -445,22 +445,33 @@ app.post('/api/usuarios/:id/solicitar-baja', async (req, res) => {
     const u = await queryOne('SELECT nombre, nickname, telefono, email FROM usuarios WHERE id = ?', [userId]);
     if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
 
-    // Marcar con flag de baja solicitada (no eliminamos aún — el admin lo revisa)
-    await runSql('UPDATE usuarios SET baja_solicitada = 1 WHERE id = ?', [userId]);
+    // Fecha y hora local Chile (UTC-4)
+    const ahora = new Date();
+    const fechaLocal = ahora.toLocaleString('es-CL', { timeZone: 'America/Santiago' });
 
-    // Alerta al administrador vía Telegram
-    sendTelegramAlert(
-      `🗑️ <b>SOLICITUD DE BAJA VOLUNTARIA</b>\n` +
-      `Usuario: ${u.nickname || u.nombre}\n` +
-      `Teléfono: ${u.telefono}\n` +
-      `Email: ${u.email || 'sin email'}\n` +
-      `ID: ${userId}\n\n` +
-      `⚠️ El usuario ha solicitado eliminar su cuenta. Revisar y eliminar desde el panel admin.`
+    // Guardar flag + fecha en la BD
+    await runSql(
+      'UPDATE usuarios SET baja_solicitada = 1, baja_fecha = ? WHERE id = ?',
+      [ahora.toISOString().slice(0, 19).replace('T', ' '), userId]
     );
 
+    // Alerta al administrador vía Telegram
+    const nombreUsuario = u.nickname || u.nombre || 'Sin nombre';
+    sendTelegramAlert(
+      `🗑️ <b>SOLICITUD DE BAJA VOLUNTARIA</b>\n` +
+      `👤 Usuario: ${nombreUsuario}\n` +
+      `📱 Teléfono: ${u.telefono}\n` +
+      `📧 Email: ${u.email || 'sin email'}\n` +
+      `🆔 ID: ${userId}\n` +
+      `🕐 Fecha: ${fechaLocal}\n\n` +
+      `⚠️ El usuario solicitó eliminar su cuenta.\n` +
+      `Revisar y eliminar desde el panel admin.`
+    );
+
+    console.log(`✅ Solicitud de baja registrada: usuario ${userId} (${nombreUsuario}) - ${fechaLocal}`);
     res.json({ ok: true });
   } catch (e) {
-    console.error('Error solicitud-baja:', e);
+    console.error('❌ Error solicitud-baja:', e);
     res.status(500).json({ error: 'Error interno' });
   }
 });
