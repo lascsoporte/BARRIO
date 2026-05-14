@@ -213,43 +213,65 @@ const App = {
     const btn = document.getElementById('btnPushOnboardingAccept');
     btn.disabled = true; btn.textContent = 'Activando...';
     
-    // Timeout de seguridad: si en 10s no responde, cerrar y continuar
+    // Timeout de seguridad: si en 15s no responde, cerrar y continuar
     const safetyTimeout = setTimeout(() => {
+      console.warn('⏱️ Timeout: Push notifications tomaron más de 15s');
       App.toast('No se pudo activar. Puedes intentarlo más tarde.');
       localStorage.setItem('barrio_push_enabled', 'denied_temp');
       modal.remove(); done();
-    }, 10000);
+    }, 15000);
 
     try {
+      console.log('🔔 Solicitando permiso de notificaciones...');
       const permission = await Notification.requestPermission();
+      console.log('🔔 Permiso:', permission);
+      
       clearTimeout(safetyTimeout);
+      
       if (permission === 'granted') {
         try {
+          console.log('⏳ Esperando service worker...');
+          
+          // Verificar que el service worker esté disponible
+          if (!('serviceWorker' in navigator)) {
+            throw new Error('Service Worker no soportado');
+          }
+          
           const registration = await navigator.serviceWorker.ready;
+          console.log('✅ Service worker listo');
+          
+          console.log('📲 Suscribiendo a push...');
           const subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: this.urlBase64ToUint8Array('BPfYyug0EiK_oS0FRF8w-k2WpxoDs79-DZjjFI505RsAeUrzi5e88XPgsj8Pp2YV6pZfMtnb-IXiYN8tJ9mgrFc')
+            applicationServerKey: App.urlBase64ToUint8Array('BPfYyug0EiK_oS0FRF8w-k2WpxoDs79-DZjjFI505RsAeUrzi5e88XPgsj8Pp2YV6pZfMtnb-IXiYN8tJ9mgrFc')
           });
+          console.log('✅ Suscripción creada');
+          
+          console.log('💾 Guardando en servidor...');
           const res = await API.savePushSubscription({ userId: user.id, subscription });
-          if (res.ok) {
-            localStorage.setItem('barrio_push_enabled', 'true');
-            App.toast('✅ Alertas activadas correctamente');
-          } else {
-            throw new Error('Error al guardar en servidor');
-          }
+          console.log('✅ Respuesta servidor:', res);
+          
+          localStorage.setItem('barrio_push_enabled', 'true');
+          console.log('✅ Alertas activadas correctamente');
+          App.toast('✅ Alertas activadas correctamente');
         } catch(e) {
+          console.error('❌ Error suscripción push:', e);
           App.toast('No se pudieron activar las alertas');
           localStorage.setItem('barrio_push_enabled', 'denied_temp');
         }
       } else {
+        console.log('❌ Permiso denegado');
         localStorage.setItem('barrio_push_enabled', 'denied_perm');
         App.toast('Permiso de notificaciones denegado');
       }
     } catch(e) {
       clearTimeout(safetyTimeout);
+      console.error('❌ Error al pedir permisos:', e);
       App.toast('Error al activar alertas');
       localStorage.setItem('barrio_push_enabled', 'denied_temp');
     }
+    
+    console.log('🔚 Cerrando modal push');
     modal.remove(); done();
   };
  },
