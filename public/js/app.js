@@ -1,4 +1,4 @@
-// BARRIO - Main Application
+﻿// BARRIO - Main Application
 const App = {
  deviceId: null,
  deferredPrompt: null,
@@ -12,7 +12,7 @@ const App = {
        return;
     }
     const loader = document.querySelector('.loading-screen') || document.getElementById('loadingScreen');
-    if (loader) loader.style.display = 'none';
+    if (loader) { loader.classList.add('hiding'); setTimeout(() => loader.remove(), 400); }
     Admin.route(document.getElementById('app'), hash);
     return;
   }
@@ -57,6 +57,10 @@ const App = {
  },
 
  async continueInit(user) {
+ // Ocultar loading screen con fade suave
+ const loader = document.getElementById('loadingScreen');
+ if (loader) { loader.classList.add('hiding'); setTimeout(() => loader.remove(), 400); }
+
  this.searchRadius = parseFloat(localStorage.getItem('barrio_radius')) || 1;
  this.config = {};
  

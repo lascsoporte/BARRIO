@@ -1,5 +1,5 @@
-﻿<!DOCTYPE html>
-<html lang="es">
+<!DOCTYPE html>
+<html lang="es" style="background:#F9F1E7;">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -11,22 +11,52 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏘️</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="/css/styles.css?v=9">
+  <link rel="stylesheet" href="/css/styles.css?v=10">
+  <!-- CSS crítico INLINE: evita parpadeo blanco antes de que cargue el stylesheet externo -->
   <style>
+    html, body {
+      margin: 0; padding: 0;
+      background: #F9F1E7;  /* mismo color que --bg, sin depender de variables CSS */
+    }
+    #loadingScreen {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: #F9F1E7;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999;
+      opacity: 1;
+      transition: opacity 0.35s ease-out;  /* fade suave al salir */
+    }
+    #loadingScreen.hiding {
+      opacity: 0;
+      pointer-events: none;
+    }
+    /* Spinner mínimo inline para que se vea ANTES de que cargue styles.css */
+    .splash-spinner-inline {
+      width: 36px; height: 36px;
+      border: 4px solid rgba(255,107,53,0.25);
+      border-top-color: #FF6B35;
+      border-radius: 50%;
+      animation: spin-inline 0.8s linear infinite;
+      margin: 16px auto 0;
+    }
+    @keyframes spin-inline {
+      to { transform: rotate(360deg); }
+    }
     /* Estilos básicos para el mensaje de error de login */
     .login-error { color: #ff0000; font-size: 0.8rem; margin-top: 10px; display: none; }
   </style>
 </head>
-<body>
+<body style="margin:0;padding:0;background:#F9F1E7;">
   <div id="app">
-    <div id="loadingScreen" class="loading-screen">
+    <div id="loadingScreen">
       <div class="splash-content">
-        <div class="splash-logo">🏘️</div>
-        <h1 class="splash-title">BARRIO</h1>
-        <div style="font-size:1.2rem; font-weight:800; letter-spacing:4px; margin-top:-20px; margin-bottom:10px; color:var(--text-light);">PUERTO MONTT</div>
-        <div style="font-size:1.8rem; margin: 10px 0 20px;">🇨🇱</div>
-        <div class="splash-spinner"></div>
-        <p class="splash-text">Conectando con tu barrio...</p>
+        <div style="font-size:5rem;margin-bottom:15px;">🏘️</div>
+        <h1 style="font-size:2.5rem;font-weight:900;background:linear-gradient(135deg,#FF6B35,#FF2E00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0 0 5px;">BARRIO</h1>
+        <div style="font-size:1.1rem;font-weight:800;letter-spacing:4px;color:#888;margin-bottom:8px;">PUERTO MONTT</div>
+        <div style="font-size:1.6rem;">🇨🇱</div>
+        <div class="splash-spinner-inline"></div>
+        <p style="font-size:0.85rem;color:#AAA;margin-top:12px;font-family:sans-serif;">Conectando con tu barrio...</p>
       </div>
     </div>
   </div>
