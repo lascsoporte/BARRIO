@@ -438,6 +438,33 @@ app.post('/api/reportar-extravio', async (req, res) => {
   res.json({ success: true });
 });
 
+// Solicitud de baja voluntaria por el propio usuario
+app.post('/api/usuarios/:id/solicitar-baja', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const u = await queryOne('SELECT nombre, nickname, telefono, email FROM usuarios WHERE id = ?', [userId]);
+    if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    // Marcar con flag de baja solicitada (no eliminamos aún — el admin lo revisa)
+    await runSql('UPDATE usuarios SET baja_solicitada = 1 WHERE id = ?', [userId]);
+
+    // Alerta al administrador vía Telegram
+    sendTelegramAlert(
+      `🗑️ <b>SOLICITUD DE BAJA VOLUNTARIA</b>\n` +
+      `Usuario: ${u.nickname || u.nombre}\n` +
+      `Teléfono: ${u.telefono}\n` +
+      `Email: ${u.email || 'sin email'}\n` +
+      `ID: ${userId}\n\n` +
+      `⚠️ El usuario ha solicitado eliminar su cuenta. Revisar y eliminar desde el panel admin.`
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Error solicitud-baja:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
 app.post('/api/emergencia', async (req, res) => {
   const { usuario_id, institucion, latitud, longitud } = req.body;
   const user = await queryOne('SELECT nickname, nombre, telefono FROM usuarios WHERE id = ?', [usuario_id]);

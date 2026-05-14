@@ -1,4 +1,4 @@
-﻿// BARRIO - Main Application
+// BARRIO - Main Application
 const App = {
  deviceId: null,
  deferredPrompt: null,
@@ -904,7 +904,7 @@ const App = {
  renderLegal(container) {
  container.innerHTML = `
  <div class="fade-in" style="padding: 20px; max-width: 600px; margin: 0 auto;">
- 
+
  <h2 style="color:var(--primary); margin-bottom: 20px;">📋 Aviso Legal</h2>
  <div class="card" style="line-height: 1.7; font-size: 0.9rem; color: #444;">
  <h3 style="margin-bottom: 10px; font-size: 1rem; color:#D32F2F;">⚠️ Aviso</h3>
@@ -919,8 +919,80 @@ const App = {
  <p style="margin-top: 10px;">El uso de esta aplicación implica la aceptación de estos términos.</p>
  <p style="margin-top: 20px; font-size: 0.8rem; color: #999; text-align: center;">&copy; 2026 PUERTOMAS SPA. Todos los derechos reservados.</p>
  </div>
+
+ <button onclick="App.solicitarBaja()" style="
+   width:100%; margin-top:24px; padding:14px;
+   background:transparent; color:#D32F2F;
+   border:2px solid #D32F2F; border-radius:12px;
+   font-weight:900; font-size:0.95rem; cursor:pointer;
+   letter-spacing:0.5px;">
+   🗑️ ELIMINARME COMO USUARIO DE ESTA APLICACIÓN
+ </button>
+
  </div>
  `;
+ },
+
+ // Solicitud de eliminación de cuenta
+ solicitarBaja() {
+   const user = App.currentUser;
+   if (!user) return;
+
+   // Primera confirmación
+   const modal1 = document.createElement('div');
+   modal1.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;';
+   modal1.innerHTML = `
+     <div style="background:white;border-radius:20px;padding:30px 25px;max-width:360px;width:100%;text-align:center;border-top:6px solid #D32F2F;">
+       <div style="font-size:3rem;margin-bottom:12px;">⚠️</div>
+       <h2 style="color:#D32F2F;font-weight:900;margin-bottom:12px;">¿Eliminar tu cuenta?</h2>
+       <p style="color:#555;font-size:0.9rem;line-height:1.5;margin-bottom:20px;">Esta acción enviará una solicitud al administrador para eliminar tu cuenta y todos tus datos de BARRIO.<br><br><strong>¿Estás seguro que deseas continuar?</strong></p>
+       <button id="btnBajaConfirmar" style="width:100%;background:#D32F2F;color:white;border:none;padding:14px;border-radius:12px;font-weight:900;font-size:1rem;cursor:pointer;margin-bottom:10px;">SÍ, QUIERO ELIMINAR MI CUENTA</button>
+       <button id="btnBajaCancelar" style="width:100%;background:transparent;border:none;color:#999;font-size:0.9rem;cursor:pointer;padding:8px;">Cancelar</button>
+     </div>`;
+   document.body.appendChild(modal1);
+   document.body.classList.add('modal-open');
+
+   modal1.querySelector('#btnBajaCancelar').addEventListener('click', () => {
+     modal1.remove(); document.body.classList.remove('modal-open');
+   });
+
+   modal1.querySelector('#btnBajaConfirmar').addEventListener('click', () => {
+     modal1.remove();
+
+     // Segunda confirmación — más directa
+     const modal2 = document.createElement('div');
+     modal2.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:20001;display:flex;align-items:center;justify-content:center;padding:20px;';
+     modal2.innerHTML = `
+       <div style="background:white;border-radius:20px;padding:30px 25px;max-width:360px;width:100%;text-align:center;border-top:6px solid #D32F2F;">
+         <div style="font-size:2.5rem;margin-bottom:12px;">🗑️</div>
+         <h2 style="color:#D32F2F;font-weight:900;margin-bottom:12px;">Confirmación final</h2>
+         <p style="color:#333;font-size:0.9rem;line-height:1.5;margin-bottom:20px;">Hola <strong>${user.nickname || user.nombre}</strong>, ¿confirmas que deseas eliminar tu cuenta de BARRIO definitivamente?</p>
+         <button id="btnBajaFinal" style="width:100%;background:#D32F2F;color:white;border:none;padding:14px;border-radius:12px;font-weight:900;font-size:1rem;cursor:pointer;margin-bottom:10px;">✅ SÍ, CONFIRMO — ELIMINAR MI CUENTA</button>
+         <button id="btnBajaCancelar2" style="width:100%;background:transparent;border:none;color:#999;font-size:0.9rem;cursor:pointer;padding:8px;">No, quiero quedarme</button>
+       </div>`;
+     document.body.appendChild(modal2);
+
+     modal2.querySelector('#btnBajaCancelar2').addEventListener('click', () => {
+       modal2.remove(); document.body.classList.remove('modal-open');
+     });
+
+     modal2.querySelector('#btnBajaFinal').addEventListener('click', async () => {
+       modal2.querySelector('#btnBajaFinal').textContent = 'Procesando...';
+       modal2.querySelector('#btnBajaFinal').disabled = true;
+       try {
+         await fetch('/api/usuarios/' + user.id + '/solicitar-baja', { method: 'POST' });
+       } catch(e) { /* continuar igual */ }
+
+       // Limpiar sesión local
+       localStorage.clear();
+       modal2.remove();
+       document.body.classList.remove('modal-open');
+
+       // Mostrar confirmación y redirigir
+       App.toast('✅ Solicitud enviada. Tu cuenta será eliminada pronto.');
+       setTimeout(() => { window.location.href = '/'; }, 2000);
+     });
+   });
  },
 
  radiusSelectorHtml() {
