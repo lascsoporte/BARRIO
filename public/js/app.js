@@ -1611,6 +1611,8 @@ const App = {
       <h3 style="color:#673AB7; margin-bottom:10px;">Reporte de Extravío</h3>
       <p>Si extraviaste tu celular y tenías instalada esta aplicación, puedes reportarlo aquí para <strong>saber si se continúa utilizando nuestra aplicación</strong>.</p>
       <button id="btnReportarRobo" class="btn btn-primary" style="background:#673AB7; width:100%; margin-top:10px; font-weight:900;">REPORTAR TELÉFONO EXTRAVIADO</button>
+      <hr style="margin:20px 0; border:0; border-top:1px solid #EEE;">
+      <button id="btnEliminarCuenta" style="width:100%; padding:14px; background:transparent; color:#D32F2F; border:2px solid #D32F2F; border-radius:12px; font-weight:900; font-size:0.95rem; cursor:pointer; letter-spacing:0.5px;">🗑️ ELIMINARME DE LA APP</button>
     </div>
     ${this.footerHtml()}
     `;
@@ -1634,6 +1636,61 @@ const App = {
           alert("Teléfono marcado como EXTRAVIADO. El rastreo se activará al abrir la app en ese equipo.");
         } catch(e) { this.toast('Error al reportar'); }
         finally { btn.disabled = false; btn.textContent = "Reportar Teléfono Extraviado"; }
+      });
+    });
+
+    // ---- Botón ELIMINARME DE LA APP ----
+    document.getElementById('btnEliminarCuenta').addEventListener('click', () => {
+      this.requireAuth((user) => {
+
+        // Primera confirmación
+        const m1 = document.createElement('div');
+        m1.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+        m1.innerHTML = `
+          <div style="background:white;border-radius:20px;padding:30px 25px;max-width:360px;width:100%;text-align:center;border-top:6px solid #D32F2F;">
+            <div style="font-size:3rem;margin-bottom:12px;">⚠️</div>
+            <h2 style="color:#D32F2F;font-weight:900;margin-bottom:12px;">¿Eliminar tu cuenta?</h2>
+            <p style="color:#555;font-size:0.9rem;line-height:1.5;margin-bottom:20px;">Se enviará una solicitud al administrador para eliminar tu cuenta y todos tus datos de BARRIO.<br><br><strong>¿Estás seguro?</strong></p>
+            <button id="m1Si" style="width:100%;background:#D32F2F;color:white;border:none;padding:14px;border-radius:12px;font-weight:900;font-size:1rem;cursor:pointer;margin-bottom:10px;">SÍ, QUIERO ELIMINAR MI CUENTA</button>
+            <button id="m1No" style="width:100%;background:transparent;border:none;color:#999;font-size:0.9rem;cursor:pointer;padding:8px;">Cancelar</button>
+          </div>`;
+        document.body.appendChild(m1);
+        document.body.classList.add('modal-open');
+
+        m1.querySelector('#m1No').onclick = () => { m1.remove(); document.body.classList.remove('modal-open'); };
+
+        m1.querySelector('#m1Si').onclick = () => {
+          m1.remove();
+
+          // Segunda confirmación
+          const m2 = document.createElement('div');
+          m2.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:20001;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+          m2.innerHTML = `
+            <div style="background:white;border-radius:20px;padding:30px 25px;max-width:360px;width:100%;text-align:center;border-top:6px solid #D32F2F;">
+              <div style="font-size:2.5rem;margin-bottom:12px;">🗑️</div>
+              <h2 style="color:#D32F2F;font-weight:900;margin-bottom:12px;">Confirmación final</h2>
+              <p style="color:#333;font-size:0.9rem;line-height:1.5;margin-bottom:20px;">Hola <strong>${user.nickname || user.nombre}</strong>, ¿confirmas que quieres eliminar tu cuenta definitivamente?</p>
+              <button id="m2Si" style="width:100%;background:#D32F2F;color:white;border:none;padding:14px;border-radius:12px;font-weight:900;font-size:1rem;cursor:pointer;margin-bottom:10px;">✅ SÍ, CONFIRMO — ELIMINAR MI CUENTA</button>
+              <button id="m2No" style="width:100%;background:transparent;border:none;color:#999;font-size:0.9rem;cursor:pointer;padding:8px;">No, quiero quedarme</button>
+            </div>`;
+          document.body.appendChild(m2);
+
+          m2.querySelector('#m2No').onclick = () => { m2.remove(); document.body.classList.remove('modal-open'); };
+
+          m2.querySelector('#m2Si').onclick = async () => {
+            const btn = m2.querySelector('#m2Si');
+            btn.textContent = 'Procesando...';
+            btn.disabled = true;
+            try {
+              await fetch('/api/usuarios/' + user.id + '/solicitar-baja', { method: 'POST' });
+            } catch(e) { /* continuar igual si falla la red */ }
+            localStorage.clear();
+            m2.remove();
+            document.body.classList.remove('modal-open');
+            this.toast('✅ Solicitud enviada. Tu cuenta será eliminada pronto.');
+            setTimeout(() => { window.location.href = '/'; }, 2000);
+          };
+        };
       });
     });
   },
