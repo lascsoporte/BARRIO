@@ -423,7 +423,7 @@ const App = {
         <div style="font-size:1.2rem; margin-top:5px;">🇨🇱</div>
       </header>
 
-      <div id="homeMap" style="height: 244px; width: 100%; border-radius: 16px; margin: 10px 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
+      <div id="homeMap" style="height: 264px; width: 100%; border-radius: 16px; margin: 10px 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
 
       <div class="qa-grid" style="margin-top: 5px;">
         <div class="qa-item" style="background: #D32F2F; color:white;" onclick="location.hash='#/emergencia-menu'">
@@ -444,7 +444,7 @@ const App = {
         </div>
       </div>
 
-      <div style="margin-top:8px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:8px;">
+      <div style="margin-top:10px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:8px; padding-bottom:5px;">
         <p style="font-size:0.8rem; color:var(--text-light); margin-bottom:0; padding:5px 0; line-height:1.2;">📍 <b>Georreferencia activa</b> para seguridad ciudadana.</p>
         <button onclick="App.showShareMenu()" style="background:#673AB7; color:white; border:none; padding:6px 25px; border-radius:25px; font-weight:900; font-size:0.9rem; cursor:pointer; width:80%; max-width:250px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">COMPARTIR APP</button>
         <div id="installBanner" style="display:none; width:100%; max-width:400px; background:linear-gradient(135deg,#FF6B35,#E55A25); border-radius:16px; padding:10px 18px; box-shadow:0 4px 15px rgba(255,107,53,0.35); text-align:left; margin-top:8px;">
@@ -479,7 +479,7 @@ const App = {
           <a href="tel:134" onclick="App.logLlamada('134 - PDI')" class="emg-btn" style="background:#0D47A1;">PDI (134)</a>
           <a href="tel:1529" onclick="App.logLlamada('1529 - SEGURIDAD CIUDADANA PUERTO MONTT')" class="emg-btn" style="background:#F57C00;">SEGURIDAD CIUDADANA PUERTO MONTT (1529)</a>
           <div style="margin-top:15px; border-top:1px solid #EEE; padding-top:15px;">
-            <button onclick="App.hideEmergencyMenu(); App.iniciarReporteExtravio();" class="btn btn-sm" style="background:#673AB7; color:white; width:100%; justify-content:center; font-weight:900;">REPORTAR TELÉFONO EXTRAVIADO</button>
+            <button onclick="App.hideEmergencyMenu(true); App.iniciarReporteExtravio();" class="btn btn-sm" style="background:#673AB7; color:white; width:100%; justify-content:center; font-weight:900;">REPORTAR TELÉFONO EXTRAVIADO</button>
           </div>
         </div>
       </div>
@@ -528,7 +528,7 @@ const App = {
         API.getReportes().then(reports => {
           reports.forEach(r => {
             if (r.latitud && r.longitud) {
-              const icons = { 'extravío': '🚨', 'incendio': '🔥', 'accidente': '🚗', 'sospechoso': '👤', 'mascota': '🐶', 'otros': '📍' };
+              const icons = { 'robo': '🦹', 'extravío': '🚨', 'incendio': '🔥', 'accidente': '🚗', 'sospechoso': '👤', 'mascota': '🐶', 'otros': '📍' };
               const marker = L.marker([r.latitud, r.longitud], {
                 icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px; background:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2); border:2px solid var(--primary);">${icons[r.tipo_reporte] || '📍'}</div>`})
               }).addTo(map);
@@ -573,10 +573,10 @@ const App = {
     document.getElementById('emergencyMenu').classList.add('active');
     document.body.classList.add('modal-open');
   },
-  hideEmergencyMenu() { 
+  hideEmergencyMenu(noBack = false) { 
     document.getElementById('emergencyMenu').classList.remove('active');
     document.body.classList.remove('modal-open');
-    if (location.hash === '#/emergencia-menu') history.back();
+    if (!noBack && location.hash === '#/emergencia-menu') history.back();
   },
 
   urlBase64ToUint8Array(base64String) {
@@ -764,6 +764,7 @@ const App = {
     <p style="font-size:0.85rem; color:#666; margin-bottom:15px;">Fija el punto en el mapa y selecciona el tipo de reporte. <b>Tu identidad pública será protegida con tu Nickname.</b></p>
     
     <div class="report-grid">
+      <button class="report-opt" data-tipo="robo">🦹 Robo</button>
       <button class="report-opt" data-tipo="accidente">🚗 Choque</button>
       <button class="report-opt" data-tipo="incendio">🔥 Incendio</button>
       <button class="report-opt" data-tipo="sospechoso">👤 Sospechoso</button>
@@ -805,7 +806,7 @@ const App = {
         API.getReportes().then(reports => {
           reports.forEach(r => {
             if (r.latitud && r.longitud) {
-              const icons = { 'extravío': '🚨', 'incendio': '🔥', 'accidente': '🚗', 'sospechoso': '👤', 'mascota': '🐶', 'otros': '📍' };
+              const icons = { 'robo': '🦹', 'extravío': '🚨', 'incendio': '🔥', 'accidente': '🚗', 'sospechoso': '👤', 'mascota': '🐶', 'otros': '📍' };
               const m = L.marker([r.latitud, r.longitud], {
                 icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px; background:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2); border:2px solid #BBB;">${icons[r.tipo_reporte] || '📍'}</div>`})
               }).addTo(map);
@@ -836,6 +837,7 @@ const App = {
     
     // Duraciones predeterminadas por tipo
     const duracionesPorTipo = {
+      'robo': 12,        // 12 horas
       'accidente': 4,    // 4 horas
       'incendio': 4,     // 4 horas
       'sospechoso': 5,   // 5 horas
@@ -1404,85 +1406,73 @@ const App = {
  },
 
   async iniciarReporteExtravio() {
-    // Crear modal personalizado para ingresar teléfono
-    const modal = document.createElement('div');
-    modal.className = 'auth-overlay';
-    modal.style.zIndex = '10000';
-    modal.innerHTML = `
-    <div class="auth-modal fade-in" style="max-width: 400px;">
-      <button class="auth-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
-      <div style="font-size:2.5rem; margin-bottom:10px;">📱</div>
-      <h2 style="text-transform:uppercase; letter-spacing:1px; font-size:1.3rem;">Reportar Teléfono Extraviado</h2>
-      <p style="font-size:0.85rem; color:var(--text-light); margin-bottom:15px;">Por seguridad, ingresa el número de teléfono que extraviaste.</p>
-      
-      <div class="form-group">
-        <label style="display:block; margin-bottom:5px; font-weight:bold; font-size:0.9rem;">Número de Teléfono</label>
-        <input 
-          type="tel" 
-          id="phoneExtraviado" 
-          placeholder="+56912345678"
-          autocomplete="off"
-          autocorrect="off"
-          spellcheck="false"
-          data-form-type="other"
-          inputmode="tel"
-          style="width:100%; padding:12px; border-radius:8px; border:1px solid #CCC; font-size:1rem; font-family:Nunito,sans-serif;"
-        >
-        <small style="color:#666; font-size:0.75rem;">Formato: +569XXXXXXXX (11 dígitos)</small>
-      </div>
-      
-      <button id="btnConfirmarExtravio" class="btn btn-primary" style="width:100%; margin-top:15px; background:#D32F2F; font-weight:900;">CONFIRMAR EXTRAVÍO</button>
-    </div>
-    `;
-    
-    document.body.appendChild(modal);
-    document.getElementById('phoneExtraviado').focus();
-    
-    // Permitir enviar con Enter
-    document.getElementById('phoneExtraviado').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        document.getElementById('btnConfirmarExtravio').click();
-      }
-    });
-    
-    document.getElementById('btnConfirmarExtravio').addEventListener('click', async () => {
-      const num = document.getElementById('phoneExtraviado').value.trim();
-      
-      if (!num) {
-        alert('Por favor ingresa un número de teléfono');
-        return;
-      }
-      
-      const phoneRegex = /^\+\d{11}$/;
-      if (!phoneRegex.test(num.replace(/\s+/g, ''))) {
-        alert('Formato inválido. Debe comenzar con + y tener 11 números (Ej: +56912345678)');
-        return;
-      }
-      
-      modal.remove();
-      
-      this.requireAuth(async (user) => {
-        try {
-          await Geo.getUserLocation().catch(() => {});
-          const lat = Geo.userLat;
-          const lng = Geo.userLng;
-          if (lat && lng) API.ping(this.deviceId, lat, lng).catch(() => {});
-          const refGps = (lat && lng)
-            ? `\n📍 Ubicación del Denunciante: https://maps.google.com/?q=${lat},${lng}`
-            : '\n📍 Ubicación del Denunciante: No disponible (GPS desactivado)';
-          await API.reportarExtravio({
-            reporting_user_id: user.id,
-            reported_phone: num,
-            mensaje_extra: refGps
-          });
-          alert('✅ Teléfono marcado como EXTRAVIADO. El sistema de ubicación se activará al abrir la app en ese equipo y la ubicación se mostrará en el mapa del administrador.');
-        } catch(e) {
-          this.toast('Error al reportar extravío: ' + (e.message || ''));
-        }
-      });
-    });
-  },
+    const mExt = document.createElement('div');
+    mExt.className = 'auth-overlay';
+    mExt.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+    mExt.innerHTML = `
+      <div style="background:white;border-radius:20px;padding:28px 22px;max-width:360px;width:100%;text-align:center;border-top:6px solid #673AB7;">
+        <div style="font-size:2.5rem;margin-bottom:10px;">📱</div>
+        <h2 style="color:#673AB7;font-weight:900;margin-bottom:8px;">Reportar Extravío</h2>
+        <p style="color:#555;font-size:0.85rem;line-height:1.4;margin-bottom:18px;">Ingresa el número del teléfono extraviado y tu PIN de seguridad para confirmar que eres el dueño.</p>
+        <input id="extNumero2" type="tel" placeholder="Número extraviado (+56912345678)"
+          autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" inputmode="tel"
+          style="width:100%;padding:12px;border-radius:10px;border:2px solid #ddd;margin-bottom:10px;font-size:0.95rem;box-sizing:border-box;outline:none;">
+        <input id="extPin2" type="password" placeholder="Tu PIN de 4 dígitos" maxlength="4"
+          autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" inputmode="numeric"
+          style="width:100%;padding:12px;border-radius:10px;border:2px solid #ddd;margin-bottom:16px;font-size:1.1rem;letter-spacing:6px;text-align:center;box-sizing:border-box;outline:none;">
+        <p id="extError2" style="color:#D32F2F;font-size:0.85rem;margin-bottom:10px;display:none;"></p>
+        <button id="extEnviar2" style="width:100%;background:#673AB7;color:white;border:none;padding:14px;border-radius:12px;font-weight:900;font-size:1rem;cursor:pointer;margin-bottom:10px;">REPORTAR EXTRAVÍO</button>
+        <button id="extCancelar2" style="width:100%;background:transparent;border:none;color:#999;font-size:0.9rem;cursor:pointer;padding:8px;">Cancelar</button>
+      </div>`;
+    document.body.appendChild(mExt);
+    document.body.classList.add('modal-open');
+    history.pushState({ modal: 'extraviado' }, '');
 
+    mExt.querySelector('#extCancelar2').onclick = () => {
+      mExt.remove(); document.body.classList.remove('modal-open');
+    };
+
+    mExt.querySelector('#extEnviar2').onclick = async () => {
+      const num = mExt.querySelector('#extNumero2').value.trim().replace(/\s+/g, '');
+      const pin = mExt.querySelector('#extPin2').value.trim();
+      const errEl = mExt.querySelector('#extError2');
+      const btnEnv = mExt.querySelector('#extEnviar2');
+
+      if (!num) { errEl.textContent = 'Ingresa el número de teléfono.'; errEl.style.display = 'block'; return; }
+      if (!/^\+\d{11}$/.test(num)) { errEl.textContent = 'Formato inválido. Ejemplo: +56912345678'; errEl.style.display = 'block'; return; }
+      if (!pin || pin.length !== 4) { errEl.textContent = 'El PIN debe ser de exactamente 4 dígitos.'; errEl.style.display = 'block'; return; }
+
+      errEl.style.display = 'none';
+      btnEnv.disabled = true;
+      btnEnv.textContent = 'Procesando...';
+
+      try {
+        await Geo.getUserLocation().catch(() => {});
+        const resp = await fetch('/api/reportar-extravio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reported_phone: num, pin })
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          errEl.textContent = data.error === 'PIN incorrecto' ? '❌ PIN incorrecto. Verifica tu PIN de seguridad.' : '❌ Error al reportar. Intenta de nuevo.';
+          errEl.style.display = 'block';
+          btnEnv.disabled = false;
+          btnEnv.textContent = 'REPORTAR EXTRAVÍO';
+          return;
+        }
+        mExt.remove();
+        document.body.classList.remove('modal-open');
+        this.toast('✅ Teléfono reportado. Si alguien utiliza BARRIO con ese equipo, recibiremos una alerta.');
+      } catch(e) {
+        errEl.textContent = 'Error de conexión. Intenta de nuevo.';
+        errEl.style.display = 'block';
+        btnEnv.disabled = false;
+        btnEnv.textContent = 'REPORTAR EXTRAVÍO';
+      }
+    };
+  },
+      
  async logLlamada(institucion) {
     // Obtener ubicación fresca antes de loguear
     await Geo.getUserLocation().catch(() => {});
@@ -1743,8 +1733,8 @@ const App = {
           <div style="font-size:2.5rem;margin-bottom:10px;">📱</div>
           <h2 style="color:#673AB7;font-weight:900;margin-bottom:8px;">Reportar Extravío</h2>
           <p style="color:#555;font-size:0.85rem;line-height:1.4;margin-bottom:18px;">Ingresa el número del teléfono extraviado y tu PIN de seguridad para confirmar que eres el dueño.</p>
-          <input id="extNumero" type="tel" placeholder="Número extraviado (+56912345678)" style="width:100%;padding:12px;border-radius:10px;border:2px solid #ddd;margin-bottom:10px;font-size:0.95rem;box-sizing:border-box;outline:none;">
-          <input id="extPin" type="number" placeholder="Tu PIN de 4 dígitos" maxlength="4" style="width:100%;padding:12px;border-radius:10px;border:2px solid #ddd;margin-bottom:16px;font-size:1.1rem;letter-spacing:6px;text-align:center;box-sizing:border-box;outline:none;">
+          <input id="extNumero" type="tel" placeholder="Número extraviado (+56912345678)" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" inputmode="tel" style="width:100%;padding:12px;border-radius:10px;border:2px solid #ddd;margin-bottom:10px;font-size:0.95rem;box-sizing:border-box;outline:none;">
+          <input id="extPin" type="password" placeholder="Tu PIN de 4 dígitos" maxlength="4" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" inputmode="numeric" style="width:100%;padding:12px;border-radius:10px;border:2px solid #ddd;margin-bottom:16px;font-size:1.1rem;letter-spacing:6px;text-align:center;box-sizing:border-box;outline:none;">
           <p id="extError" style="color:#D32F2F;font-size:0.85rem;margin-bottom:10px;display:none;"></p>
           <button id="extEnviar" style="width:100%;background:#673AB7;color:white;border:none;padding:14px;border-radius:12px;font-weight:900;font-size:1rem;cursor:pointer;margin-bottom:10px;">REPORTAR EXTRAVÍO</button>
           <button id="extCancelar" style="width:100%;background:transparent;border:none;color:#999;font-size:0.9rem;cursor:pointer;padding:8px;">Cancelar</button>

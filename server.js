@@ -709,9 +709,9 @@ app.delete('/api/admin/emergencias/:id', authMw, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/admin/ubicación', authMw, async (req, res) => res.json(await queryAll('SELECT r.*, u.nombre, u.telefono FROM registro_extravios r JOIN usuarios u ON r.usuario_id = u.id ORDER BY r.created_at DESC')));
+app.get('/api/admin/ubicacion', authMw, async (req, res) => res.json(await queryAll('SELECT r.*, u.nombre, u.telefono FROM registro_extravios r JOIN usuarios u ON r.usuario_id = u.id ORDER BY r.created_at DESC')));
 
-app.delete('/api/admin/ubicación/:id', authMw, async (req, res) => {
+app.delete('/api/admin/ubicacion/:id', authMw, async (req, res) => {
   await runSql('DELETE FROM registro_extravios WHERE id = ?', [req.params.id]);
   sendTelegramAlert(`🗑️ <b>ADMIN: UBICACIÓN BORRADO</b>\nID: ${req.params.id}`);
   res.json({ ok: true });
@@ -890,7 +890,7 @@ app.get('/api/admin/export/mensajes', authMw, async (req, res) => {
     rows);
 });
 
-app.get('/api/admin/export/ubicación', authMw, async (req, res) => {
+app.get('/api/admin/export/ubicacion', authMw, async (req, res) => {
   const rows = await queryAll('SELECT r.*, u.nombre, u.telefono FROM registro_extravios r JOIN usuarios u ON r.usuario_id = u.id ORDER BY r.created_at DESC');
   sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla ubicación.`);
   sendCsvDownload(res, 'planilla_ubicación_extravios.csv',
@@ -914,19 +914,19 @@ app.get('/api/admin/analytics', authMw, async (req, res) => {
   let registrosDia;
   let muroDia;
   let buzonDia;
-  let ubicaciónDia;
+  let ubicacionDia;
   if (mysql) {
     visitasDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM visitas WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
     registrosDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM usuarios WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
     muroDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM muro_comunitario WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
     buzonDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM mensajes_admin WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
-    ubicaciónDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM registro_extravios WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
+    ubicacionDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM registro_extravios WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
   } else {
     visitasDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM visitas WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
     registrosDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM usuarios WHERE date(created_at) >= date('now', '-30 days') GROUP BY date(created_at) ORDER BY dia`);
     muroDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM muro_comunitario WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
     buzonDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM mensajes_admin WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
-    ubicaciónDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM registro_extravios WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
+    ubicacionDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM registro_extravios WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
   }
   const reportesTipo = await queryAll('SELECT tipo_reporte as tipo, COUNT(*) as n FROM reportes_ciudadanos GROUP BY tipo_reporte ORDER BY n DESC');
   const emergInst = await queryAll('SELECT institucion, COUNT(*) as n FROM registro_emergencias GROUP BY institucion ORDER BY n DESC');
@@ -942,7 +942,7 @@ app.get('/api/admin/analytics', authMw, async (req, res) => {
     GROUP BY l.id, l.nombre ORDER BY n DESC LIMIT 15
   `);
   res.json({
-    visitasDia, registrosDia, muroDia, buzonDia, ubicaciónDia, reportesDia, emergenciasDia,
+    visitasDia, registrosDia, muroDia, buzonDia, ubicacionDia, reportesDia, emergenciasDia,
     reportesTipo, emergInst, productosLocal,
   });
 });
@@ -974,17 +974,15 @@ function scheduleRenderKeepAlive() {
 
 async function start() {
   try {
-    app.listen(PORT, '0.0.0.0', async () => {
-      console.log(`Servidor escuchando en puerto ${PORT}`);
-      try {
-        await initDatabase();
-        await loadPasswords();
-        scheduleRenderKeepAlive();
-        sendTelegramAlert(`🚀 <b>SISTEMA BARRIO INICIADO</b>\nServidor online y base de datos lista.`);
-      } catch (dbErr) {
-        console.error('Error de base de datos:', dbErr);
-        sendTelegramAlert(`🚨 <b>PROBLEMA DE BASE DE DATOS</b>\n${dbErr.message}`);
-      }
+    // PRIMERO inicializar la base de datos
+    await initDatabase();
+    await loadPasswords();
+    
+    // LUEGO iniciar el servidor
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Servidor escuchando en puerto ${PORT}`);
+      scheduleRenderKeepAlive();
+      sendTelegramAlert(`🚀 <b>SISTEMA BARRIO INICIADO</b>\nServidor online y base de datos lista.`);
     });
   } catch (e) {
     console.error('CRITICAL START ERROR:', e);

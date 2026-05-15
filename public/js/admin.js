@@ -224,7 +224,7 @@ const Admin = {
           <button type="button" class="admin-tab" data-tab="usuarios">👥 Usuarios</button>
           <button type="button" class="admin-tab" data-tab="muro">💬 Muro</button>
           <button type="button" class="admin-tab" data-tab="buzon">📬 Buzón</button>
-          <button type="button" class="admin-tab" data-tab="ubicación">📍 Rastreo</button>
+          <button type="button" class="admin-tab" data-tab="ubicacion">📍 Rastreo</button>
           <button type="button" class="admin-tab" data-tab="reportes">📢 Reportes</button>
           <button type="button" class="admin-tab" data-tab="emergencias">🚨 Emergencias</button>
         </div>
@@ -503,11 +503,11 @@ const Admin = {
         return;
       }
 
-      if (this.currentTab === 'ubicación') {
+      if (this.currentTab === 'ubicacion') {
         const data = await API.adminGetRastreo(this.token);
         html = `
           <div class="admin-toolbar">
-            ${this.exportBtn('/api/admin/export/ubicación', 'planilla_ubicación_extravios.csv', 'Planilla ubicación (.csv)')}
+            ${this.exportBtn('/api/admin/export/ubicacion', 'planilla_ubicación_extravios.csv', 'Planilla ubicación (.csv)')}
           </div>
           ${this.chartBlock('Puntos de ubicación registrados por día (14 días)')}
           <div class="admin-table-wrap"><table class="admin-table"><thead><tr>
@@ -529,7 +529,7 @@ const Admin = {
           </tbody></table></div>`;
         box.innerHTML = html;
         this.bindDownloads(box);
-        await this.drawChart('adminChartCanvas', this.lineChart('Rastreos / día', analytics.ubicaciónDia, '#E65100', 'rgba(230,81,0,0.12)'));
+        await this.drawChart('adminChartCanvas', this.lineChart('Rastreos / día', analytics.ubicacionDia, '#E65100', 'rgba(230,81,0,0.12)'));
         return;
       }
 

@@ -120,7 +120,7 @@ const API = {
   adminDeleteMascota(id, token) { return this.del(`/api/admin/mascotas/${id}`, token); },
   adminDeleteMensaje(id, token) { return this.del(`/api/admin/mensajes/${id}`, token); },
   adminDeleteEmergencia(id, token) { return this.del(`/api/admin/emergencias/${id}`, token); },
-  adminDeleteRastreo(id, token) { return this.del(`/api/admin/ubicación/${id}`, token); },
+  adminDeleteRastreo(id, token) { return this.del(`/api/admin/ubicacion/${id}`, token); },
   adminUpdateConfig(data, token) { return this.put('/api/admin/config', data, token); },
   adminChangePasswords(data, token) { return this.put('/api/admin/passwords', data, token); },
   adminGetStats(token) { return this.get('/api/admin/stats', token); },
@@ -132,7 +132,7 @@ const API = {
   adminVerifyUsuario(id, is_verified, token) { return this.put(`/api/admin/usuarios/${id}/verificar`, { is_verified }, token); },
   adminDeleteUsuario(id, token) { return this.del(`/api/admin/usuarios/${id}`, token); },
   adminGetEmergencias(token) { return this.get('/api/admin/emergencias', token); },
-  adminGetRastreo(token) { return this.get('/api/admin/ubicación', token); },
+  adminGetRastreo(token) { return this.get('/api/admin/ubicacion', token); },
   adminGetMuro(token) { return this.get('/api/admin/muro', token); },
   adminGetAnalytics(token) { return this.get('/api/admin/analytics', token); },
   async adminDownloadBlob(path, token, filename) {
