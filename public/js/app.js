@@ -104,6 +104,9 @@ const App = {
 
   // Sistema de navegación con botón retroceder del celular
   window.addEventListener('popstate', (event) => {
+    // Solo actuar si estamos retrocediendo (NO si navegamos hacia adelante con clicks)
+    // popstate se dispara en ambos casos, pero solo queremos interceptar el back
+    
     // 1. Si hay modal abierto, cerrarlo primero
     const modals = [
       'searchModal',
@@ -115,9 +118,6 @@ const App = {
       const modal = document.getElementById(modalId);
       if (modal && (modal.classList.contains('active') || modal.classList.contains('open'))) {
         modal.classList.remove('active', 'open');
-        event.preventDefault();
-        // Pushear estado para que próximo back cierre el modal, no la página
-        history.pushState({ page: location.hash }, '', location.hash);
         return;
       }
     }
@@ -126,22 +126,18 @@ const App = {
     const deleteModal = document.querySelector('.auth-overlay');
     if (deleteModal) {
       deleteModal.remove();
-      event.preventDefault();
-      history.pushState({ page: location.hash }, '', location.hash);
       return;
     }
     
-    // 3. Si NO estamos en home, ir a home
+    // 3. Si NO estamos en home y el hash está vacío (indica back button), ir a home
     const currentHash = location.hash || '#/';
-    if (currentHash !== '#/' && currentHash !== '') {
-      event.preventDefault();
+    if (currentHash === '' || currentHash === '#') {
       location.hash = '#/';
-      history.pushState({ page: '#/' }, '', '#/');
       return;
     }
     
-    // 4. Si estamos en home, permitir salir de la app
-    // (el navegador maneja esto automáticamente)
+    // 4. Dejar que la navegación normal continúe
+    // (clicks en botones, links, etc.)
   });
 
   if (!window.__barrioRenderKeepAlive) {
