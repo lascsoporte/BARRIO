@@ -1,13 +1,26 @@
+/**
+ * database.js - BARRIO
+ * 
+ * Sistema de base de datos con MySQL (Clever Cloud) como fuente principal.
+ * SQLite se usa ÚNICAMENTE para migrar datos existentes la primera vez.
+ * 
+ * Flujo:
+ * 1. Conectar a MySQL (hasta 15 segundos de espera)
+ * 2. Crear tablas si no existen
+ * 3. Si MySQL está vacío Y existe barrio.db → migrar datos una sola vez
+ * 4. Si MySQL no conecta → reintentar cada 30 segundos (nunca usar SQLite vacío)
+ */
+
 const mysql = require('mysql2/promise');
 const initSqlJs = require('sql.js');
 const fs = require('fs');
 const path = require('path');
 
 const DB_PATH = path.join(__dirname, 'barrio.db');
-let sqliteDb = null;
 let mysqlPool = null;
+let dbReady = false;
 
-// Configuración MySQL (Clever Cloud - Persistencia Total)
+// Configuración MySQL Clever Cloud
 const mysqlConfig = {
   host: 'blmmp8n5ku7ibhlbw78j-mysql.services.clever-cloud.com',
   user: 'uaeljzbnpravc2uc',
@@ -16,167 +29,244 @@ const mysqlConfig = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  ssl: { rejectUnauthorized: false } // Requerido por algunos servicios cloud
+  ssl: { rejectUnauthorized: false },
+  connectTimeout: 15000,
+  acquireTimeout: 15000
 };
 
-let useMysql = false;
+// ─── INICIALIZACIÓN ────────────────────────────────────────────────────────────
 
 async function initDatabase() {
-  console.log('🔄 Iniciando Base de Datos...');
-  
-  // Intentar MySQL primero, pero con timeout corto
-  try {
-    console.log('⏱️  Probando conexión a la nube (timeout 10s)...');
-    mysqlPool = mysql.createPool({
-      ...mysqlConfig,
-      connectTimeout: 10000,
-      acquireTimeout: 10000
-    });
-    
-    // Prueba de conexión con timeout
-    const testConnection = await Promise.race([
-      mysqlPool.query('SELECT 1'),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
-    ]);
-    
-    useMysql = true;
-    console.log('✅ ¡CONECTADO A CLEVER CLOUD! (Persistencia Activa)');
-    
-    // Crear tablas en la nube si no existen
-    await createCloudTables();
-  } catch (e) {
-    console.warn('⚠️ No se pudo conectar a la nube (usando SQLite local):', e.message);
-    useMysql = false;
-    if (mysqlPool) {
-      try { await mysqlPool.end(); } catch(err) {}
-      mysqlPool = null;
+  console.log('🔄 Conectando a MySQL (Clever Cloud)...');
+
+  let intentos = 0;
+  const maxIntentos = 3;
+
+  while (intentos < maxIntentos) {
+    intentos++;
+    try {
+      mysqlPool = mysql.createPool(mysqlConfig);
+
+      // Probar conexión real
+      await Promise.race([
+        mysqlPool.query('SELECT 1'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 15000))
+      ]);
+
+      console.log('✅ Conectado a MySQL (Clever Cloud)');
+
+      // Crear todas las tablas si no existen
+      await crearTablas();
+
+      // Agregar columnas faltantes (para actualizaciones)
+      await agregarColumnasNuevas();
+
+      // Insertar configuración por defecto si no existe
+      await insertarConfiguracionPorDefecto();
+
+      // Migrar desde SQLite si MySQL está vacío y existe barrio.db
+      await migrarDesdeLocalSiNecesario();
+
+      dbReady = true;
+      console.log('✅ Base de datos lista');
+      return;
+
+    } catch (e) {
+      console.error(`❌ Intento ${intentos}/${maxIntentos} fallido: ${e.message}`);
+      if (mysqlPool) {
+        try { await mysqlPool.end(); } catch (_) {}
+        mysqlPool = null;
+      }
+      if (intentos < maxIntentos) {
+        console.log('⏳ Reintentando en 5 segundos...');
+        await new Promise(r => setTimeout(r, 5000));
+      }
     }
   }
 
-  // Si no hay MySQL, usar SQLite
-  if (!useMysql) {
-    console.log('📂 Iniciando SQLite local...');
-    const SQL = await initSqlJs();
-    if (fs.existsSync(DB_PATH)) {
-      const buf = fs.readFileSync(DB_PATH);
-      sqliteDb = new SQL.Database(buf);
-      console.log('✅ Base de datos SQLite cargada desde archivo');
-    } else {
-      sqliteDb = new SQL.Database();
-      console.log('✅ Nueva base de datos SQLite creada');
-    }
-    initSqliteTables();
-    console.log('✅ Usando SQLite (Local)');
-  }
+  // Si llegamos aquí, MySQL no conectó después de todos los intentos
+  throw new Error('No se pudo conectar a MySQL después de ' + maxIntentos + ' intentos. Verifica la conexión a Clever Cloud.');
 }
 
-async function createCloudTables() {
+// ─── CREAR TABLAS ──────────────────────────────────────────────────────────────
+
+async function crearTablas() {
   const queries = [
     `CREATE TABLE IF NOT EXISTS usuarios (
-      id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(255) NOT NULL, telefono VARCHAR(50) NOT NULL UNIQUE,
-      direccion TEXT, ip VARCHAR(100), device_id VARCHAR(255), 
-      is_blocked TINYINT(1) DEFAULT 0, is_stolen TINYINT(1) DEFAULT 0, is_verified TINYINT(1) DEFAULT 0, 
-      terms_accepted TINYINT(1) DEFAULT 0, nickname VARCHAR(100), email VARCHAR(255), pin_seguridad VARCHAR(4),
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      nombre VARCHAR(255) NOT NULL,
+      telefono VARCHAR(50) NOT NULL UNIQUE,
+      direccion TEXT,
+      ip VARCHAR(100),
+      device_id VARCHAR(255),
+      is_blocked TINYINT(1) DEFAULT 0,
+      is_stolen TINYINT(1) DEFAULT 0,
+      is_verified TINYINT(1) DEFAULT 1,
+      terms_accepted TINYINT(1) DEFAULT 0,
+      nickname VARCHAR(100),
+      email VARCHAR(255),
+      pin_seguridad VARCHAR(10),
+      push_enabled TINYINT(1) DEFAULT 0,
+      last_lat DOUBLE,
+      last_lng DOUBLE,
+      home_lat DOUBLE,
+      home_lng DOUBLE,
+      baja_solicitada TINYINT(1) DEFAULT 0,
+      baja_fecha DATETIME NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS reportes_ciudadanos (
-      id INT AUTO_INCREMENT PRIMARY KEY, usuario_id INT, nombre_contacto VARCHAR(255) NOT NULL, telefono VARCHAR(50) NOT NULL,
-      tipo_reporte VARCHAR(50) DEFAULT 'otros', ubicacion_texto TEXT, foto_base64 LONGTEXT,
-      detalles TEXT, latitud DOUBLE, longitud DOUBLE, fecha_expiracion TIMESTAMP NULL,
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      usuario_id INT,
+      nombre_contacto VARCHAR(255) NOT NULL,
+      telefono VARCHAR(50) NOT NULL,
+      tipo_reporte VARCHAR(50) DEFAULT 'otros',
+      ubicacion_texto TEXT,
+      foto_base64 LONGTEXT,
+      detalles TEXT,
+      latitud DOUBLE,
+      longitud DOUBLE,
+      fecha_expiracion TIMESTAMP NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS locales (
-      id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(255) NOT NULL, direccion TEXT,
-      horario_apertura VARCHAR(10) DEFAULT '08:00', horario_cierre VARCHAR(10) DEFAULT '20:00',
-      dias_atencion VARCHAR(50) DEFAULT 'lun-sab', acepta_efectivo TINYINT(1) DEFAULT 1,
-      acepta_tarjeta TINYINT(1) DEFAULT 0, latitud DOUBLE NOT NULL, longitud DOUBLE NOT NULL,
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      nombre VARCHAR(255) NOT NULL,
+      direccion TEXT,
+      horario_apertura VARCHAR(10) DEFAULT '08:00',
+      horario_cierre VARCHAR(10) DEFAULT '20:00',
+      dias_atencion VARCHAR(50) DEFAULT 'lun-sab',
+      acepta_efectivo TINYINT(1) DEFAULT 1,
+      acepta_tarjeta TINYINT(1) DEFAULT 0,
+      latitud DOUBLE NOT NULL,
+      longitud DOUBLE NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS productos (
-      id INT AUTO_INCREMENT PRIMARY KEY, local_id INT NOT NULL, nombre VARCHAR(255) NOT NULL,
-      marca VARCHAR(255), precio DECIMAL(10,2) NOT NULL, en_stock TINYINT(1) DEFAULT 1, unidad VARCHAR(20) DEFAULT 'kg',
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      local_id INT NOT NULL,
+      nombre VARCHAR(255) NOT NULL,
+      marca VARCHAR(255),
+      precio DECIMAL(10,2) NOT NULL,
+      en_stock TINYINT(1) DEFAULT 1,
+      unidad VARCHAR(20) DEFAULT 'unidad',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS servicios (
-      id INT AUTO_INCREMENT PRIMARY KEY, tipo VARCHAR(100) NOT NULL, nombre_prestador VARCHAR(255) NOT NULL,
-      telefono VARCHAR(50), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      tipo VARCHAR(100) NOT NULL,
+      nombre_prestador VARCHAR(255) NOT NULL,
+      telefono VARCHAR(50),
+      latitud DOUBLE NULL,
+      longitud DOUBLE NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS calificaciones (
-      id INT AUTO_INCREMENT PRIMARY KEY, local_id INT NOT NULL,
-      estrellas INT NOT NULL, comentario TEXT, device_id VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      local_id INT NOT NULL,
+      estrellas INT NOT NULL,
+      comentario TEXT,
+      device_id VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS mascotas_perdidas (
-      id INT AUTO_INCREMENT PRIMARY KEY, nombre_contacto VARCHAR(255) NOT NULL, telefono VARCHAR(50) NOT NULL,
-      ubicacion_extravio TEXT, direccion TEXT, foto_base64 LONGTEXT, tipo_animal VARCHAR(50),
-      caracteristicas TEXT, nombre_mascota VARCHAR(255), comentarios TEXT, latitud DOUBLE, longitud DOUBLE,
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      nombre_contacto VARCHAR(255) NOT NULL,
+      telefono VARCHAR(50) NOT NULL,
+      ubicacion_extravio TEXT,
+      direccion TEXT,
+      foto_base64 LONGTEXT,
+      tipo_animal VARCHAR(50),
+      caracteristicas TEXT,
+      nombre_mascota VARCHAR(255),
+      comentarios TEXT,
+      latitud DOUBLE,
+      longitud DOUBLE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS visitas (
-      id INT AUTO_INCREMENT PRIMARY KEY, device_id VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      device_id VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS mensajes_admin (
-      id INT AUTO_INCREMENT PRIMARY KEY, usuario_id INT NOT NULL, mensaje TEXT NOT NULL,
-      leido TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      usuario_id INT NOT NULL,
+      mensaje TEXT NOT NULL,
+      leido TINYINT(1) DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS muro_comunitario (
-      id INT AUTO_INCREMENT PRIMARY KEY, usuario_id INT NOT NULL, contenido TEXT NOT NULL,
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      usuario_id INT NOT NULL,
+      contenido TEXT NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS registro_emergencias (
-      id INT AUTO_INCREMENT PRIMARY KEY, usuario_id INT NOT NULL, institucion VARCHAR(100) NOT NULL,
-      latitud DOUBLE, longitud DOUBLE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      usuario_id INT NOT NULL,
+      institucion VARCHAR(100) NOT NULL,
+      latitud DOUBLE,
+      longitud DOUBLE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS registro_extravios (
-      id INT AUTO_INCREMENT PRIMARY KEY, usuario_id INT NOT NULL, latitud DOUBLE NOT NULL,
-      longitud DOUBLE NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      usuario_id INT NOT NULL,
+      latitud DOUBLE NOT NULL,
+      longitud DOUBLE NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS push_subscriptions (
-      id INT AUTO_INCREMENT PRIMARY KEY, usuario_id INT NOT NULL, 
-      subscription_json TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      usuario_id INT NOT NULL,
+      subscription_json TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
-    `CREATE TABLE IF NOT EXISTS configuracion ( clave VARCHAR(100) PRIMARY KEY, valor TEXT )`
+    `CREATE TABLE IF NOT EXISTS configuracion (
+      clave VARCHAR(100) PRIMARY KEY,
+      valor TEXT
+    )`
   ];
 
-  for (let q of queries) {
+  for (const q of queries) {
     await mysqlPool.execute(q);
   }
+  console.log('✅ Tablas verificadas');
+}
 
-  const columns = [
-    'ALTER TABLE usuarios ADD COLUMN is_verified TINYINT(1) DEFAULT 0',
-    'ALTER TABLE usuarios ADD COLUMN terms_accepted TINYINT(1) DEFAULT 0',
-    'ALTER TABLE usuarios ADD COLUMN nickname VARCHAR(100)',
-    'ALTER TABLE usuarios ADD COLUMN email VARCHAR(255)',
-    'ALTER TABLE usuarios ADD COLUMN pin_seguridad VARCHAR(4)',
-    'ALTER TABLE usuarios ADD COLUMN push_enabled TINYINT(1) DEFAULT 0',
-    'ALTER TABLE usuarios ADD COLUMN last_lat DOUBLE',
-    'ALTER TABLE usuarios ADD COLUMN last_lng DOUBLE',
-    'ALTER TABLE usuarios ADD COLUMN home_lat DOUBLE',
-    'ALTER TABLE usuarios ADD COLUMN home_lng DOUBLE',
-    'ALTER TABLE usuarios ADD COLUMN baja_solicitada TINYINT(1) DEFAULT 0',
-    'ALTER TABLE usuarios ADD COLUMN baja_fecha DATETIME NULL'
+// ─── AGREGAR COLUMNAS NUEVAS (actualizaciones) ─────────────────────────────────
+
+async function agregarColumnasNuevas() {
+  const columnas = [
+    ['usuarios', 'push_enabled', 'TINYINT(1) DEFAULT 0'],
+    ['usuarios', 'last_lat', 'DOUBLE'],
+    ['usuarios', 'last_lng', 'DOUBLE'],
+    ['usuarios', 'home_lat', 'DOUBLE'],
+    ['usuarios', 'home_lng', 'DOUBLE'],
+    ['usuarios', 'baja_solicitada', 'TINYINT(1) DEFAULT 0'],
+    ['usuarios', 'baja_fecha', 'DATETIME NULL'],
+    ['usuarios', 'is_verified', 'TINYINT(1) DEFAULT 1'],
+    ['usuarios', 'terms_accepted', 'TINYINT(1) DEFAULT 0'],
+    ['usuarios', 'nickname', 'VARCHAR(100)'],
+    ['usuarios', 'email', 'VARCHAR(255)'],
+    ['usuarios', 'pin_seguridad', 'VARCHAR(10)'],
+    ['servicios', 'latitud', 'DOUBLE NULL'],
+    ['servicios', 'longitud', 'DOUBLE NULL'],
   ];
 
-  for (let col of columns) {
+  for (const [tabla, columna, tipo] of columnas) {
     try {
-      await mysqlPool.execute(col);
-      console.log(`✅ Columna procesada: ${col.split('ADD COLUMN ')[1]}`);
+      await mysqlPool.execute(`ALTER TABLE ${tabla} ADD COLUMN ${columna} ${tipo}`);
     } catch (e) {
-      // Ignorar si la columna ya existe
+      // Ignorar si ya existe — es el comportamiento esperado
     }
   }
+}
 
-  for (const servCol of [
-    'ALTER TABLE servicios ADD COLUMN latitud DOUBLE NULL',
-    'ALTER TABLE servicios ADD COLUMN longitud DOUBLE NULL'
-  ]) {
-    try {
-      await mysqlPool.execute(servCol);
-      console.log(`✅ Servicios: ${servCol}`);
-    } catch (e) {
-      /* ya existe */
-    }
-  }
+// ─── CONFIGURACIÓN POR DEFECTO ────────────────────────────────────────────────
 
+async function insertarConfiguracionPorDefecto() {
   const configs = [
     ['admin_whatsapp', '56987606517'],
     ['tel_carabineros', '133'],
@@ -187,34 +277,108 @@ async function createCloudTables() {
     ['push_radius', '500'],
     ['admin_pass1', 'barrio2025'],
     ['admin_pass2', 'admin2025'],
-    ['admin_pass3', 'seguridad2025']
+    ['admin_pass3', 'seguridad2025'],
+    ['whatsapp_vecinos', '56987606517']
   ];
 
-  for (let [clave, valor] of configs) {
+  for (const [clave, valor] of configs) {
     try {
-      const [exists] = await mysqlPool.execute('SELECT clave FROM configuracion WHERE clave = ?', [clave]);
-      if (exists.length === 0) {
+      const [rows] = await mysqlPool.execute('SELECT clave FROM configuracion WHERE clave = ?', [clave]);
+      if (rows.length === 0) {
         await mysqlPool.execute('INSERT INTO configuracion (clave, valor) VALUES (?, ?)', [clave, valor]);
-        console.log(`✅ Configuración creada: ${clave}`);
       }
-    } catch (e) {
-      console.error(`❌ Error en config ${clave}:`, e.message);
-    }
+    } catch (e) { /* ignorar */ }
   }
 }
 
-async function queryAll(sql, params = []) {
-  if (useMysql) {
-    const [rows] = await mysqlPool.execute(sql, params);
-    return rows;
-  } else {
-    const stmt = sqliteDb.prepare(sql);
-    stmt.bind(params);
-    const rows = [];
-    while (stmt.step()) rows.push(stmt.getAsObject());
-    stmt.free();
-    return rows;
+// ─── MIGRACIÓN ÚNICA DESDE SQLITE ─────────────────────────────────────────────
+
+async function migrarDesdeLocalSiNecesario() {
+  // Solo migrar si MySQL está vacío Y existe barrio.db con datos
+  if (!fs.existsSync(DB_PATH)) return;
+
+  const [rows] = await mysqlPool.query('SELECT COUNT(*) as total FROM usuarios');
+  if (rows[0].total > 0) {
+    console.log(`✅ MySQL ya tiene ${rows[0].total} usuarios. Sin migración necesaria.`);
+    return;
   }
+
+  // Cargar SQLite
+  let sqliteDb;
+  try {
+    const SQL = await initSqlJs();
+    const buf = fs.readFileSync(DB_PATH);
+    sqliteDb = new SQL.Database(buf);
+  } catch (e) {
+    console.warn('⚠️ No se pudo leer barrio.db:', e.message);
+    return;
+  }
+
+  // Verificar que SQLite tiene usuarios
+  const checkUsers = sqliteDb.exec('SELECT COUNT(*) as total FROM usuarios');
+  const totalSQLite = checkUsers[0]?.values[0][0] || 0;
+  if (totalSQLite === 0) {
+    console.log('ℹ️ SQLite también está vacío. Sin migración.');
+    sqliteDb.close();
+    return;
+  }
+
+  console.log(`📦 Migrando ${totalSQLite} usuarios desde SQLite → MySQL...`);
+
+  // Orden: tablas padre primero, luego tablas hijo
+  const tablas = [
+    'configuracion', 'usuarios', 'locales',
+    'productos', 'servicios', 'calificaciones',
+    'reportes_ciudadanos', 'mascotas_perdidas',
+    'muro_comunitario', 'mensajes_admin',
+    'registro_emergencias', 'registro_extravios',
+    'push_subscriptions', 'visitas'
+  ];
+
+  for (const tabla of tablas) {
+    try {
+      const result = sqliteDb.exec(`SELECT * FROM ${tabla}`);
+      if (!result.length || !result[0].values.length) continue;
+
+      const cols = result[0].columns;
+      const vals = result[0].values;
+
+      console.log(`  → ${tabla}: ${vals.length} registros`);
+
+      for (const row of vals) {
+        const valores = row.map(v => (v === undefined ? null : v));
+        const ph = cols.map(() => '?').join(',');
+        await mysqlPool.execute(
+          `INSERT IGNORE INTO ${tabla} (${cols.join(',')}) VALUES (${ph})`,
+          valores
+        ).catch(() => {}); // ignorar duplicados
+      }
+
+      // Actualizar AUTO_INCREMENT al valor correcto
+      await mysqlPool.execute(
+        `ALTER TABLE ${tabla} AUTO_INCREMENT = 1`
+      ).catch(() => {});
+
+    } catch (e) {
+      // Tabla puede no existir en SQLite — ignorar
+    }
+  }
+
+  sqliteDb.close();
+  console.log('✅ Migración completada. Todos los usuarios y datos conservados.');
+  
+  // Renombrar barrio.db para que no se migre de nuevo en futuros reinicios
+  try {
+    fs.renameSync(DB_PATH, DB_PATH + '.migrado');
+    console.log('✅ barrio.db renombrado a barrio.db.migrado (ya no se necesita)');
+  } catch(e) { /* ignorar si no se puede renombrar */ }
+}
+
+// ─── FUNCIONES DE CONSULTA ─────────────────────────────────────────────────────
+
+async function queryAll(sql, params = []) {
+  const [rows] = await mysqlPool.execute(sql, params);
+  return rows;
 }
 
 async function queryOne(sql, params = []) {
@@ -223,204 +387,17 @@ async function queryOne(sql, params = []) {
 }
 
 async function runSql(sql, params = []) {
-  if (useMysql) {
-    const [result] = await mysqlPool.execute(sql, params);
-    return result;
-  } else {
-    sqliteDb.run(sql, params);
-    saveSqlite();
-    // Obtener el último ID insertado en SQLite para compatibilidad
-    const last = sqliteDb.exec('SELECT last_insert_rowid() as id');
-    const id = last[0]?.values[0][0];
-    return { insertId: id };
-  }
+  const [result] = await mysqlPool.execute(sql, params);
+  return result;
 }
 
-function saveSqlite() {
-  if (!useMysql && sqliteDb) {
-    const data = sqliteDb.export();
-    fs.writeFileSync(DB_PATH, Buffer.from(data));
-  }
-}
-
-function initSqliteTables() {
-  // Tabla completa de usuarios con TODAS las columnas necesarias
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS usuarios (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL,
-    telefono TEXT NOT NULL UNIQUE,
-    direccion TEXT,
-    ip TEXT,
-    device_id TEXT,
-    is_blocked INTEGER DEFAULT 0,
-    is_stolen INTEGER DEFAULT 0,
-    is_verified INTEGER DEFAULT 0,
-    terms_accepted INTEGER DEFAULT 0,
-    nickname TEXT,
-    email TEXT,
-    pin_seguridad TEXT,
-    push_enabled INTEGER DEFAULT 0,
-    last_lat REAL,
-    last_lng REAL,
-    home_lat REAL,
-    home_lng REAL,
-    baja_solicitada INTEGER DEFAULT 0,
-    baja_fecha TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS reportes_ciudadanos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    usuario_id INTEGER,
-    nombre_contacto TEXT NOT NULL,
-    telefono TEXT NOT NULL,
-    tipo_reporte TEXT DEFAULT 'otros',
-    ubicacion_texto TEXT,
-    foto_base64 TEXT,
-    detalles TEXT,
-    latitud REAL,
-    longitud REAL,
-    fecha_expiracion TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS locales (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL,
-    direccion TEXT,
-    horario_apertura TEXT DEFAULT '08:00',
-    horario_cierre TEXT DEFAULT '20:00',
-    dias_atencion TEXT DEFAULT 'lun-sab',
-    acepta_efectivo INTEGER DEFAULT 1,
-    acepta_tarjeta INTEGER DEFAULT 0,
-    latitud REAL NOT NULL,
-    longitud REAL NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS productos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    local_id INTEGER NOT NULL,
-    nombre TEXT NOT NULL,
-    marca TEXT,
-    precio REAL NOT NULL,
-    en_stock INTEGER DEFAULT 1,
-    unidad TEXT DEFAULT 'kg',
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS servicios (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    tipo TEXT NOT NULL,
-    nombre_prestador TEXT NOT NULL,
-    telefono TEXT,
-    latitud REAL,
-    longitud REAL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS calificaciones (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    local_id INTEGER NOT NULL,
-    estrellas INTEGER NOT NULL,
-    comentario TEXT,
-    device_id TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS mascotas_perdidas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre_contacto TEXT NOT NULL,
-    telefono TEXT NOT NULL,
-    ubicacion_extravio TEXT,
-    direccion TEXT,
-    foto_base64 TEXT,
-    tipo_animal TEXT,
-    caracteristicas TEXT,
-    nombre_mascota TEXT,
-    comentarios TEXT,
-    latitud REAL,
-    longitud REAL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS visitas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    device_id TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS mensajes_admin (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    usuario_id INTEGER NOT NULL,
-    mensaje TEXT NOT NULL,
-    leido INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS muro_comunitario (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    usuario_id INTEGER NOT NULL,
-    contenido TEXT NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS registro_emergencias (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    usuario_id INTEGER NOT NULL,
-    institucion TEXT NOT NULL,
-    latitud REAL,
-    longitud REAL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS registro_extravios (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    usuario_id INTEGER NOT NULL,
-    latitud REAL NOT NULL,
-    longitud REAL NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS push_subscriptions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    usuario_id INTEGER NOT NULL,
-    subscription_json TEXT NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  sqliteDb.run(`CREATE TABLE IF NOT EXISTS configuracion (
-    clave TEXT PRIMARY KEY,
-    valor TEXT
-  )`);
-
-  // Insertar configuraciones por defecto
-  const configs = [
-    ['admin_whatsapp', '56987606517'],
-    ['tel_carabineros', '133'],
-    ['tel_bomberos', '132'],
-    ['tel_pdi', '134'],
-    ['tel_ambulancia', '131'],
-    ['tel_seguridad', '1529'],
-    ['push_radius', '500'],
-    ['admin_pass1', 'barrio2025'],
-    ['admin_pass2', 'admin2025'],
-    ['admin_pass3', 'seguridad2025']
-  ];
-
-  for (let [clave, valor] of configs) {
-    sqliteDb.run('INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?, ?)', [clave, valor]);
-  }
-
-  saveSqlite();
-}
+// ─── LIMPIEZA PERIÓDICA ────────────────────────────────────────────────────────
 
 async function cleanupMascotas() {
-  const sql = useMysql 
-    ? "DELETE FROM mascotas_perdidas WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)"
-    : "DELETE FROM mascotas_perdidas WHERE created_at < DATETIME('now', '-30 days')";
   try {
-    const result = await runSql(sql);
+    const result = await runSql(
+      "DELETE FROM mascotas_perdidas WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)"
+    );
     return result.affectedRows || 0;
   } catch (e) {
     console.error('Error en limpieza de mascotas:', e);
@@ -429,11 +406,10 @@ async function cleanupMascotas() {
 }
 
 async function cleanupReportes() {
-  const sql = useMysql 
-    ? "DELETE FROM reportes_ciudadanos WHERE fecha_expiracion < NOW()"
-    : "DELETE FROM reportes_ciudadanos WHERE fecha_expiracion < DATETIME('now')";
   try {
-    const result = await runSql(sql);
+    const result = await runSql(
+      "DELETE FROM reportes_ciudadanos WHERE fecha_expiracion IS NOT NULL AND fecha_expiracion < NOW()"
+    );
     return result.affectedRows || 0;
   } catch (e) {
     console.error('Error en limpieza de reportes:', e);
@@ -441,4 +417,7 @@ async function cleanupReportes() {
   }
 }
 
-module.exports = { initDatabase, queryAll, queryOne, runSql, cleanupMascotas, cleanupReportes, isUsingMysql: () => useMysql };
+// isUsingMysql siempre retorna true — solo usamos MySQL
+function isUsingMysql() { return true; }
+
+module.exports = { initDatabase, queryAll, queryOne, runSql, cleanupMascotas, cleanupReportes, isUsingMysql };

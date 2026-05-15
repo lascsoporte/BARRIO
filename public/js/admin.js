@@ -160,16 +160,17 @@ const Admin = {
           <button type="button" id="btnLogout" class="btn btn-sm btn-outline">Salir</button>
         </div>
         <div class="admin-tabs">
-          <button type="button" class="admin-tab active" data-tab="resumen">📊 Resumen</button>
+          <button type="button" class="admin-tab active" data-tab="usuarios">👥 Usuarios</button>
+          <button type="button" class="admin-tab" data-tab="reportes">📢 Reportes</button>
+          <button type="button" class="admin-tab" data-tab="buzon">📬 Buzón</button>
+          <button type="button" class="admin-tab" data-tab="muro">💬 Muro</button>
+          <button type="button" class="admin-tab" data-tab="emergencias">🚨 Emergencias</button>
+          <button type="button" class="admin-tab" data-tab="ubicacion">📍 Rastreo</button>
+          <button type="button" class="admin-tab" data-tab="mascotas">🐶 Mascotas</button>
           <button type="button" class="admin-tab" data-tab="locales">🏪 Locales</button>
           <button type="button" class="admin-tab" data-tab="productos">📦 Productos</button>
           <button type="button" class="admin-tab" data-tab="servicios">🔧 Servicios</button>
-          <button type="button" class="admin-tab" data-tab="usuarios">👥 Usuarios</button>
-          <button type="button" class="admin-tab" data-tab="muro">💬 Muro</button>
-          <button type="button" class="admin-tab" data-tab="buzon">📬 Buzón</button>
-          <button type="button" class="admin-tab" data-tab="ubicacion">📍 Rastreo</button>
-          <button type="button" class="admin-tab" data-tab="reportes">📢 Reportes</button>
-          <button type="button" class="admin-tab" data-tab="emergencias">🚨 Emergencias</button>
+          <button type="button" class="admin-tab" data-tab="resumen">📊 Resumen</button>
           <button type="button" class="admin-tab" data-tab="configuracion">⚙️ Configuración</button>
         </div>
         <div id="adminContent" style="background:white;padding:14px;border-radius:12px;min-height:300px;box-shadow:0 4px 10px rgba(0,0,0,0.05);"></div>
@@ -189,7 +190,7 @@ const Admin = {
       };
     });
 
-    this.currentTab = 'resumen';
+    this.currentTab = 'usuarios';
     this.loadTab();
   },
 
@@ -219,6 +220,38 @@ const Admin = {
         const c2 = document.getElementById('adminChartCanvas2');
         if (c1 && window.Chart) this._chart = new Chart(c1.getContext('2d'), this.lineChart('Visitas', analytics.visitasDia, '#FF6B35', 'rgba(255,107,53,0.12)'));
         if (c2 && window.Chart) this._chart2 = new Chart(c2.getContext('2d'), this.barChart('Cantidad', analytics.reportesTipo, 'tipo', 'n', true));
+        return;
+      }
+
+      // ── MASCOTAS PERDIDAS ──
+      if (this.currentTab === 'mascotas') {
+        const data = await API.adminGetMascotas(this.token);
+        box.innerHTML = `
+          <div class="admin-toolbar">${this.exportBtn('/api/admin/export/mascotas','planilla_mascotas.csv','📥 Planilla mascotas')}</div>
+          <div class="admin-table-wrap"><table class="admin-table"><thead><tr>
+            <th>ID</th><th>Fecha</th><th>Mascota</th><th>Tipo</th><th>Contacto</th><th>Tel</th><th>Lugar</th><th>Características</th><th>Foto</th><th>Acción</th>
+          </tr></thead><tbody>
+          ${data.map(m=>`<tr>
+            <td>${this.esc(m.id)}</td>
+            <td>${this.formatDate(m.created_at)}</td>
+            <td><b>${this.esc(m.nombre_mascota||'Sin nombre')}</b></td>
+            <td>${this.esc(m.tipo_animal||'—')}</td>
+            <td>${this.esc(m.nombre_contacto)}</td>
+            <td>${this.esc(m.telefono)}</td>
+            <td>${this.esc(this.trunc(m.ubicacion_extravio||'—',40))}</td>
+            <td>${this.esc(this.trunc(m.caracteristicas||'—',60))}</td>
+            <td>${m.foto_base64?`<img src="${m.foto_base64}" style="width:50px;height:50px;object-fit:cover;border-radius:4px;">`:'—'}</td>
+            <td><button class="btn-del btn-del-mascota" data-id="${m.id}">🗑️</button></td>
+          </tr>`).join('')}
+          </tbody></table></div>`;
+        this.bindDownloads(box);
+        box.querySelectorAll('.btn-del-mascota').forEach(btn => {
+          btn.onclick = async () => {
+            if (!confirm('¿Eliminar este aviso de mascota?')) return;
+            try { await API.del(`/api/admin/mascotas/${btn.dataset.id}`, this.token); this.toast('Aviso eliminado'); this.loadTab(); }
+            catch(e) { alert(e.message); }
+          };
+        });
         return;
       }
 

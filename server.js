@@ -53,6 +53,7 @@ function httpGetWithRedirects(targetUrl, maxRedirects = 5) {
 const { initDatabase, cleanupMascotas, cleanupReportes, isUsingMysql, ...dbHelper } = require('./database');
 const nodemailer = require('nodemailer');
 const webpush = require('web-push');
+const { Server: SocketIO } = require('socket.io');
 
 // VAPID keys para notificaciones push
 const publicVapidKey = 'BPfYyug0EiK_oS0FRF8w-k2WpxoDs79-DZjjFI505RsAeUrzi5e88XPgsj8Pp2YV6pZfMtnb-IXiYN8tJ9mgrFc';
@@ -105,12 +106,14 @@ const mailTransporter = nodemailer.createTransport({
   tls: { rejectUnauthorized: false }
 });
 
-function sendEmailPin(to, nickname, pin) {
-  // Leer texto configurable desde BD (async, pero usamos valores por defecto si no están listos)
-  queryOne("SELECT valor FROM configuracion WHERE clave = 'email_pin_asunto'").then(rowAsunto => {
-  queryOne("SELECT valor FROM configuracion WHERE clave = 'email_pin_bienvenida'").then(rowBienvenida => {
-  queryOne("SELECT valor FROM configuracion WHERE clave = 'email_pin_texto'").then(rowTexto => {
-  queryOne("SELECT valor FROM configuracion WHERE clave = 'email_pin_pie'").then(rowPie => {
+async function sendEmailPin(to, nickname, pin) {
+  try {
+    const [rowAsunto, rowBienvenida, rowTexto, rowPie] = await Promise.all([
+      queryOne("SELECT valor FROM configuracion WHERE clave = 'email_pin_asunto'"),
+      queryOne("SELECT valor FROM configuracion WHERE clave = 'email_pin_bienvenida'"),
+      queryOne("SELECT valor FROM configuracion WHERE clave = 'email_pin_texto'"),
+      queryOne("SELECT valor FROM configuracion WHERE clave = 'email_pin_pie'")
+    ]);
     const asunto = rowAsunto?.valor || '🔐 Tu PIN de Seguridad - BARRIO';
     const bienvenida = rowBienvenida?.valor || '¡Bienvenido/a a BARRIO! 🏘️';
     const textoCrudo = rowTexto?.valor || 'Hola {nombre}, tu registro fue exitoso. Este es tu PIN de seguridad: {pin}. Guárdalo en un lugar seguro.';
@@ -131,11 +134,11 @@ function sendEmailPin(to, nickname, pin) {
           </div>
         </div>`
     };
-    mailTransporter.sendMail(mailOptions, (err) => {
-      if (err) console.error('❌ Error enviando email:', err.message);
-      else console.log('✅ Email PIN enviado a:', to);
-    });
-  });});});});
+    await mailTransporter.sendMail(mailOptions);
+    console.log('✅ Email PIN enviado a:', to);
+  } catch(err) {
+    console.error('❌ Error enviando email:', err.message);
+  }
 }
 
 async function queryAll(sql, params = []) { return await dbHelper.queryAll(sql, params); }
@@ -341,10 +344,9 @@ app.get('/api/servicios/tipos', async (req, res) => {
 });
 
 app.get('/api/reportes', async (req, res) => {
-  const sql = isUsingMysql() 
-    ? `SELECT r.*, COALESCE(u.nickname, u.nombre) as autor_nick FROM reportes_ciudadanos r LEFT JOIN usuarios u ON r.usuario_id = u.id WHERE r.fecha_expiracion > NOW() OR r.fecha_expiracion IS NULL ORDER BY r.created_at DESC`
-    : `SELECT r.*, COALESCE(u.nickname, u.nombre) as autor_nick FROM reportes_ciudadanos r LEFT JOIN usuarios u ON r.usuario_id = u.id WHERE r.fecha_expiracion > datetime('now') OR r.fecha_expiracion IS NULL ORDER BY r.created_at DESC`;
-  res.json(await queryAll(sql));
+  res.json(await queryAll(
+    `SELECT r.*, COALESCE(u.nickname, u.nombre) as autor_nick FROM reportes_ciudadanos r LEFT JOIN usuarios u ON r.usuario_id = u.id WHERE r.fecha_expiracion > NOW() OR r.fecha_expiracion IS NULL ORDER BY r.created_at DESC`
+  ));
 });
 
 app.post('/api/reportes', async (req, res) => {
@@ -357,12 +359,18 @@ app.post('/api/reportes', async (req, res) => {
   }
   
   const exp = new Date(Date.now() + (parseInt(duracion_horas)||24)*3600000).toISOString().slice(0,19).replace('T',' ');
-  await runSql('INSERT INTO reportes_ciudadanos (usuario_id, nombre_contacto, telefono, tipo_reporte, detalles, latitud, longitud, fecha_expiracion) VALUES (?,?,?,?,?,?,?,?)', [usuario_id||null, nombre_contacto, telefono, tipo_reporte, detalles||'', latitud, longitud, exp]);
+  await runSql('INSERT INTO reportes_ciudadanos (usuario_id, nombre_contacto, telefono, tipo_reporte, detalles, latitud, longitud, fecha_expiracion, foto_base64) VALUES (?,?,?,?,?,?,?,?,?)', [usuario_id||null, nombre_contacto, telefono, tipo_reporte, detalles||'', latitud, longitud, exp, req.body.foto_base64||null]);
   const mapaReporte = (latitud && longitud) ? `\n📍 <a href="https://maps.google.com/?q=${latitud},${longitud}">Ver en mapa</a>` : '';
   sendTelegramAlert(`📢 <b>NUEVO REPORTE</b>\n🕐 ${fechaChile(new Date())}\nTipo: ${tipo_reporte}\nPor: ${user?.nickname || user?.nombre || nombre_contacto}\nDetalles: ${detalles||'Sin detalles'}${mapaReporte}`);
   
   // Enviar Notificación Push (Solo a vecinos cercanos)
   sendPushToNearbyUsers(latitud, longitud, `🚨 REPORTE: ${tipo_reporte.toUpperCase()}`, detalles || 'Hay un nuevo reporte cerca de tu ubicación.', usuario_id);
+
+  // Emitir en tiempo real a todos los clientes conectados
+  try {
+    const nuevoReporte = await queryOne('SELECT r.*, COALESCE(u.nickname, u.nombre) as autor_nick FROM reportes_ciudadanos r LEFT JOIN usuarios u ON r.usuario_id = u.id ORDER BY r.id DESC LIMIT 1');
+    if (nuevoReporte) req.app.get('io')?.emit('nuevo_reporte', nuevoReporte);
+  } catch(e) {}
   
   res.json({ ok: true });
 });
@@ -405,6 +413,26 @@ app.post('/api/registro', async (req, res) => {
     user = { ...user, nombre, email, nickname, pin_seguridad, home_lat, home_lng, direccion };
     sendTelegramAlert(`🔄 <b>PERFIL ACTUALIZADO</b>\nUsuario: ${nickname || nombre}`);
   }
+  res.json({ user });
+});
+
+app.post('/api/login', async (req, res) => {
+  const { telefono, pin, device_id } = req.body;
+  if (!telefono || !pin) return res.status(400).json({ error: 'Teléfono y PIN son obligatorios' });
+
+  const user = await queryOne('SELECT * FROM usuarios WHERE telefono = ?', [telefono]);
+  
+  if (!user) return res.status(401).json({ error: 'Teléfono no registrado en BARRIO' });
+  if (String(user.pin_seguridad) !== String(pin)) return res.status(401).json({ error: 'PIN incorrecto' });
+  if (user.is_blocked) return res.status(403).json({ error: 'Cuenta bloqueada. Contacta al administrador.' });
+
+  // Actualizar device_id con el nuevo celular
+  if (device_id && device_id !== user.device_id) {
+    await runSql('UPDATE usuarios SET device_id = ? WHERE id = ?', [device_id, user.id]);
+    user.device_id = device_id;
+  }
+
+  sendTelegramAlert(`🔑 <b>LOGIN</b>\n🕐 ${fechaChile(new Date())}\nUsuario: ${user.nickname||user.nombre}\nTel: ${user.telefono}`);
   res.json({ user });
 });
 
@@ -470,7 +498,7 @@ app.post('/api/push/subscribe', async (req, res) => {
 });
 
 app.get('/api/ping', async (req, res) => {
-  res.json({ status: 'ok', server: 'BARRIO PRO', db: isUsingMysql() ? 'Cloud' : 'Local', time: new Date().toISOString() });
+  res.json({ status: 'ok', server: 'BARRIO PRO', db: 'Cloud (MySQL)', time: new Date().toISOString() });
 });
 app.post('/api/ping', async (req, res) => {
   const { device_id, lat, lng } = req.body;
@@ -660,7 +688,7 @@ app.put('/api/admin/passwords', authMw, async (req, res) => {
 app.get('/api/admin/stats', authMw, async (req, res) => {
   const totalVisitas = (await queryOne('SELECT COUNT(*) as count FROM visitas')).count;
   const uniqueUsers = (await queryOne('SELECT COUNT(*) as count FROM usuarios')).count;
-  const visitasHoy = (await queryOne(isUsingMysql() ? 'SELECT COUNT(*) as count FROM visitas WHERE DATE(created_at) = CURDATE()' : "SELECT COUNT(*) as count FROM visitas WHERE date(created_at) = date('now')")).count;
+  const visitasHoy = (await queryOne('SELECT COUNT(*) as count FROM visitas WHERE DATE(created_at) = CURDATE()')).count;
   const totalMascotas = (await queryOne('SELECT COUNT(*) as count FROM mascotas_perdidas')).count;
   const topLocales = await queryAll('SELECT l.nombre, COUNT(c.id) as calif_count, AVG(c.estrellas) as avg_estrellas FROM locales l LEFT JOIN calificaciones c ON l.id = c.local_id GROUP BY l.id ORDER BY calif_count DESC LIMIT 5');
   res.json({ totalVisitas, uniqueUsers, visitasHoy, totalMascotas, topLocales });
@@ -752,6 +780,10 @@ app.delete('/api/admin/muro/:id', authMw, async (req, res) => {
   await runSql('DELETE FROM muro_comunitario WHERE id = ?', [req.params.id]);
   sendTelegramAlert(`🗑️ <b>ADMIN: POST MURO BORRADO</b>\nID: ${req.params.id}`);
   res.json({ ok: true });
+});
+
+app.get('/api/admin/mascotas', authMw, async (req, res) => {
+  res.json(await queryAll('SELECT * FROM mascotas_perdidas ORDER BY created_at DESC'));
 });
 
 app.delete('/api/admin/mascotas/:id', authMw, async (req, res) => {
@@ -853,6 +885,15 @@ app.delete('/api/admin/servicios/:id', authMw, async (req, res) => {
   await runSql('DELETE FROM servicios WHERE id = ?', [req.params.id]);
   sendTelegramAlert(`🗑️ <b>ADMIN: SERVICIO ELIMINADO</b>\nID: ${req.params.id}`);
   res.json({ ok: true });
+});
+
+app.get('/api/admin/export/mascotas', authMw, async (req, res) => {
+  const rows = await queryAll('SELECT id, nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, created_at FROM mascotas_perdidas ORDER BY created_at DESC');
+  sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla mascotas perdidas.`);
+  sendCsvDownload(res, 'planilla_mascotas.csv',
+    ['id','nombre_mascota','tipo_animal','nombre_contacto','telefono','ubicacion_extravio','caracteristicas','created_at'],
+    ['id','nombre_mascota','tipo_animal','nombre_contacto','telefono','ubicacion_extravio','caracteristicas','created_at'],
+    rows);
 });
 
 app.get('/api/admin/export/servicios', authMw, async (req, res) => {
@@ -979,42 +1020,19 @@ app.post('/api/admin/config/correo', authMw, async (req, res) => {
 
 
 app.get('/api/admin/analytics', authMw, async (req, res) => {
-  const mysql = isUsingMysql();
-  let visitasDia;
-  let registrosDia;
-  let muroDia;
-  let buzonDia;
-  let ubicacionDia;
-  if (mysql) {
-    visitasDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM visitas WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
-    registrosDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM usuarios WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
-    muroDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM muro_comunitario WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
-    buzonDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM mensajes_admin WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
-    ubicacionDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM registro_extravios WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
-  } else {
-    visitasDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM visitas WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
-    registrosDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM usuarios WHERE date(created_at) >= date('now', '-30 days') GROUP BY date(created_at) ORDER BY dia`);
-    muroDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM muro_comunitario WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
-    buzonDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM mensajes_admin WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
-    ubicacionDia = await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM registro_extravios WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
-  }
-  const reportesTipo = await queryAll('SELECT tipo_reporte as tipo, COUNT(*) as n FROM reportes_ciudadanos GROUP BY tipo_reporte ORDER BY n DESC');
-  const emergInst = await queryAll('SELECT institucion, COUNT(*) as n FROM registro_emergencias GROUP BY institucion ORDER BY n DESC');
-  const reportesDia = mysql
-    ? await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM reportes_ciudadanos WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`)
-    : await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM reportes_ciudadanos WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
-  const emergenciasDia = mysql
-    ? await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM registro_emergencias WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`)
-    : await queryAll(`SELECT date(created_at) as dia, COUNT(*) as n FROM registro_emergencias WHERE date(created_at) >= date('now', '-14 days') GROUP BY date(created_at) ORDER BY dia`);
-  const productosLocal = await queryAll(`
-    SELECT l.nombre as nombre, COUNT(p.id) as n
-    FROM locales l LEFT JOIN productos p ON p.local_id = l.id
-    GROUP BY l.id, l.nombre ORDER BY n DESC LIMIT 15
-  `);
-  res.json({
-    visitasDia, registrosDia, muroDia, buzonDia, ubicacionDia, reportesDia, emergenciasDia,
-    reportesTipo, emergInst, productosLocal,
-  });
+  const [visitasDia, registrosDia, muroDia, buzonDia, ubicacionDia, reportesDia, emergenciasDia, reportesTipo, emergInst, productosLocal] = await Promise.all([
+    queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM visitas WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`),
+    queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM usuarios WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) GROUP BY DATE(created_at) ORDER BY dia`),
+    queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM muro_comunitario WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`),
+    queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM mensajes_admin WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`),
+    queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM registro_extravios WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`),
+    queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM reportes_ciudadanos WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`),
+    queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM registro_emergencias WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`),
+    queryAll(`SELECT tipo_reporte as tipo, COUNT(*) as n FROM reportes_ciudadanos GROUP BY tipo_reporte ORDER BY n DESC`),
+    queryAll(`SELECT institucion, COUNT(*) as n FROM registro_emergencias GROUP BY institucion ORDER BY n DESC`),
+    queryAll(`SELECT l.nombre as nombre, COUNT(p.id) as n FROM locales l LEFT JOIN productos p ON p.local_id = l.id GROUP BY l.id, l.nombre ORDER BY n DESC LIMIT 15`)
+  ]);
+  res.json({ visitasDia, registrosDia, muroDia, buzonDia, ubicacionDia, reportesDia, emergenciasDia, reportesTipo, emergInst, productosLocal });
 });
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
@@ -1048,8 +1066,22 @@ async function start() {
     await initDatabase();
     await loadPasswords();
     
-    // LUEGO iniciar el servidor
-    app.listen(PORT, '0.0.0.0', () => {
+    // Crear servidor HTTP con Socket.io
+    const httpServer = http.createServer(app);
+    const io = new SocketIO(httpServer, {
+      cors: { origin: '*', methods: ['GET', 'POST'] }
+    });
+
+    // Hacer io accesible globalmente para emitir desde endpoints
+    app.set('io', io);
+
+    io.on('connection', (socket) => {
+      console.log('🔌 Cliente conectado al mapa en tiempo real');
+      socket.on('disconnect', () => {});
+    });
+
+    // Iniciar servidor
+    httpServer.listen(PORT, '0.0.0.0', () => {
       console.log(`✅ Servidor escuchando en puerto ${PORT}`);
       scheduleRenderKeepAlive();
       sendTelegramAlert(`🚀 <b>SISTEMA BARRIO INICIADO</b>\nServidor online y base de datos lista.`);

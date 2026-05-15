@@ -113,9 +113,38 @@ const App = {
  checkExtravio();
  setInterval(checkExtravio, 60000);
 
+ // ── REPORTES EN TIEMPO REAL (Socket.io) ──
+ try {
+   if (typeof io !== 'undefined') {
+     const socket = io();
+     socket.on('nuevo_reporte', (reporte) => {
+       // Si estamos en el HOME, agregar el marcador al mapa sin recargar
+       if ((location.hash === '' || location.hash === '#/' || location.hash === '#') && window._homeMap) {
+         const icons = { 'robo': '🦹', 'extravío': '🚨', 'incendio': '🔥', 'accidente': '🚗', 'sospechoso': '👤', 'mascota': '🐶', 'otros': '📍' };
+         if (reporte.latitud && reporte.longitud) {
+           const marker = L.marker([reporte.latitud, reporte.longitud], {
+             icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px;background:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 4px rgba(0,0,0,0.2);border:2px solid var(--primary);">${icons[reporte.tipo_reporte] || '📍'}</div>`})
+           }).addTo(window._homeMap);
+           const fotoHtml = reporte.foto_base64 ? `<img src="${reporte.foto_base64}" style="width:100%;max-height:140px;object-fit:cover;border-radius:6px;margin:6px 0;">` : '';
+           const waLink = `https://wa.me/?text=${encodeURIComponent(`🚨 BARRIO ALERTA\n${reporte.tipo_reporte.toUpperCase()}: ${(reporte.detalles||'').slice(0,100)}\nVer en mapa: https://maps.google.com/?q=${reporte.latitud},${reporte.longitud}`)}`;
+           marker.bindPopup(`
+             <div style="font-family:Nunito,sans-serif;min-width:180px;max-width:240px;">
+               <strong style="color:var(--primary);text-transform:uppercase;">${icons[reporte.tipo_reporte]||'📍'} ${reporte.tipo_reporte}</strong>
+               ${fotoHtml}
+               <p style="font-size:0.85rem;margin:4px 0;">${(reporte.detalles||'Sin detalles').slice(0,100)}</p>
+               <small style="color:#999;">Por: ${reporte.autor_nick||'Vecino'}</small><br>
+               <a href="${waLink}" target="_blank" style="display:inline-block;margin-top:6px;padding:4px 10px;background:#25D366;color:white;border-radius:6px;font-size:0.8rem;text-decoration:none;font-weight:bold;">📤 Compartir</a>
+             </div>
+           `).openPopup();
+         }
+         App.toast(`🚨 Nuevo reporte: ${reporte.tipo_reporte.toUpperCase()}`);
+       }
+     });
+   }
+ } catch(e) {}
+
  } catch(e) { 
  console.warn('Error general en continueInit:', e);
- // NO resetear sesión por errores de red
  if (e.message && e.message.includes('Error 404')) {
    App._fullReset();
    return;
@@ -144,10 +173,10 @@ const App = {
       }
     }
     
-    // 2. Si hay modal (.auth-overlay) abierto, cerrarlo y volver al HOME
-    const deleteModal = document.querySelector('.auth-overlay');
-    if (deleteModal) {
-      deleteModal.remove();
+    // 2. Si hay modal de acción (.auth-overlay pero NO el de registro) cerrarlo y volver al HOME
+    const actionModal = document.querySelector('.auth-overlay:not(.auth-registro-modal)');
+    if (actionModal) {
+      actionModal.remove();
       document.body.classList.remove('modal-open');
       location.hash = '#/';
       return;
@@ -332,7 +361,7 @@ const App = {
           App.toast('✅ Alertas activadas correctamente');
         } catch(e) {
           console.error('❌ Error suscripción push:', e);
-          App.toast('Alertas no activadas, podu00e1s habilitarlas mu00e1s tarde');
+          App.toast('Alertas no activadas, puedes habilitarlas más tarde');
           localStorage.setItem('barrio_push_enabled', 'denied_temp');
         }
       } else {
@@ -548,6 +577,7 @@ const App = {
     setTimeout(() => {
       try {
         const map = L.map('homeMap', { zoomControl: false }).setView([-41.4693, -72.9423], 13);
+        window._homeMap = map; // Guardar referencia para Socket.io
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         API.getReportes().then(reports => {
           reports.forEach(r => {
@@ -556,11 +586,18 @@ const App = {
               const marker = L.marker([r.latitud, r.longitud], {
                 icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px; background:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2); border:2px solid var(--primary);">${icons[r.tipo_reporte] || '📍'}</div>`})
               }).addTo(map);
+              const fotoHtml = r.foto_base64
+                ? `<img src="${r.foto_base64}" style="width:100%;max-height:140px;object-fit:cover;border-radius:6px;margin:6px 0;">`
+                : '';
+              const resumen = r.detalles ? r.detalles.slice(0, 100) + (r.detalles.length > 100 ? '…' : '') : 'Sin detalles';
+              const waLink = `https://wa.me/?text=${encodeURIComponent(`🚨 BARRIO ALERTA\n${r.tipo_reporte.toUpperCase()}: ${resumen}\nVer en mapa: https://maps.google.com/?q=${r.latitud},${r.longitud}`)}`;
               marker.bindPopup(`
-                <div style="font-family:Nunito, sans-serif;">
-                  <strong style="color:var(--primary); text-transform:uppercase;">${r.tipo_reporte}</strong><br>
-                  <span style="font-size:0.9rem;">${r.detalles || 'Sin detalles'}</span><br>
-                  <small style="color:#999;">Reportado por: ${r.autor_nick || 'Vecino'}</small>
+                <div style="font-family:Nunito,sans-serif;min-width:180px;max-width:240px;">
+                  <strong style="color:var(--primary);text-transform:uppercase;font-size:0.95rem;">${icons[r.tipo_reporte] || '📍'} ${r.tipo_reporte}</strong>
+                  ${fotoHtml}
+                  <p style="font-size:0.85rem;margin:4px 0;color:#333;">${resumen}</p>
+                  <small style="color:#999;">Por: ${r.autor_nick || 'Vecino'}</small><br>
+                  <a href="${waLink}" target="_blank" style="display:inline-block;margin-top:6px;padding:4px 10px;background:#25D366;color:white;border-radius:6px;font-size:0.8rem;text-decoration:none;font-weight:bold;">📤 Compartir</a>
                 </div>
               `);
             }
@@ -799,6 +836,18 @@ const App = {
     <input type="text" id="reportUbicacion" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="📍 Ubicación (Pincha en el mapa)" readonly style="width:100%; padding:10px; margin:10px 0; border-radius:8px; border:1px solid #CCC; background:#EEE;">
     <textarea id="reportDetalles" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Detalles adicionales (opcional)" rows="3" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #CCC; font-family:Nunito, sans-serif; font-size:1rem;"></textarea>
     
+    <!-- Foto opcional -->
+    <div style="margin-bottom:12px;">
+      <input type="file" id="reportFotoInput" accept="image/*" capture="environment" style="display:none;">
+      <button type="button" id="btnAgregarFoto" style="width:100%; padding:10px; border-radius:8px; border:2px dashed #CCC; background:#FAFAFA; color:#666; font-size:0.9rem; cursor:pointer; font-family:Nunito,sans-serif;">
+        📷 Agregar foto (opcional)
+      </button>
+      <div id="fotoPreview" style="display:none; margin-top:8px; position:relative;">
+        <img id="fotoPreviewImg" style="width:100%; max-height:200px; object-fit:cover; border-radius:8px; border:2px solid var(--primary);">
+        <button type="button" id="btnQuitarFoto" style="position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.6); color:white; border:none; border-radius:50%; width:28px; height:28px; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
+      </div>
+    </div>
+    
     <label style="display:block; margin-bottom:5px; font-weight:bold; font-size:0.85rem;">Duración en el mapa:</label>
     <select id="reportDuracion" style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #CCC;">
       <option value="1">1 hora</option>
@@ -831,14 +880,21 @@ const App = {
           reports.forEach(r => {
             if (r.latitud && r.longitud) {
               const icons = { 'robo': '🦹', 'extravío': '🚨', 'incendio': '🔥', 'accidente': '🚗', 'sospechoso': '👤', 'mascota': '🐶', 'otros': '📍' };
+              const fotoHtmlR = r.foto_base64
+                ? `<img src="${r.foto_base64}" style="width:100%;max-height:140px;object-fit:cover;border-radius:6px;margin:6px 0;">`
+                : '';
+              const resumenR = r.detalles ? r.detalles.slice(0, 100) + (r.detalles.length > 100 ? '…' : '') : 'Sin detalles';
+              const waLinkR = `https://wa.me/?text=${encodeURIComponent(`🚨 BARRIO ALERTA\n${r.tipo_reporte.toUpperCase()}: ${resumenR}\nVer en mapa: https://maps.google.com/?q=${r.latitud},${r.longitud}`)}`;
               const m = L.marker([r.latitud, r.longitud], {
                 icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px; background:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2); border:2px solid #BBB;">${icons[r.tipo_reporte] || '📍'}</div>`})
               }).addTo(map);
               m.bindPopup(`
-                <div style="font-family:Nunito, sans-serif;">
-                  <strong style="color:var(--primary); text-transform:uppercase;">${r.tipo_reporte}</strong><br>
-                  <span style="font-size:0.9rem;">${r.detalles || 'Sin detalles'}</span><br>
-                  <small style="color:#999;">Reportado por: ${r.autor_nick || 'Vecino'}</small>
+                <div style="font-family:Nunito,sans-serif;min-width:180px;max-width:240px;">
+                  <strong style="color:var(--primary);text-transform:uppercase;font-size:0.95rem;">${icons[r.tipo_reporte] || '📍'} ${r.tipo_reporte}</strong>
+                  ${fotoHtmlR}
+                  <p style="font-size:0.85rem;margin:4px 0;color:#333;">${resumenR}</p>
+                  <small style="color:#999;">Por: ${r.autor_nick || 'Vecino'}</small><br>
+                  <a href="${waLinkR}" target="_blank" style="display:inline-block;margin-top:6px;padding:4px 10px;background:#25D366;color:white;border-radius:6px;font-size:0.8rem;text-decoration:none;font-weight:bold;">📤 Compartir</a>
                 </div>
               `);
             }
@@ -894,6 +950,65 @@ const App = {
       });
     });
 
+    // ── FOTO CON COMPRESIÓN AUTOMÁTICA ──
+    let fotoBase64 = null;
+
+    // Función de compresión — reduce foto a máximo 500KB
+    const comprimirFoto = (file) => new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX = 1024; // máximo 1024px en el lado más largo
+          let w = img.width, h = img.height;
+          if (w > h && w > MAX) { h = (h * MAX) / w; w = MAX; }
+          else if (h > MAX) { w = (w * MAX) / h; h = MAX; }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          // Comprimir a calidad 0.7 (70%) — suficiente para ver bien
+          const compressed = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(compressed);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('btnAgregarFoto').onclick = () => {
+      document.getElementById('reportFotoInput').click();
+    };
+
+    document.getElementById('reportFotoInput').onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const btn = document.getElementById('btnAgregarFoto');
+      btn.textContent = '⏳ Comprimiendo foto...';
+      btn.disabled = true;
+      try {
+        fotoBase64 = await comprimirFoto(file);
+        document.getElementById('fotoPreviewImg').src = fotoBase64;
+        document.getElementById('fotoPreview').style.display = 'block';
+        btn.textContent = '📷 Cambiar foto';
+        btn.style.borderColor = 'var(--primary)';
+        btn.style.color = 'var(--primary)';
+      } catch(err) {
+        btn.textContent = '📷 Agregar foto (opcional)';
+        App.toast('No se pudo procesar la foto');
+      }
+      btn.disabled = false;
+    };
+
+    document.getElementById('btnQuitarFoto').onclick = () => {
+      fotoBase64 = null;
+      document.getElementById('fotoPreview').style.display = 'none';
+      document.getElementById('reportFotoInput').value = '';
+      const btn = document.getElementById('btnAgregarFoto');
+      btn.textContent = '📷 Agregar foto (opcional)';
+      btn.style.borderColor = '#CCC';
+      btn.style.color = '#666';
+    };
+
     document.getElementById('btnSubmitReporte').addEventListener('click', () => {
       const detalles = document.getElementById('reportDetalles').value.trim();
       const duracion = document.getElementById('reportDuracion').value;
@@ -901,16 +1016,23 @@ const App = {
 
       this.requireAuth(async (user) => {
         try {
+          const btn = document.getElementById('btnSubmitReporte');
+          btn.disabled = true; btn.textContent = 'Publicando...';
           await API.createReporte({
             usuario_id: user.id,
             nombre_contacto: user.nombre, telefono: user.telefono,
             tipo_reporte: selectedTipo, detalles, latitud: selectedLat, longitud: selectedLng,
             duracion_horas: duracion,
-            device_id: this.deviceId // Para rastreo de dispositivos extraviados
+            foto_base64: fotoBase64 || null,
+            device_id: this.deviceId
           });
-          App.toast("Reporte publicado con éxito");
+          App.toast("✅ Reporte publicado");
           location.hash = '#/';
-        } catch(e) { App.toast("Error al publicar"); }
+        } catch(e) {
+          document.getElementById('btnSubmitReporte').disabled = false;
+          document.getElementById('btnSubmitReporte').textContent = 'Publicar Reporte';
+          App.toast("Error al publicar");
+        }
       });
     });
 
@@ -926,9 +1048,11 @@ const App = {
             <div style="font-weight:bold; font-size:1.1rem; margin-bottom:5px;">
               ${r.tipo_reporte.toUpperCase()} - ${new Date(r.created_at).toLocaleTimeString('es-CL')}
             </div>
+            ${r.foto_base64 ? `<img src="${r.foto_base64}" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-bottom:8px;">` : ''}
             <p style="font-size:0.9rem; margin:0;">${r.detalles || 'Sin detalles adicionales.'}</p>
-            <div style="font-size:0.75rem; color:#999; margin-top:10px; text-align:right;">
-              Reportado por: ${r.autor_nick || 'Vecino Verificado'}
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+              <span style="font-size:0.75rem; color:#999;">Por: ${r.autor_nick || 'Vecino Verificado'}</span>
+              <a href="https://wa.me/?text=${encodeURIComponent(`🚨 BARRIO ALERTA\n${r.tipo_reporte.toUpperCase()}: ${(r.detalles||'').slice(0,100)}\nVer en mapa: https://maps.google.com/?q=${r.latitud},${r.longitud}`)}" target="_blank" style="padding:4px 10px;background:#25D366;color:white;border-radius:6px;font-size:0.8rem;text-decoration:none;font-weight:bold;">📤 Compartir</a>
             </div>
           </div>
         `).join('');
@@ -1527,50 +1651,196 @@ const App = {
     }
     
     const modal = document.createElement('div');
-    modal.className = 'auth-overlay';
+    modal.className = 'auth-overlay auth-registro-modal';
     modal.innerHTML = `
     <div class="auth-modal fade-in">
       ${!mandatory ? '<button class="auth-close" onclick="this.parentElement.parentElement.remove()">&times;</button>' : ''}
-      <div style="font-size:3rem; margin-bottom:10px;">🏘️</div>
-      <h2 style="text-transform:uppercase; letter-spacing:1px;">Registro de Vecino</h2>
-      <p style="font-size:0.9rem; color:var(--text-light); margin-bottom:10px;">Únete a la red de seguridad y comercio de tu barrio.</p>
-      <div class="form-grid-auth">
-        <div class="form-group">
-          <label>Nombre Real</label>
-          <input type="text" id="authNombre" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Ej: Juan Pérez">
-        </div>
-        <div class="form-group">
-          <label>Nickname (Público)</label>
-          <input type="text" id="authNickname" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Ej: VecinoMirasol">
-        </div>
+      
+      <!-- PASO 1: ¿Ya tienes cuenta o eres nuevo? -->
+      <div id="authStep1">
+        <div style="font-size:3rem; margin-bottom:10px;">🏘️</div>
+        <h2 style="text-transform:uppercase; letter-spacing:1px; font-size:1.2rem;">Bienvenido a BARRIO</h2>
+        <p style="font-size:0.9rem; color:var(--text-light); margin-bottom:20px;">La red de seguridad y comercio de tu barrio.</p>
+        <button id="btnYaTengo" class="btn btn-primary" style="width:100%;margin-bottom:12px;font-weight:900;padding:14px;">📱 YA TENGO CUENTA</button>
+        <button id="btnSoyNuevo" class="btn btn-outline" style="width:100%;font-weight:900;padding:14px;">✨ REGISTRARME</button>
+      </div>
+
+      <!-- PASO 2A: Recuperar cuenta con teléfono + PIN -->
+      <div id="authStep2Login" style="display:none;">
+        <div style="font-size:2.5rem; margin-bottom:10px;">🔐</div>
+        <h2 style="text-transform:uppercase; letter-spacing:1px; font-size:1.2rem;">Recuperar Cuenta</h2>
+        <p style="font-size:0.85rem; color:var(--text-light); margin-bottom:16px;">Ingresa tu teléfono y PIN para volver a entrar.</p>
         <div class="form-group">
           <label>Teléfono</label>
-          <input type="tel" id="authTelefono" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="+569...">
+          <input type="tel" id="loginTelefono" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" inputmode="tel" placeholder="+56912345678" style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:1rem;box-sizing:border-box;">
         </div>
-        <div class="form-group">
-          <label>Correo Electrónico</label>
-          <input type="email" id="authEmail" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Para recibir tu PIN">
+        <div class="form-group" style="margin-top:10px;">
+          <label>PIN de seguridad (4 dígitos)</label>
+          <input type="password" id="loginPin" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" inputmode="numeric" maxlength="4" placeholder="****" style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:1.5rem;letter-spacing:8px;text-align:center;box-sizing:border-box;">
         </div>
-        <div class="form-group">
-          <label>PIN Seguridad (4 dígitos)</label>
-          <input type="password" id="authPin" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" maxlength="4" placeholder="****">
-        </div>
-        <div class="form-group">
-          <label>Población/Sector (Referencia)</label>
-          <input type="text" id="authDireccion" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="📍 Pincha el mapa para detectar tu sector" readonly style="background:#EEF2FF;color:#555;cursor:default;">
-        </div>
+        <p id="loginError" style="color:#D32F2F;font-size:0.85rem;margin:8px 0;display:none;"></p>
+        <button id="btnLoginSubmit" class="btn btn-primary" style="width:100%;margin-top:12px;font-weight:900;padding:14px;">ENTRAR</button>
+        <button id="btnVolver1" style="background:none;border:none;color:#999;margin-top:12px;cursor:pointer;width:100%;font-size:0.9rem;">← Volver</button>
       </div>
-      <p style="font-size:0.8rem; color:var(--primary); font-weight:bold; margin:10px 0 5px;">📍 MARCA TU HOGAR EN EL MAPA</p>
-      <div id="homeSelectMap" style="height: 180px; width: 100%; border-radius: 12px; margin-bottom: 10px; border: 2px solid var(--primary); z-index:1;"></div>
-      <button id="authSubmit" class="btn btn-primary" style="margin-top:10px; width:100%; font-weight:900;">REGISTRARME AHORA</button>
-      <p style="font-size:0.7rem; color:var(--text-light); margin-top:15px;">Tus datos reales son privados. El PIN se enviará a tu correo.</p>
+
+      <!-- PASO 2B: Formulario de registro nuevo -->
+      <div id="authStep2Register" style="display:none;">
+        <div style="font-size:2rem; margin-bottom:8px;">🏘️</div>
+        <h2 style="text-transform:uppercase; letter-spacing:1px; font-size:1.1rem; margin-bottom:8px;">Registro de Vecino</h2>
+        <p style="font-size:0.85rem; color:var(--text-light); margin-bottom:10px;">Únete a la red de tu barrio.</p>
+        <div class="form-grid-auth">
+          <div class="form-group">
+            <label>Nombre Real</label>
+            <input type="text" id="authNombre" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Ej: Juan Pérez">
+          </div>
+          <div class="form-group">
+            <label>Nickname (Público)</label>
+            <input type="text" id="authNickname" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Ej: VecinoMirasol">
+          </div>
+          <div class="form-group">
+            <label>Teléfono</label>
+            <input type="tel" id="authTelefono" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="+569...">
+          </div>
+          <div class="form-group">
+            <label>Correo Electrónico</label>
+            <input type="email" id="authEmail" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="Para recibir tu PIN">
+          </div>
+          <div class="form-group">
+            <label>PIN Seguridad (4 dígitos)</label>
+            <input type="password" id="authPin" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" maxlength="4" placeholder="****">
+          </div>
+          <div class="form-group">
+            <label>Población/Sector (Referencia)</label>
+            <input type="text" id="authDireccion" autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" placeholder="📍 Pincha el mapa para detectar tu sector" readonly style="background:#EEF2FF;color:#555;cursor:default;">
+          </div>
+        </div>
+        <p style="font-size:0.8rem; color:var(--primary); font-weight:bold; margin:10px 0 5px;">📍 MARCA TU HOGAR EN EL MAPA</p>
+        <div id="homeSelectMap" style="height: 180px; width: 100%; border-radius: 12px; margin-bottom: 10px; border: 2px solid var(--primary); z-index:1;"></div>
+        <button id="authSubmit" class="btn btn-primary" style="margin-top:10px; width:100%; font-weight:900;">REGISTRARME AHORA</button>
+        <button id="btnVolver2" style="background:none;border:none;color:#999;margin-top:10px;cursor:pointer;width:100%;font-size:0.9rem;">← Volver</button>
+        <p style="font-size:0.7rem; color:var(--text-light); margin-top:10px;">Tus datos reales son privados. El PIN se enviará a tu correo.</p>
+      </div>
     </div>
     `;
     document.body.appendChild(modal);
 
-    // Declarar ANTES del listener para que el click siempre pueda leer los valores
+    // ── NAVEGACIÓN ENTRE PASOS ──
+    const step1 = document.getElementById('authStep1');
+    const step2Login = document.getElementById('authStep2Login');
+    const step2Register = document.getElementById('authStep2Register');
+
+    document.getElementById('btnYaTengo').onclick = () => {
+      step1.style.display = 'none';
+      step2Login.style.display = 'block';
+      document.getElementById('loginTelefono').focus();
+    };
+
+    document.getElementById('btnSoyNuevo').onclick = () => {
+      step1.style.display = 'none';
+      step2Register.style.display = 'block';
+      setTimeout(() => initMapaHogar(), 300);
+    };
+
+    document.getElementById('btnVolver1').onclick = () => {
+      step2Login.style.display = 'none';
+      step1.style.display = 'block';
+    };
+
+    document.getElementById('btnVolver2').onclick = () => {
+      step2Register.style.display = 'none';
+      step1.style.display = 'block';
+    };
+
+    // ── LOGIN CON TELÉFONO + PIN ──
+    document.getElementById('btnLoginSubmit').onclick = async () => {
+      const telefono = document.getElementById('loginTelefono').value.trim();
+      const pin = document.getElementById('loginPin').value.trim();
+      const errEl = document.getElementById('loginError');
+      const btn = document.getElementById('btnLoginSubmit');
+
+      if (!telefono) { errEl.textContent = 'Ingresa tu teléfono.'; errEl.style.display = 'block'; return; }
+      if (!pin || pin.length !== 4) { errEl.textContent = 'El PIN debe ser de 4 dígitos.'; errEl.style.display = 'block'; return; }
+
+      errEl.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Verificando...';
+
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telefono, pin, device_id: this.deviceId })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          errEl.textContent = data.error || '❌ Teléfono o PIN incorrecto.';
+          errEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'ENTRAR';
+          return;
+        }
+
+        // ✅ Login exitoso — guardar sesión y entrar
+        localStorage.setItem('barrio_user', JSON.stringify(data.user));
+        modal.remove();
+        this.toast(`✅ ¡Bienvenido/a de vuelta ${data.user.nickname || data.user.nombre}!`);
+        this.continueInit(data.user);
+
+      } catch(e) {
+        errEl.textContent = 'Error de conexión. Intenta de nuevo.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'ENTRAR';
+      }
+    };
+
+    // Permitir Enter en el PIN para hacer login
+    document.getElementById('loginPin').onkeypress = (e) => {
+      if (e.key === 'Enter') document.getElementById('btnLoginSubmit').click();
+    };
+
+    // ── REGISTRO NUEVO ──
     let homeLat = null, homeLng = null;
     let homeMarker = null;
+
+    const initMapaHogar = () => {
+      // Iniciar mapa de hogar
+      setTimeout(() => {
+        try {
+          const hMap = L.map('homeSelectMap').setView([-41.4693, -72.9423], 13);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(hMap);
+          hMap.on('click', async (e) => {
+            homeLat = e.latlng.lat;
+            homeLng = e.latlng.lng;
+            if (homeMarker) hMap.removeLayer(homeMarker);
+            homeMarker = L.marker([homeLat, homeLng], {
+              icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px; background:var(--primary); color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.4); border:2px solid white;">🏠</div>`})
+            }).addTo(hMap);
+            const dirInput = document.getElementById('authDireccion');
+            if (dirInput) {
+              dirInput.value = '📍 Obteniendo nombre del sector...';
+              dirInput.style.color = '#999';
+              try {
+                const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${homeLat}&lon=${homeLng}&format=json&accept-language=es`, { headers: { 'Accept-Language': 'es' } });
+                const geoData = await geoRes.json();
+                const addr = geoData.address || {};
+                const sector = addr.suburb || addr.neighbourhood || addr.quarter || addr.village || addr.hamlet || '';
+                const calle = addr.road || addr.pedestrian || '';
+                const ciudad = addr.city || addr.town || 'Puerto Montt';
+                const partes = [sector, calle].filter(Boolean);
+                dirInput.value = partes.length > 0 ? partes.join(', ') + ', ' + ciudad : ciudad;
+                dirInput.style.color = '';
+              } catch(geoErr) {
+                dirInput.value = `Sector ${homeLat.toFixed(4)}, ${homeLng.toFixed(4)}`;
+                dirInput.style.color = '';
+              }
+            }
+          });
+          if (Geo.userLat) hMap.setView([Geo.userLat, Geo.userLng], 16);
+        } catch(e) { console.error("Error al cargar mapa de hogar"); }
+      }, 300);
+    };
 
     document.getElementById('authSubmit').addEventListener('click', async () => {
       const nombre = document.getElementById('authNombre').value.trim();
@@ -1594,62 +1864,21 @@ const App = {
           direccion, device_id: this.deviceId, terms_accepted: termsAccepted,
           home_lat: homeLat, home_lng: homeLng
         });
-        // Guardar usuario y acceder directamente (is_verified=1 automático)
         const savedUser = res.user;
         localStorage.setItem('barrio_user', JSON.stringify(savedUser));
         this.toast(`¡Bienvenido/a ${nickname}! Registro completado.`);
         modal.remove();
-        // Ingresar a la app directamente sin esperar verificación manual
         this.continueInit(savedUser);
       } catch (err) {
         btn.disabled = false;
-        btn.textContent = 'Registrarme AHORA';
-        
-        // Mostrar mensaje específico de geofencing
+        btn.textContent = 'REGISTRARME AHORA';
         if (err.message && err.message.includes('FUERA_DE_COBERTURA')) {
-          alert('⚠️ Ubicación fuera del área de cobertura\n\nPor favor, marca tu casa dentro de Puerto Montt en el mapa. Esta app solo funciona para residentes de Puerto Montt y alrededores.');
+          alert('⚠️ Ubicación fuera del área de cobertura\n\nPor favor, marca tu casa dentro de Puerto Montt en el mapa.');
         } else {
           this.toast(err.message || 'Error al registrar');
         }
       }
     });
-
-    // Iniciar mapa de hogar
-    setTimeout(() => {
-      try {
-        const hMap = L.map('homeSelectMap').setView([-41.4693, -72.9423], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(hMap);
-        hMap.on('click', async (e) => {
-          homeLat = e.latlng.lat;
-          homeLng = e.latlng.lng;
-          if (homeMarker) hMap.removeLayer(homeMarker);
-          homeMarker = L.marker([homeLat, homeLng], {
-            icon: L.divIcon({className: 'map-pin', html: `<div style="font-size:18px; background:var(--primary); color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.4); border:2px solid white;">🏠</div>`})
-          }).addTo(hMap);
-          // Autorellenar campo Sector/Población con reverse geocoding
-          const dirInput = document.getElementById('authDireccion');
-          if (dirInput) {
-            dirInput.value = '📍 Obteniendo nombre del sector...';
-            dirInput.style.color = '#999';
-            try {
-              const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${homeLat}&lon=${homeLng}&format=json&accept-language=es`, { headers: { 'Accept-Language': 'es' } });
-              const geoData = await geoRes.json();
-              const addr = geoData.address || {};
-              const sector = addr.suburb || addr.neighbourhood || addr.quarter || addr.village || addr.hamlet || '';
-              const calle = addr.road || addr.pedestrian || '';
-              const ciudad = addr.city || addr.town || 'Puerto Montt';
-              const partes = [sector, calle].filter(Boolean);
-              dirInput.value = partes.length > 0 ? partes.join(', ') + ', ' + ciudad : ciudad;
-              dirInput.style.color = '';
-            } catch(geoErr) {
-              dirInput.value = `Sector ${homeLat.toFixed(4)}, ${homeLng.toFixed(4)}`;
-              dirInput.style.color = '';
-            }
-          }
-        });
-        if (Geo.userLat) hMap.setView([Geo.userLat, Geo.userLng], 16);
-      } catch(e) { console.error("Error al cargar mapa de hogar"); }
-    }, 500);
   },
 
  showPendingVerification() {

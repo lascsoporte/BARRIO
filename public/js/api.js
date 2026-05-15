@@ -133,6 +133,7 @@ const API = {
   adminDeleteUsuario(id, token) { return this.del(`/api/admin/usuarios/${id}`, token); },
   adminGetEmergencias(token) { return this.get('/api/admin/emergencias', token); },
   adminGetRastreo(token) { return this.get('/api/admin/ubicacion', token); },
+  adminGetMascotas(token) { return this.get('/api/admin/mascotas', token); },
   adminGetMuro(token) { return this.get('/api/admin/muro', token); },
   adminGetAnalytics(token) { return this.get('/api/admin/analytics', token); },
   async adminDownloadBlob(path, token, filename) {
