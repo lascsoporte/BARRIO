@@ -38,18 +38,28 @@ const App = {
   try {
     const localUser = JSON.parse(userStr);
     if (localUser && localUser.id) {
-      const serverUser = await API.checkUser(localUser.id);
-      localStorage.setItem('barrio_user', JSON.stringify(serverUser));
-    }
-    } catch(e) {
-      console.warn('Sesión no verificada:', e.message);
-      // Si el usuario fue eliminado por el admin (404), limpiar todo y reiniciar como nuevo
-      if (e.message && e.message.includes('404')) {
-        App._fullReset();
-        return;
+      // Intentar verificar con servidor, pero con tolerancia a fallos
+      try {
+        const serverUser = await API.checkUser(localUser.id);
+        localStorage.setItem('barrio_user', JSON.stringify(serverUser));
+      } catch(e) {
+        // Si es 404 real → usuario eliminado por admin → borrar sesión
+        if (e.message && e.message.includes('Error 404')) {
+          App._fullReset();
+          return;
+        }
+        // Si es TIMEOUT, error de red, error 500, etc → 
+        // NO borrar sesión, usar datos locales que ya tenemos
+        console.warn('No se pudo verificar con servidor, usando datos locales:', e.message);
+        // Continuar con el usuario local guardado
       }
     }
+  } catch(e) {
+    console.warn('Error parseando usuario local:', e.message);
+    // Solo si el JSON está corrupto, resetear
+    localStorage.removeItem('barrio_user');
   }
+ }
 
   this.requireAuth((user) => {
   this.continueInit(user);
@@ -65,14 +75,25 @@ const App = {
  this.config = {};
  
  try {
- this.config = await API.getConfig();
+ this.config = await API.getConfig().catch(() => ({}));
  
- const serverUser = await API.checkUser(user.id);
- localStorage.setItem('barrio_user', JSON.stringify(serverUser));
- if (serverUser.is_verified === 0) {
- document.getElementById('app').innerHTML = ''; 
- this.showPendingVerification();
- return; 
+ try {
+   const serverUser = await API.checkUser(user.id);
+   localStorage.setItem('barrio_user', JSON.stringify(serverUser));
+   if (serverUser.is_verified === 0) {
+     document.getElementById('app').innerHTML = ''; 
+     this.showPendingVerification();
+     return; 
+   }
+   user = serverUser;
+ } catch(e) {
+   // Si es 404 real → usuario eliminado por admin
+   if (e.message && e.message.includes('Error 404')) {
+     App._fullReset();
+     return;
+   }
+   // Cualquier otro error (timeout, red, 500) → seguir con datos locales
+   console.warn('Servidor no disponible, usando datos locales:', e.message);
  }
 
  document.getElementById('btnLateralWhatsapp').href = this.config.whatsapp_vecinos || '#';
@@ -93,10 +114,11 @@ const App = {
  setInterval(checkExtravio, 60000);
 
  } catch(e) { 
- console.warn('Error al verificar usuario o cargar config', e);
- if (e.message && e.message.includes('404')) {
- App._fullReset();
- return;
+ console.warn('Error general en continueInit:', e);
+ // NO resetear sesión por errores de red
+ if (e.message && e.message.includes('Error 404')) {
+   App._fullReset();
+   return;
  }
  }
 
@@ -122,16 +144,18 @@ const App = {
       }
     }
     
-    // 2. Si hay modal de eliminación de cuenta, cerrarlo
+    // 2. Si hay modal (.auth-overlay) abierto, cerrarlo y volver al HOME
     const deleteModal = document.querySelector('.auth-overlay');
     if (deleteModal) {
       deleteModal.remove();
+      document.body.classList.remove('modal-open');
+      location.hash = '#/';
       return;
     }
     
-    // 3. Si NO estamos en home y el hash está vacío (indica back button), ir a home
+    // 3. Si NO estamos en home → ir al home
     const currentHash = location.hash || '#/';
-    if (currentHash === '' || currentHash === '#') {
+    if (currentHash !== '#/' && currentHash !== '') {
       location.hash = '#/';
       return;
     }
@@ -997,7 +1021,8 @@ const App = {
 
  // Solicitud de eliminación de cuenta
  solicitarBaja() {
-   const user = App.currentUser;
+   const userStr = localStorage.getItem('barrio_user');
+   const user = userStr ? JSON.parse(userStr) : null;
    if (!user) return;
 
    // Primera confirmación
@@ -1857,8 +1882,7 @@ const App = {
  <textarea autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" id="contactoInput" placeholder="Escribe tu mensaje aquí..." rows="5" style="width:100%; padding:14px; border-radius:8px; border:2px solid #E5E7EB; margin-bottom:15px; font-family:inherit; resize:vertical; outline:none; font-size:1rem;"></textarea>
  <button id="btnEnviarContacto" class="btn btn-primary" style="width:100%; margin-bottom:15px;">Enviar Mensaje</button>
  <div style="border-top:1px solid #EEE; padding-top:15px; text-align:center;">
- <p style="font-size:0.85rem; color:#666; margin-bottom:8px;">¿Extraviaste el celular y tenías la app instalada?</p>
- <button id="btnReportarRobo" class="btn btn-sm" style="background:#D32F2F; color:white; width:100%; justify-content:center;">Reporta teléfono extraviado al administrador</button>
+ <p style="font-size:0.85rem; color:#666; margin-bottom:8px;">¿Extraviaste el celular? Ve a <a href="#/legal" style="color:#673AB7; font-weight:bold;">Aviso Legal</a> para reportarlo.</p>
  </div>
  </div>
  `;
@@ -1891,46 +1915,6 @@ const App = {
  });
  });
 
- document.getElementById('btnReportarRobo').addEventListener('click', () => {
- const num = prompt("Por seguridad, ingresa el NÚMERO DE TELÉFONO que extraviaste (Formato: +569XXXXXXXX):");
- if (!num) return;
- 
- // Validación formato WhatsApp (+ y 11 dígitos)
- const phoneRegex = /^\+\d{11}$/;
- if (!phoneRegex.test(num.replace(/\s+/g, ''))) {
- return alert("Formato inválido. Debe comenzar con + y tener 11 números (Ej: +56912345678)");
- }
-
- this.requireAuth(async (user) => {
- const btn = document.getElementById('btnReportarRobo');
- btn.disabled = true;
- btn.textContent = 'Procesando reporte...';
-
- try {
- // Intentar obtener ubicación del denunciante como referencia (opcional)
- if (!Geo.userLat || !Geo.userLng) {
- await Geo.getUserLocation().catch(() => {});
- }
- const lat = Geo.userLat;
- const lng = Geo.userLng;
- const refGps = (lat && lng) ? `\n📍 Ubicación del Denunciante: https://maps.google.com/?q=${lat},${lng}` : "\n📍 Ubicación del Denunciante: No disponible (GPS desactivado)";
-
- // Llamamos al nuevo sistema que separa al reportero del teléfono perdido
- await API.reportarExtravio({ 
- reporting_user_id: user.id, 
- reported_phone: num,
- mensaje_extra: refGps
- });
-
- alert("Alerta enviada y el teléfono reportado quedará marcado como extraviado en la plataforma BARRIO.");
- } catch(e) { 
- this.toast('Error al reportar'); 
- } finally {
- btn.disabled = false;
- btn.textContent = "Reporta teléfono extraviado al administrador";
- }
- });
- });
  const f = document.createElement('div');
  f.innerHTML = this.footerHtml();
  container.appendChild(f);

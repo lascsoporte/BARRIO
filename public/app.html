@@ -68,37 +68,10 @@
   <script src="/js/admin.js?v=10"></script>
   
   <script>
-    // --- REPARACIÓN DE ACCESO ADMINISTRADOR ---
-    // Credenciales configuradas según tu solicitud
-    const ADMIN_CREDENTIALS = {
-      user: "admin",
-      pass: "AccesoTemporal2026"
-    };
-
-    // Función global de validación (sobrescribe o complementa la lógica de admin.js si es necesario)
-    window.validarAccesoAdmin = function(usuario, password) {
-      if (usuario === ADMIN_CREDENTIALS.user && password === ADMIN_CREDENTIALS.pass) {
-        console.log("Acceso concedido");
-        localStorage.setItem('admin_session', 'active');
-        return true;
-      }
-      return false;
-    };
-
     // Registrar Service Worker (necesario para PWA y push notifications)
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(e => console.warn('SW error:', e));
     }
-
-    // Manejador de errores global
-    window.onerror = function(msg, url, line) {
-      const div = document.createElement('div');
-      div.style = "position:fixed;top:0;left:0;width:100%;background:red;color:white;padding:20px;z-index:10000;font-family:sans-serif;";
-      div.innerHTML = "<b>⚠️ Error:</b> " + msg + "<br><small>" + url + ":" + line + "</small>";
-      document.body.appendChild(div);
-      const loader = document.querySelector('.loading-screen');
-      if (loader) loader.style.display = 'none';
-    };
   </script>
   
   <script src="/js/app.js?v=10"></script>

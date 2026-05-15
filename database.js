@@ -26,17 +26,17 @@ async function initDatabase() {
   
   // Intentar MySQL primero, pero con timeout corto
   try {
-    console.log('⏱️  Probando conexión a la nube (timeout 5s)...');
+    console.log('⏱️  Probando conexión a la nube (timeout 10s)...');
     mysqlPool = mysql.createPool({
       ...mysqlConfig,
-      connectTimeout: 5000, // 5 segundos máximo
-      acquireTimeout: 5000
+      connectTimeout: 10000,
+      acquireTimeout: 10000
     });
     
     // Prueba de conexión con timeout
     const testConnection = await Promise.race([
       mysqlPool.query('SELECT 1'),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
     ]);
     
     useMysql = true;

@@ -95,43 +95,47 @@ function sendTelegramAlert(message) {
 }
 
 const mailTransporter = nodemailer.createTransport({
-  host: process.env.MAIL_HOST || 'mail.puertomas.cl',
+  host: process.env.MAIL_HOST || 'c1800365.ferozo.com',
   port: parseInt(process.env.MAIL_PORT) || 465,
   secure: true,
   auth: {
     user: process.env.MAIL_USER || 'contacto@puertomas.cl',
-    pass: process.env.MAIL_PASS || 'TU_PASSWORD_AQUI' // ⚠️ CAMBIAR: configurar MAIL_PASS en variables de entorno
-  }
+    pass: process.env.MAIL_PASS || 'Andres1619'
+  },
+  tls: { rejectUnauthorized: false }
 });
 
 function sendEmailPin(to, nickname, pin) {
-  const mailOptions = {
-    from: `"BARRIO Seguridad" <${process.env.MAIL_USER || 'contacto@puertomas.cl'}>`,
-    to,
-    subject: '🔐 Tu PIN de Seguridad - BARRIO Puerto Montt',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f9f9f9;">
-        <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-          <h2 style="color: #673AB7; margin-bottom: 20px;">¡Bienvenido/a a BARRIO! 🏘️</h2>
-          <p style="font-size: 16px; color: #333; line-height: 1.6;">Hola <strong>${nickname}</strong>,</p>
-          <p style="font-size: 16px; color: #333; line-height: 1.6;">Tu registro fue exitoso. Este es tu <strong>PIN de Seguridad</strong> para acceder a funciones especiales:</p>
-          <div style="background: #673AB7; color: white; font-size: 32px; font-weight: bold; text-align: center; padding: 20px; border-radius: 8px; margin: 25px 0; letter-spacing: 8px;">
-            ${pin}
+  // Leer texto configurable desde BD (async, pero usamos valores por defecto si no están listos)
+  queryOne("SELECT valor FROM configuracion WHERE clave = 'email_pin_asunto'").then(rowAsunto => {
+  queryOne("SELECT valor FROM configuracion WHERE clave = 'email_pin_bienvenida'").then(rowBienvenida => {
+  queryOne("SELECT valor FROM configuracion WHERE clave = 'email_pin_texto'").then(rowTexto => {
+  queryOne("SELECT valor FROM configuracion WHERE clave = 'email_pin_pie'").then(rowPie => {
+    const asunto = rowAsunto?.valor || '🔐 Tu PIN de Seguridad - BARRIO';
+    const bienvenida = rowBienvenida?.valor || '¡Bienvenido/a a BARRIO! 🏘️';
+    const textoCrudo = rowTexto?.valor || 'Hola {nombre}, tu registro fue exitoso. Este es tu PIN de seguridad: {pin}. Guárdalo en un lugar seguro.';
+    const pie = rowPie?.valor || 'BARRIO - Seguridad Ciudadana';
+    const textoFinal = textoCrudo.replace(/\{nombre\}/g, nickname).replace(/\{pin\}/g, pin);
+    const mailOptions = {
+      from: `"BARRIO Seguridad" <contacto@puertomas.cl>`,
+      to,
+      subject: asunto,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;background:#f9f9f9;">
+          <div style="background:white;padding:30px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+            <h2 style="color:#673AB7;margin-bottom:20px;">${bienvenida}</h2>
+            <p style="font-size:16px;color:#333;line-height:1.6;">${textoFinal.replace(/\n/g,'<br>')}</p>
+            <div style="background:#673AB7;color:white;font-size:32px;font-weight:bold;text-align:center;padding:20px;border-radius:8px;margin:25px 0;letter-spacing:8px;">${pin}</div>
+            <hr style="border:none;border-top:1px solid #eee;margin:25px 0;">
+            <p style="font-size:13px;color:#999;text-align:center;">${pie}</p>
           </div>
-          <p style="font-size: 14px; color: #666; line-height: 1.6;"><strong>⚠️ Importante:</strong> Guarda este PIN en un lugar seguro. Lo necesitarás para validar acciones importantes en la app.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;">
-          <p style="font-size: 13px; color: #999; text-align: center;">BARRIO Puerto Montt - Seguridad Ciudadana</p>
-        </div>
-      </div>
-    `
-  };
-  mailTransporter.sendMail(mailOptions, (err, info) => {
-    if (err) {
-      console.error('❌ Error enviando email:', err.message);
-    } else {
-      console.log('✅ Email PIN enviado a:', to);
-    }
-  });
+        </div>`
+    };
+    mailTransporter.sendMail(mailOptions, (err) => {
+      if (err) console.error('❌ Error enviando email:', err.message);
+      else console.log('✅ Email PIN enviado a:', to);
+    });
+  });});});});
 }
 
 async function queryAll(sql, params = []) { return await dbHelper.queryAll(sql, params); }
@@ -193,10 +197,23 @@ function csvCell(v) {
   return s;
 }
 
+// Convierte cualquier fecha a formato legible en hora Chile
+function fechaChile(v) {
+  if (!v) return '';
+  try {
+    return new Date(v).toLocaleString('es-CL', { timeZone: 'America/Santiago', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  } catch(e) { return String(v); }
+}
+
 function sendCsvDownload(res, filename, headerLabels, keys, rows) {
+  const dateKeys = ['created_at', 'baja_fecha', 'fecha_expiracion'];
   let csv = '\ufeff' + headerLabels.join(';') + '\n';
   for (const row of rows) {
-    csv += keys.map((k) => csvCell(row[k])).join(';') + '\n';
+    csv += keys.map((k) => {
+      const v = row[k];
+      if (dateKeys.includes(k) && v) return csvCell(fechaChile(v));
+      return csvCell(v);
+    }).join(';') + '\n';
   }
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${String(filename).replace(/"/g, '')}"`);
@@ -341,7 +358,8 @@ app.post('/api/reportes', async (req, res) => {
   
   const exp = new Date(Date.now() + (parseInt(duracion_horas)||24)*3600000).toISOString().slice(0,19).replace('T',' ');
   await runSql('INSERT INTO reportes_ciudadanos (usuario_id, nombre_contacto, telefono, tipo_reporte, detalles, latitud, longitud, fecha_expiracion) VALUES (?,?,?,?,?,?,?,?)', [usuario_id||null, nombre_contacto, telefono, tipo_reporte, detalles||'', latitud, longitud, exp]);
-  sendTelegramAlert(`📢 <b>NUEVO REPORTE</b>\nTipo: ${tipo_reporte}\nPor: ${user?.nickname || user?.nombre || nombre_contacto}\nDetalles: ${detalles}`);
+  const mapaReporte = (latitud && longitud) ? `\n📍 <a href="https://maps.google.com/?q=${latitud},${longitud}">Ver en mapa</a>` : '';
+  sendTelegramAlert(`📢 <b>NUEVO REPORTE</b>\n🕐 ${fechaChile(new Date())}\nTipo: ${tipo_reporte}\nPor: ${user?.nickname || user?.nombre || nombre_contacto}\nDetalles: ${detalles||'Sin detalles'}${mapaReporte}`);
   
   // Enviar Notificación Push (Solo a vecinos cercanos)
   sendPushToNearbyUsers(latitud, longitud, `🚨 REPORTE: ${tipo_reporte.toUpperCase()}`, detalles || 'Hay un nuevo reporte cerca de tu ubicación.', usuario_id);
@@ -380,7 +398,7 @@ app.post('/api/registro', async (req, res) => {
   if (!user) {
     const r = await runSql('INSERT INTO usuarios (nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion, is_verified) VALUES (?,?,?,?,?,?,?,?,?,1)', [nombre, telefono, email||'', nickname||'', pin_seguridad||'', device_id||'', home_lat||null, home_lng||null, direccion||'']);
     user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [r.insertId]);
-    sendTelegramAlert(`🆕 <b>NUEVO REGISTRO</b>\nNombre: ${nombre}\nNick: ${nickname}\nTel: ${telefono}`);
+    sendTelegramAlert(`🆕 <b>NUEVO REGISTRO</b>\n🕐 ${fechaChile(new Date())}\nNombre: ${nombre}\nNick: ${nickname}\nTel: ${telefono}\nEmail: ${email||'No indicado'}`);
     if (email && pin_seguridad) sendEmailPin(email, nickname||nombre, pin_seguridad);
   } else {
     await runSql('UPDATE usuarios SET nombre=?, email=?, nickname=?, pin_seguridad=?, home_lat=?, home_lng=?, direccion=? WHERE id=?', [nombre, email||user.email, nickname||user.nickname, pin_seguridad||user.pin_seguridad, home_lat||user.home_lat, home_lng||user.home_lng, direccion||user.direccion, user.id]);
@@ -414,7 +432,7 @@ app.get('/api/mascotas', async (req, res) => {
 app.post('/api/mascotas', async (req, res) => {
   const { nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, foto_base64 } = req.body;
   await runSql('INSERT INTO mascotas_perdidas (nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, foto_base64) VALUES (?,?,?,?,?,?,?)', [nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, foto_base64]);
-  sendTelegramAlert(`🐶 <b>MASCOTA PERDIDA</b>\nNombre: ${nombre_mascota}\nContacto: ${nombre_contacto}\nLugar: ${ubicacion_extravio}`);
+  sendTelegramAlert(`🐶 <b>MASCOTA PERDIDA</b>\n🕐 ${fechaChile(new Date())}\nNombre: ${nombre_mascota}\nContacto: ${nombre_contacto}\nTel: ${telefono}\nLugar: ${ubicacion_extravio}`);
   
   // Como mascotas no tiene lat/lng obligatorio en el form pero sí en la DB, si están presentes, notificar
   if (req.body.latitud && req.body.longitud) {
@@ -531,7 +549,8 @@ app.post('/api/emergencia', async (req, res) => {
   const { usuario_id, institucion, latitud, longitud } = req.body;
   const user = await queryOne('SELECT nickname, nombre, telefono FROM usuarios WHERE id = ?', [usuario_id]);
   await runSql('INSERT INTO registro_emergencias (usuario_id, institucion, latitud, longitud) VALUES (?,?,?,?)', [usuario_id, institucion, latitud, longitud]);
-  sendTelegramAlert(`🚨 <b>EMERGENCIA ACTIVADA</b>\nInstitución: ${institucion}\nVecino: ${user?.nickname || user?.nombre}\nTel: ${user?.telefono}\nLat: ${latitud}, Lng: ${longitud}`);
+  const mapaEmerg = (latitud && longitud) ? `\n📍 <a href="https://maps.google.com/?q=${latitud},${longitud}">Ver en mapa</a>` : '';
+  sendTelegramAlert(`🚨 <b>EMERGENCIA ACTIVADA</b>\n🕐 ${fechaChile(new Date())}\nInstitución: ${institucion}\nVecino: ${user?.nickname || user?.nombre}\nTel: ${user?.telefono}${mapaEmerg}`);
   res.json({ ok: true });
 });
 
@@ -539,7 +558,7 @@ app.post('/api/admin/mensaje', async (req, res) => {
   const { usuario_id, mensaje } = req.body;
   const user = await queryOne('SELECT nickname, nombre FROM usuarios WHERE id = ?', [usuario_id]);
   await runSql('INSERT INTO mensajes_admin (usuario_id, mensaje) VALUES (?,?)', [usuario_id, mensaje]);
-  sendTelegramAlert(`✉️ <b>MENSAJE AL BUZÓN</b>\nDe: ${user?.nickname || user?.nombre}\nMsg: ${mensaje}`);
+  sendTelegramAlert(`✉️ <b>MENSAJE AL BUZÓN</b>\n🕐 ${fechaChile(new Date())}\nDe: ${user?.nickname || user?.nombre}\nTel: ${user?.telefono||'No registrado'}\nMsg: ${mensaje}`);
   res.json({ ok: true });
 });
 
@@ -754,15 +773,18 @@ app.delete('/api/admin/reportes/:id', authMw, async (req, res) => {
 app.get('/api/admin/locales', authMw, async (req, res) => res.json(await queryAll('SELECT * FROM locales ORDER BY nombre')));
 
 app.post('/api/admin/locales', authMw, async (req, res) => {
-  const { nombre, direccion, latitud, longitud } = req.body;
-  await runSql('INSERT INTO locales (nombre,direccion,latitud,longitud) VALUES (?,?,?,?)', [nombre, direccion, latitud, longitud]);
-  sendTelegramAlert(`➕ <b>ADMIN: NUEVO LOCAL</b>\nNombre: ${nombre}`);
+  const { nombre, direccion, latitud, longitud, horario_apertura, horario_cierre, dias_atencion, acepta_efectivo, acepta_tarjeta } = req.body;
+  if (!nombre || !latitud || !longitud) return res.status(400).json({ error: 'Nombre, latitud y longitud son obligatorios' });
+  await runSql('INSERT INTO locales (nombre,direccion,latitud,longitud,horario_apertura,horario_cierre,dias_atencion,acepta_efectivo,acepta_tarjeta) VALUES (?,?,?,?,?,?,?,?,?)',
+    [nombre, direccion||'', latitud, longitud, horario_apertura||'08:00', horario_cierre||'20:00', dias_atencion||'lun-sab', acepta_efectivo?1:0, acepta_tarjeta?1:0]);
+  sendTelegramAlert(`➕ <b>ADMIN: NUEVO LOCAL</b>\n🕐 ${fechaChile(new Date())}\nNombre: ${nombre}\nDirección: ${direccion||'No indicada'}`);
   res.json({ ok: true });
 });
 
 app.put('/api/admin/locales/:id', authMw, async (req, res) => {
-  const { nombre, direccion, latitud, longitud } = req.body;
-  await runSql('UPDATE locales SET nombre=?, direccion=?, latitud=?, longitud=? WHERE id=?', [nombre, direccion, latitud, longitud, req.params.id]);
+  const { nombre, direccion, latitud, longitud, horario_apertura, horario_cierre, dias_atencion, acepta_efectivo, acepta_tarjeta } = req.body;
+  await runSql('UPDATE locales SET nombre=?,direccion=?,latitud=?,longitud=?,horario_apertura=?,horario_cierre=?,dias_atencion=?,acepta_efectivo=?,acepta_tarjeta=? WHERE id=?',
+    [nombre, direccion||'', latitud, longitud, horario_apertura||'08:00', horario_cierre||'20:00', dias_atencion||'lun-sab', acepta_efectivo?1:0, acepta_tarjeta?1:0, req.params.id]);
   sendTelegramAlert(`🛠️ <b>ADMIN: LOCAL ACTUALIZADO</b>\nID: ${req.params.id}\nNombre: ${nombre}`);
   res.json({ ok: true });
 });
@@ -776,12 +798,14 @@ app.delete('/api/admin/locales/:id', authMw, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/admin/productos', authMw, async (req, res) => res.json(await queryAll('SELECT p.*, l.nombre as local_nombre FROM productos p JOIN locales l ON p.local_id = l.id')));
+app.get('/api/admin/productos', authMw, async (req, res) => res.json(await queryAll('SELECT p.*, l.nombre as local_nombre FROM productos p JOIN locales l ON p.local_id = l.id ORDER BY l.nombre, p.nombre')));
 
 app.post('/api/admin/productos', authMw, async (req, res) => {
-  const { local_id, nombre, precio } = req.body;
-  await runSql('INSERT INTO productos (local_id, nombre, precio) VALUES (?,?,?)', [local_id, nombre, precio]);
-  sendTelegramAlert(`➕ <b>ADMIN: NUEVO PRODUCTO</b>\nNombre: ${nombre}`);
+  const { local_id, nombre, marca, precio, unidad, en_stock } = req.body;
+  if (!local_id || !nombre || precio === undefined) return res.status(400).json({ error: 'local_id, nombre y precio son obligatorios' });
+  await runSql('INSERT INTO productos (local_id, nombre, marca, precio, unidad, en_stock) VALUES (?,?,?,?,?,?)',
+    [local_id, nombre, marca||'', precio, unidad||'unidad', en_stock===false||en_stock===0?0:1]);
+  sendTelegramAlert(`➕ <b>ADMIN: NUEVO PRODUCTO</b>\nNombre: ${nombre}\nPrecio: $${precio}`);
   res.json({ ok: true });
 });
 
@@ -795,8 +819,9 @@ app.post('/api/admin/productos/masivo', authMw, async (req, res) => {
 });
 
 app.put('/api/admin/productos/:id', authMw, async (req, res) => {
-  const { nombre, precio } = req.body;
-  await runSql('UPDATE productos SET nombre=?, precio=? WHERE id=?', [nombre, precio, req.params.id]);
+  const { nombre, marca, precio, unidad, en_stock } = req.body;
+  await runSql('UPDATE productos SET nombre=?,marca=?,precio=?,unidad=?,en_stock=? WHERE id=?',
+    [nombre, marca||'', precio, unidad||'unidad', en_stock===false||en_stock===0?0:1, req.params.id]);
   sendTelegramAlert(`🛠️ <b>ADMIN: PRODUCTO ACTUALIZADO</b>\nID: ${req.params.id}\nNombre: ${nombre}`);
   res.json({ ok: true });
 });
@@ -807,18 +832,19 @@ app.delete('/api/admin/productos/:id', authMw, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/admin/servicios', authMw, async (req, res) => res.json(await queryAll('SELECT * FROM servicios ORDER BY nombre_prestador')));
+app.get('/api/admin/servicios', authMw, async (req, res) => res.json(await queryAll('SELECT * FROM servicios ORDER BY tipo, nombre_prestador')));
 
 app.post('/api/admin/servicios', authMw, async (req, res) => {
   const { tipo, nombre_prestador, telefono } = req.body;
-  await runSql('INSERT INTO servicios (tipo, nombre_prestador, telefono) VALUES (?,?,?)', [tipo, nombre_prestador, telefono]);
-  sendTelegramAlert(`➕ <b>ADMIN: NUEVO SERVICIO</b>\nPrestador: ${nombre_prestador}`);
+  if (!tipo || !nombre_prestador) return res.status(400).json({ error: 'Tipo y nombre son obligatorios' });
+  await runSql('INSERT INTO servicios (tipo, nombre_prestador, telefono) VALUES (?,?,?)', [tipo, nombre_prestador, telefono||'']);
+  sendTelegramAlert(`➕ <b>ADMIN: NUEVO SERVICIO</b>\nTipo: ${tipo}\nPrestador: ${nombre_prestador}\nTel: ${telefono||'No indicado'}`);
   res.json({ ok: true });
 });
 
 app.put('/api/admin/servicios/:id', authMw, async (req, res) => {
   const { tipo, nombre_prestador, telefono } = req.body;
-  await runSql('UPDATE servicios SET tipo=?, nombre_prestador=?, telefono=? WHERE id=?', [tipo, nombre_prestador, telefono, req.params.id]);
+  await runSql('UPDATE servicios SET tipo=?, nombre_prestador=?, telefono=? WHERE id=?', [tipo, nombre_prestador, telefono||'', req.params.id]);
   sendTelegramAlert(`🛠️ <b>ADMIN: SERVICIO ACTUALIZADO</b>\nPrestador: ${nombre_prestador}`);
   res.json({ ok: true });
 });
@@ -829,12 +855,22 @@ app.delete('/api/admin/servicios/:id', authMw, async (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/api/admin/export/servicios', authMw, async (req, res) => {
+  const rows = await queryAll('SELECT * FROM servicios ORDER BY tipo, nombre_prestador');
+  sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla servicios.`);
+  sendCsvDownload(res, 'planilla_servicios.csv',
+    ['id', 'tipo', 'nombre_prestador', 'telefono', 'created_at'],
+    ['id', 'tipo', 'nombre_prestador', 'telefono', 'created_at'],
+    rows);
+});
+
 app.get('/api/admin/export/reportes', authMw, async (req, res) => {
   const reports = await queryAll('SELECT r.*, u.nombre FROM reportes_ciudadanos r LEFT JOIN usuarios u ON r.usuario_id = u.id');
   sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla reportes ciudadanos.`);
-  let csv = '\ufeffID;Fecha;Tipo;Ubicacion_texto;Detalles;Lat;Lng;Usuario_nombre;Nombre_contacto;Telefono\n';
+  let csv = '\ufeffID;Fecha Chile;Tipo;Ubicacion_texto;Detalles;Lat;Lng;URL_Mapa;Usuario_nombre;Nombre_contacto;Telefono\n';
   reports.forEach((r) => {
-    csv += [r.id, r.created_at, r.tipo_reporte, r.ubicacion_texto, r.detalles, r.latitud, r.longitud, r.nombre, r.nombre_contacto, r.telefono]
+    const mapUrl = (r.latitud && r.longitud) ? `https://maps.google.com/?q=${r.latitud},${r.longitud}` : '';
+    csv += [r.id, fechaChile(r.created_at), r.tipo_reporte, r.ubicacion_texto, r.detalles, r.latitud, r.longitud, mapUrl, r.nombre, r.nombre_contacto, r.telefono]
       .map((x) => csvCell(x)).join(';') + '\n';
   });
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -844,10 +880,11 @@ app.get('/api/admin/export/reportes', authMw, async (req, res) => {
 
 app.get('/api/admin/export/usuarios', authMw, async (req, res) => {
   const rows = await queryAll('SELECT * FROM usuarios ORDER BY created_at DESC');
+  rows.forEach(r => { r.url_ultima_ubicacion = (r.last_lat && r.last_lng) ? `https://maps.google.com/?q=${r.last_lat},${r.last_lng}` : ''; });
   sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla usuarios.`);
   sendCsvDownload(res, 'planilla_usuarios.csv',
-    ['id', 'nombre', 'nickname', 'telefono', 'email', 'direccion', 'device_id', 'is_verified', 'is_blocked', 'is_stolen', 'terms_accepted', 'baja_solicitada', 'baja_fecha', 'home_lat', 'home_lng', 'last_lat', 'last_lng', 'created_at'],
-    ['id', 'nombre', 'nickname', 'telefono', 'email', 'direccion', 'device_id', 'is_verified', 'is_blocked', 'is_stolen', 'terms_accepted', 'baja_solicitada', 'baja_fecha', 'home_lat', 'home_lng', 'last_lat', 'last_lng', 'created_at'],
+    ['id', 'nombre', 'nickname', 'telefono', 'email', 'direccion', 'device_id', 'is_verified', 'is_blocked', 'is_stolen', 'terms_accepted', 'baja_solicitada', 'baja_fecha', 'home_lat', 'home_lng', 'last_lat', 'last_lng', 'url_ultima_ubicacion', 'created_at'],
+    ['id', 'nombre', 'nickname', 'telefono', 'email', 'direccion', 'device_id', 'is_verified', 'is_blocked', 'is_stolen', 'terms_accepted', 'baja_solicitada', 'baja_fecha', 'home_lat', 'home_lng', 'last_lat', 'last_lng', 'url_ultima_ubicacion', 'created_at'],
     rows);
 });
 
@@ -892,21 +929,54 @@ app.get('/api/admin/export/mensajes', authMw, async (req, res) => {
 
 app.get('/api/admin/export/ubicacion', authMw, async (req, res) => {
   const rows = await queryAll('SELECT r.*, u.nombre, u.telefono FROM registro_extravios r JOIN usuarios u ON r.usuario_id = u.id ORDER BY r.created_at DESC');
-  sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla ubicación.`);
-  sendCsvDownload(res, 'planilla_ubicación_extravios.csv',
-    ['id', 'usuario_id', 'nombre', 'telefono', 'latitud', 'longitud', 'created_at'],
-    ['id', 'usuario_id', 'nombre', 'telefono', 'latitud', 'longitud', 'created_at'],
+  rows.forEach(r => { r.url_mapa = (r.latitud && r.longitud) ? `https://maps.google.com/?q=${r.latitud},${r.longitud}` : ''; });
+  sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla ubicación/extravíos.`);
+  sendCsvDownload(res, 'planilla_ubicacion_extravios.csv',
+    ['id', 'usuario_id', 'nombre', 'telefono', 'latitud', 'longitud', 'url_mapa', 'created_at'],
+    ['id', 'usuario_id', 'nombre', 'telefono', 'latitud', 'longitud', 'url_mapa', 'created_at'],
     rows);
 });
 
 app.get('/api/admin/export/emergencias', authMw, async (req, res) => {
   const rows = await queryAll('SELECT e.*, u.nombre, u.telefono FROM registro_emergencias e JOIN usuarios u ON e.usuario_id = u.id ORDER BY e.created_at DESC');
+  rows.forEach(r => { r.url_mapa = (r.latitud && r.longitud) ? `https://maps.google.com/?q=${r.latitud},${r.longitud}` : ''; });
   sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla emergencias.`);
   sendCsvDownload(res, 'planilla_emergencias.csv',
-    ['id', 'usuario_id', 'nombre', 'telefono', 'institucion', 'latitud', 'longitud', 'created_at'],
-    ['id', 'usuario_id', 'nombre', 'telefono', 'institucion', 'latitud', 'longitud', 'created_at'],
+    ['id', 'usuario_id', 'nombre', 'telefono', 'institucion', 'latitud', 'longitud', 'url_mapa', 'created_at'],
+    ['id', 'usuario_id', 'nombre', 'telefono', 'institucion', 'latitud', 'longitud', 'url_mapa', 'created_at'],
     rows);
 });
+
+app.get('/api/admin/export/productos/:local_id', authMw, async (req, res) => {
+  const local = await queryOne('SELECT nombre FROM locales WHERE id = ?', [req.params.local_id]);
+  const rows = await queryAll('SELECT p.id, p.nombre, p.marca, p.precio, p.en_stock, p.unidad, p.created_at FROM productos p WHERE p.local_id = ? ORDER BY p.nombre', [req.params.local_id]);
+  const nombreLocal = local?.nombre || 'local';
+  sendCsvDownload(res, `planilla_${nombreLocal.replace(/\s+/g,'_')}.csv`,
+    ['id', 'nombre', 'marca', 'precio', 'en_stock', 'unidad', 'created_at'],
+    ['id', 'nombre', 'marca', 'precio', 'en_stock', 'unidad', 'created_at'],
+    rows);
+});
+
+app.get('/api/admin/config/correo', authMw, async (req, res) => {
+  const host = await queryOne("SELECT valor FROM configuracion WHERE clave = 'mail_host'");
+  const user = await queryOne("SELECT valor FROM configuracion WHERE clave = 'mail_user'");
+  res.json({ host: host?.valor || 'c1800365.ferozo.com', user: user?.valor || 'contacto@puertomas.cl' });
+});
+
+app.post('/api/admin/config/correo', authMw, async (req, res) => {
+  const { host, user, pass } = req.body;
+  const upsertConfig = async (clave, valor) => {
+    const exists = await queryOne('SELECT clave FROM configuracion WHERE clave = ?', [clave]);
+    if (exists) { await runSql('UPDATE configuracion SET valor = ? WHERE clave = ?', [valor, clave]); }
+    else { await runSql('INSERT INTO configuracion (clave, valor) VALUES (?, ?)', [clave, valor]); }
+  };
+  if (host) await upsertConfig('mail_host', host);
+  if (user) await upsertConfig('mail_user', user);
+  if (pass) await upsertConfig('mail_pass', pass);
+  sendTelegramAlert(`🛠️ <b>ADMIN: CONFIGURACIÓN CORREO ACTUALIZADA</b>`);
+  res.json({ ok: true });
+});
+
 
 app.get('/api/admin/analytics', authMw, async (req, res) => {
   const mysql = isUsingMysql();
