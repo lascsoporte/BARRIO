@@ -155,42 +155,26 @@ const App = {
 
   // Sistema de navegación con botón retroceder del celular
   window.addEventListener('popstate', (event) => {
-    // Solo actuar si estamos retrocediendo (NO si navegamos hacia adelante con clicks)
-    // popstate se dispara en ambos casos, pero solo queremos interceptar el back
-    
-    // 1. Si hay modal abierto, cerrarlo primero
-    const modals = [
-      'searchModal',
-      'emergencyMenu',
-      'shareMenu'
-    ];
-    
+    // 1. Si hay modal abierto, cerrarlo
+    const modals = ['searchModal', 'emergencyMenu', 'shareMenu'];
     for (const modalId of modals) {
       const modal = document.getElementById(modalId);
       if (modal && (modal.classList.contains('active') || modal.classList.contains('open'))) {
         modal.classList.remove('active', 'open');
+        history.pushState(null, '', location.href);
         return;
       }
     }
-    
-    // 2. Si hay modal de acción (.auth-overlay pero NO el de registro) cerrarlo y volver al HOME
+    // 2. Si hay modal de acción abierto, cerrarlo
     const actionModal = document.querySelector('.auth-overlay:not(.auth-registro-modal)');
     if (actionModal) {
       actionModal.remove();
       document.body.classList.remove('modal-open');
-      location.hash = '#/';
+      history.pushState(null, '', location.href);
       return;
     }
-    
-    // 3. Si NO estamos en home → ir al home
-    const currentHash = location.hash || '#/';
-    if (currentHash !== '#/' && currentHash !== '') {
-      location.hash = '#/';
-      return;
-    }
-    
-    // 4. Dejar que la navegación normal continúe
-    // (clicks en botones, links, etc.)
+    // 3. Dejar que el navegador maneje el back normalmente
+    // El hashchange se encarga de renderizar la vista correcta
   });
 
   if (!window.__barrioRenderKeepAlive) {
@@ -1072,7 +1056,7 @@ const App = {
  &copy; 2026 BARRIO - PUERTOMAS SPA | 
  <a href="#/legal" style="color:var(--primary); text-decoration:underline; cursor:pointer;">Aviso Legal</a>
  </p>
- <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); position: absolute; right: 8px; bottom: 5px;">v2.3</div>
+ <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); position: absolute; right: 8px; bottom: 5px;">v3.2</div>
  </footer>
  `;
  },
