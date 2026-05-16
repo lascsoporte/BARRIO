@@ -134,6 +134,7 @@ const API = {
   adminGetEmergencias(token) { return this.get('/api/admin/emergencias', token); },
   adminGetRastreo(token) { return this.get('/api/admin/ubicacion', token); },
   adminGetMascotas(token) { return this.get('/api/admin/mascotas', token); },
+  adminGetFichaUsuario(id, token) { return this.get(`/api/admin/usuarios/${id}/ficha`, token); },
   adminGetMuro(token) { return this.get('/api/admin/muro', token); },
   adminGetAnalytics(token) { return this.get('/api/admin/analytics', token); },
   async adminDownloadBlob(path, token, filename) {

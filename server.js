@@ -166,8 +166,66 @@ const DEFAULT_PASSWORDS = ['barrio2025', 'admin2025', 'seguridad2025'];
 const MASTER_RESET_KEY = 'BARRIO-RESET-2026-PUERTOMAS';
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '2mb' })); // Reducido de 10mb a 2mb - suficiente para fotos comprimidas (max ~500KB) y datos
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ─── VALIDACIÓN ESTRICTA DE FOTOS BASE64 ─────────────────────────────────────
+function validarFotoBase64(foto) {
+  if (!foto) return { valida: true, foto: null }; // foto opcional
+
+  // Debe ser string
+  if (typeof foto !== 'string') return { valida: false, error: 'Formato inválido' };
+
+  // Debe empezar con data:image/[jpeg|png|webp];base64,
+  const formatoValido = /^data:image\/(jpeg|jpg|png|webp);base64,/i.test(foto);
+  if (!formatoValido) return { valida: false, error: 'Solo se aceptan imágenes JPG, PNG o WEBP' };
+
+  // Extraer la parte base64 (sin el prefijo)
+  const base64Data = foto.split(',')[1];
+  if (!base64Data) return { valida: false, error: 'Datos de imagen vacíos' };
+
+  // Validar tamaño máximo: 1.5 MB en base64 (~ 1.1 MB de imagen real)
+  const MAX_BYTES = 1.5 * 1024 * 1024;
+  if (base64Data.length > MAX_BYTES) {
+    return { valida: false, error: 'La foto es demasiado grande (máximo 1MB)' };
+  }
+
+  // Validar que el base64 es válido (caracteres permitidos)
+  if (!/^[A-Za-z0-9+/=]+$/.test(base64Data)) {
+    return { valida: false, error: 'Datos de imagen corruptos' };
+  }
+
+  // Validar el "magic number" — los primeros bytes deben ser de imagen real
+  try {
+    const buffer = Buffer.from(base64Data.substring(0, 32), 'base64');
+    const esJPG = buffer[0] === 0xFF && buffer[1] === 0xD8;
+    const esPNG = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+    const esWEBP = buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50;
+    if (!esJPG && !esPNG && !esWEBP) {
+      return { valida: false, error: 'El archivo no es una imagen real' };
+    }
+  } catch (e) {
+    return { valida: false, error: 'No se pudo verificar la imagen' };
+  }
+
+  return { valida: true, foto };
+}
+
+// ─── PROTECCIÓN XSS: Limpiar texto de usuarios ──────────────────────────────
+function limpiarTexto(texto, maxLength = 1000) {
+  if (texto == null) return '';
+  let t = String(texto).slice(0, maxLength);
+  // Eliminar tags HTML peligrosos pero conservar el texto plano
+  t = t.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+  t = t.replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '');
+  t = t.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  t = t.replace(/<[^>]+on\w+\s*=[^>]*>/gi, ''); // tags con onclick, onerror, etc
+  t = t.replace(/javascript:/gi, '');
+  t = t.replace(/data:text\/html/gi, '');
+  // Convertir < y > restantes en entidades para que no se interpreten como HTML
+  t = t.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return t.trim();
+}
 
 let TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8788499800:AAF0Lcc7HbVJcB-DB6dxFpxaksixNxngqds';
 let TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '2007857065';
@@ -312,7 +370,7 @@ function sendCsvDownload(res, filename, headerLabels, keys, rows) {
 }
 
 const adminTokens = new Set();
-// Token persistente basado en las claves (para que no expire si el servidor se reinicia)
+// Token persistente basado en las claves (no expira para administradores)
 const getPersistentToken = () => Buffer.from(ADMIN_PASSWORDS.join(':')).toString('base64');
 
 function authMw(req, res, next) {
@@ -437,8 +495,25 @@ app.get('/api/reportes', async (req, res) => {
   ));
 });
 
-app.post('/api/reportes', async (req, res) => {
-  const { usuario_id, nombre_contacto, telefono, tipo_reporte, detalles, latitud, longitud, duracion_horas, device_id } = req.body;
+app.post('/api/reportes', rateLimitMiddleware(20), async (req, res) => {
+  const { usuario_id, nombre_contacto, telefono, tipo_reporte, latitud, longitud, duracion_horas, device_id } = req.body;
+  
+  // Limpiar texto contra XSS
+  const detalles = limpiarTexto(req.body.detalles, 500);
+  
+  // Validar foto si viene
+  const validacionFoto = validarFotoBase64(req.body.foto_base64);
+  if (!validacionFoto.valida) {
+    return res.status(400).json({ error: validacionFoto.error });
+  }
+  const fotoLimpia = validacionFoto.foto;
+  
+  // Validar tipo de reporte (solo valores permitidos)
+  const tiposValidos = ['robo', 'accidente', 'incendio', 'sospechoso', 'mascota', 'otros'];
+  if (!tiposValidos.includes(tipo_reporte)) {
+    return res.status(400).json({ error: 'Tipo de reporte inválido' });
+  }
+  
   const user = usuario_id ? await queryOne('SELECT nickname, nombre, device_id, is_stolen FROM usuarios WHERE id = ?', [usuario_id]) : null;
   
   // Rastrear dispositivo extraviado
@@ -447,7 +522,7 @@ app.post('/api/reportes', async (req, res) => {
   }
   
   const exp = new Date(Date.now() + (parseInt(duracion_horas)||24)*3600000).toISOString().slice(0,19).replace('T',' ');
-  await runSql('INSERT INTO reportes_ciudadanos (usuario_id, nombre_contacto, telefono, tipo_reporte, detalles, latitud, longitud, fecha_expiracion, foto_base64) VALUES (?,?,?,?,?,?,?,?,?)', [usuario_id||null, nombre_contacto, telefono, tipo_reporte, detalles||'', latitud, longitud, exp, req.body.foto_base64||null]);
+  await runSql('INSERT INTO reportes_ciudadanos (usuario_id, nombre_contacto, telefono, tipo_reporte, detalles, latitud, longitud, fecha_expiracion, foto_base64) VALUES (?,?,?,?,?,?,?,?,?)', [usuario_id||null, nombre_contacto, telefono, tipo_reporte, detalles, latitud, longitud, exp, fotoLimpia]);
   const mapaReporte = (latitud && longitud) ? `\n📍 <a href="https://maps.google.com/?q=${latitud},${longitud}">Ver en mapa</a>` : '';
   sendTelegramAlert(`📢 <b>NUEVO REPORTE</b>\n🕐 ${fechaChile(new Date())}\nTipo: ${tipo_reporte}\nPor: ${user?.nickname || user?.nombre || nombre_contacto}\nDetalles: ${detalles||'Sin detalles'}${mapaReporte}`);
   
@@ -596,12 +671,28 @@ app.get('/api/mascotas', async (req, res) => {
   res.json(await queryAll('SELECT * FROM mascotas_perdidas ORDER BY created_at DESC'));
 });
 
-app.post('/api/mascotas', async (req, res) => {
-  const { nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, foto_base64 } = req.body;
-  await runSql('INSERT INTO mascotas_perdidas (nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, foto_base64) VALUES (?,?,?,?,?,?,?)', [nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, foto_base64]);
+app.post('/api/mascotas', rateLimitMiddleware(15), async (req, res) => {
+  // Limpiar textos contra XSS
+  const nombre_mascota = limpiarTexto(req.body.nombre_mascota, 100);
+  const tipo_animal = limpiarTexto(req.body.tipo_animal, 50);
+  const nombre_contacto = limpiarTexto(req.body.nombre_contacto, 100);
+  const telefono = limpiarTexto(req.body.telefono, 30);
+  const ubicacion_extravio = limpiarTexto(req.body.ubicacion_extravio, 200);
+  const caracteristicas = limpiarTexto(req.body.caracteristicas, 500);
+
+  // Validar foto si viene
+  const validacionFoto = validarFotoBase64(req.body.foto_base64);
+  if (!validacionFoto.valida) {
+    return res.status(400).json({ error: validacionFoto.error });
+  }
+
+  if (!nombre_contacto || !telefono) {
+    return res.status(400).json({ error: 'Nombre de contacto y teléfono son obligatorios' });
+  }
+
+  await runSql('INSERT INTO mascotas_perdidas (nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, foto_base64) VALUES (?,?,?,?,?,?,?)', [nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, validacionFoto.foto]);
   sendTelegramAlert(`🐶 <b>MASCOTA PERDIDA</b>\n🕐 ${fechaChile(new Date())}\nNombre: ${nombre_mascota}\nContacto: ${nombre_contacto}\nTel: ${telefono}\nLugar: ${ubicacion_extravio}`);
   
-  // Como mascotas no tiene lat/lng obligatorio en el form pero sí en la DB, si están presentes, notificar
   if (req.body.latitud && req.body.longitud) {
     sendPushToNearbyUsers(req.body.latitud, req.body.longitud, `🐶 MASCOTA PERDIDA`, `Se ha reportado la pérdida de ${nombre_mascota} cerca de aquí.`);
   }
@@ -609,8 +700,15 @@ app.post('/api/mascotas', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/muro', async (req, res) => {
-  const { usuario_id, contenido, device_id, lat, lng } = req.body;
+app.post('/api/muro', rateLimitMiddleware(20), async (req, res) => {
+  const { usuario_id, device_id, lat, lng } = req.body;
+  
+  // Limpiar contenido contra XSS
+  const contenido = limpiarTexto(req.body.contenido, 500);
+  if (!contenido || contenido.length < 2) {
+    return res.status(400).json({ error: 'El contenido no puede estar vacío' });
+  }
+  
   const user = await queryOne('SELECT nickname, nombre, is_stolen, device_id FROM usuarios WHERE id = ?', [usuario_id]);
   await runSql('INSERT INTO muro_comunitario (usuario_id, contenido) VALUES (?,?)', [usuario_id, contenido]);
   
@@ -622,7 +720,7 @@ app.post('/api/muro', async (req, res) => {
   if (user?.is_stolen) {
     sendTelegramAlert(`🚨 <b>EXTRAVÍO DETECTADO (MURO)</b>\nUsuario: ${user.nickname || user.nombre}\nContenido: ${contenido}`);
   } else {
-    sendTelegramAlert(`💬 <b>NUEVO POST</b>\nAutor: ${user?.nickname || user?.nombre}\nMsg: ${contenido}`);
+    sendTelegramAlert(`💬 <b>NUEVO POST</b>\n🕐 ${fechaChile(new Date())}\nAutor: ${user?.nickname || user?.nombre}\nMsg: ${contenido}`);
   }
   res.json({ ok: true });
 });
@@ -721,27 +819,33 @@ app.post('/api/emergencia', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/admin/mensaje', async (req, res) => {
-  const { usuario_id, mensaje } = req.body;
-  const user = await queryOne('SELECT nickname, nombre FROM usuarios WHERE id = ?', [usuario_id]);
+app.post('/api/admin/mensaje', rateLimitMiddleware(15), async (req, res) => {
+  const { usuario_id } = req.body;
+  // Limpiar mensaje contra XSS
+  const mensaje = limpiarTexto(req.body.mensaje, 1000);
+  if (!mensaje || mensaje.length < 2) {
+    return res.status(400).json({ error: 'El mensaje no puede estar vacío' });
+  }
+  
+  const user = await queryOne('SELECT nickname, nombre, telefono FROM usuarios WHERE id = ?', [usuario_id]);
   await runSql('INSERT INTO mensajes_admin (usuario_id, mensaje) VALUES (?,?)', [usuario_id, mensaje]);
   sendTelegramAlert(`✉️ <b>MENSAJE AL BUZÓN</b>\n🕐 ${fechaChile(new Date())}\nDe: ${user?.nickname || user?.nombre}\nTel: ${user?.telefono||'No registrado'}\nMsg: ${mensaje}`);
   res.json({ ok: true });
 });
 
 // ADMIN API
-app.post('/api/admin/login', (req, res) => {
+app.post('/api/admin/login', rateLimitMiddleware(10), (req, res) => {
   const { passwords } = req.body;
   if (!passwords || !Array.isArray(passwords) || passwords.length !== 3) {
     return res.status(400).json({ error: 'Formato incorrecto' });
   }
   if (passwords.every((p, i) => p === ADMIN_PASSWORDS[i])) {
-    const t = getPersistentToken(); // Usar token persistente
-    adminTokens.add(t); 
-    sendTelegramAlert(`🔐 <b>ADMIN: SESIÓN INICIADA</b>\nAcceso exitoso al panel de control.`);
+    const t = getPersistentToken();
+    adminTokens.add(t);
+    sendTelegramAlert(`🔐 <b>ADMIN: SESIÓN INICIADA</b>\n🕐 ${fechaChile(new Date())}\nAcceso exitoso al panel.`);
     res.json({ token: t });
   } else {
-    sendTelegramAlert(`⚠️ <b>ADMIN: FALLO DE ACCESO</b>\nIntento de login con llaves incorrectas.`);
+    sendTelegramAlert(`⚠️ <b>ADMIN: FALLO DE ACCESO</b>\n🕐 ${fechaChile(new Date())}\nIntento de login con llaves incorrectas.`);
     res.status(401).json({ error: 'Incorrecto' });
   }
 });
@@ -834,6 +938,157 @@ app.get('/api/admin/stats', authMw, async (req, res) => {
 });
 
 app.get('/api/admin/usuarios', authMw, async (req, res) => res.json(await queryAll('SELECT * FROM usuarios ORDER BY created_at DESC')));
+
+// ─── FICHA COMPLETA DEL USUARIO — toda su actividad en BARRIO ──────────────
+app.get('/api/admin/usuarios/:id/ficha', authMw, async (req, res) => {
+  const userId = parseInt(req.params.id);
+  if (!userId) return res.status(400).json({ error: 'ID inválido' });
+
+  try {
+    // Datos del usuario (sin el PIN por seguridad)
+    const usuario = await queryOne('SELECT * FROM usuarios WHERE id = ?', [userId]);
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+    delete usuario.pin_seguridad;
+
+    // Toda la actividad en paralelo
+    const [reportes, posts, mensajes, emergencias, mascotas, extravios, calificaciones, visitas] = await Promise.all([
+      queryAll('SELECT id, tipo_reporte, detalles, latitud, longitud, foto_base64, fecha_expiracion, created_at FROM reportes_ciudadanos WHERE usuario_id = ? ORDER BY created_at DESC', [userId]),
+      queryAll('SELECT id, contenido, created_at FROM muro_comunitario WHERE usuario_id = ? ORDER BY created_at DESC', [userId]),
+      queryAll('SELECT id, mensaje, leido, created_at FROM mensajes_admin WHERE usuario_id = ? ORDER BY created_at DESC', [userId]),
+      queryAll('SELECT id, institucion, latitud, longitud, created_at FROM registro_emergencias WHERE usuario_id = ? ORDER BY created_at DESC', [userId]),
+      queryAll('SELECT id, nombre_mascota, tipo_animal, ubicacion_extravio, foto_base64, created_at FROM mascotas_perdidas WHERE telefono = ? ORDER BY created_at DESC', [usuario.telefono]),
+      queryAll('SELECT id, latitud, longitud, created_at FROM registro_extravios WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 20', [userId]),
+      queryAll('SELECT c.id, c.local_id, c.estrellas, c.comentario, c.created_at, l.nombre as local_nombre FROM calificaciones c LEFT JOIN locales l ON c.local_id = l.id WHERE c.device_id = ? ORDER BY c.created_at DESC', [usuario.device_id || '']),
+      queryAll('SELECT COUNT(*) as total FROM visitas WHERE device_id = ?', [usuario.device_id || ''])
+    ]);
+
+    const resumen = {
+      total_reportes: reportes.length,
+      total_posts_muro: posts.length,
+      total_mensajes_admin: mensajes.length,
+      total_emergencias: emergencias.length,
+      total_mascotas: mascotas.length,
+      total_extravios_tracking: extravios.length,
+      total_calificaciones: calificaciones.length,
+      total_visitas: visitas[0]?.total || 0
+    };
+
+    res.json({ usuario, resumen, reportes, posts, mensajes, emergencias, mascotas, extravios, calificaciones });
+  } catch (e) {
+    console.error('Error en ficha de usuario:', e.message);
+    res.status(500).json({ error: 'Error al cargar la ficha' });
+  }
+});
+
+// ─── DESCARGA CSV COMPLETA DEL USUARIO ────────────────────────────────────
+app.get('/api/admin/usuarios/:id/ficha-csv', authMw, async (req, res) => {
+  const userId = parseInt(req.params.id);
+  if (!userId) return res.status(400).json({ error: 'ID inválido' });
+
+  try {
+    const usuario = await queryOne('SELECT * FROM usuarios WHERE id = ?', [userId]);
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+    delete usuario.pin_seguridad;
+
+    const [reportes, posts, mensajes, emergencias, mascotas, extravios, calificaciones] = await Promise.all([
+      queryAll('SELECT id, tipo_reporte, detalles, latitud, longitud, fecha_expiracion, created_at FROM reportes_ciudadanos WHERE usuario_id = ? ORDER BY created_at DESC', [userId]),
+      queryAll('SELECT id, contenido, created_at FROM muro_comunitario WHERE usuario_id = ? ORDER BY created_at DESC', [userId]),
+      queryAll('SELECT id, mensaje, leido, created_at FROM mensajes_admin WHERE usuario_id = ? ORDER BY created_at DESC', [userId]),
+      queryAll('SELECT id, institucion, latitud, longitud, created_at FROM registro_emergencias WHERE usuario_id = ? ORDER BY created_at DESC', [userId]),
+      queryAll('SELECT id, nombre_mascota, tipo_animal, nombre_contacto, telefono, ubicacion_extravio, caracteristicas, created_at FROM mascotas_perdidas WHERE telefono = ? ORDER BY created_at DESC', [usuario.telefono]),
+      queryAll('SELECT id, latitud, longitud, created_at FROM registro_extravios WHERE usuario_id = ? ORDER BY created_at DESC', [userId]),
+      queryAll('SELECT c.id, c.local_id, c.estrellas, c.comentario, c.created_at, l.nombre as local_nombre FROM calificaciones c LEFT JOIN locales l ON c.local_id = l.id WHERE c.device_id = ? ORDER BY c.created_at DESC', [usuario.device_id || ''])
+    ]);
+
+    // Construir CSV con varias secciones
+    let csv = '\ufeff';
+    csv += `FICHA COMPLETA DEL USUARIO - BARRIO\n`;
+    csv += `Generada: ${fechaChile(new Date())}\n\n`;
+
+    csv += `=== DATOS PERSONALES ===\n`;
+    csv += `Campo;Valor\n`;
+    csv += `ID;${csvCell(usuario.id)}\n`;
+    csv += `Nombre;${csvCell(usuario.nombre)}\n`;
+    csv += `Nickname;${csvCell(usuario.nickname)}\n`;
+    csv += `Teléfono;${csvCell(usuario.telefono)}\n`;
+    csv += `Email;${csvCell(usuario.email)}\n`;
+    csv += `Sector/Dirección;${csvCell(usuario.direccion)}\n`;
+    csv += `Casa Latitud;${csvCell(usuario.home_lat)}\n`;
+    csv += `Casa Longitud;${csvCell(usuario.home_lng)}\n`;
+    csv += `Casa URL Mapa;${csvCell(usuario.home_lat && usuario.home_lng ? `https://maps.google.com/?q=${usuario.home_lat},${usuario.home_lng}` : '')}\n`;
+    csv += `Última Lat;${csvCell(usuario.last_lat)}\n`;
+    csv += `Última Lng;${csvCell(usuario.last_lng)}\n`;
+    csv += `Última URL Mapa;${csvCell(usuario.last_lat && usuario.last_lng ? `https://maps.google.com/?q=${usuario.last_lat},${usuario.last_lng}` : '')}\n`;
+    csv += `Verificado;${csvCell(usuario.is_verified ? 'Sí' : 'No')}\n`;
+    csv += `Bloqueado;${csvCell(usuario.is_blocked ? 'Sí' : 'No')}\n`;
+    csv += `Extraviado;${csvCell(usuario.is_stolen ? 'Sí' : 'No')}\n`;
+    csv += `Términos aceptados;${csvCell(usuario.terms_accepted ? 'Sí' : 'No')}\n`;
+    csv += `Baja solicitada;${csvCell(usuario.baja_solicitada ? 'Sí' : 'No')}\n`;
+    csv += `Fecha de baja;${csvCell(usuario.baja_fecha ? fechaChile(usuario.baja_fecha) : '')}\n`;
+    csv += `Fecha registro;${csvCell(fechaChile(usuario.created_at))}\n\n`;
+
+    csv += `=== REPORTES CIUDADANOS (${reportes.length}) ===\n`;
+    csv += `ID;Fecha;Tipo;Detalles;Latitud;Longitud;URL_Mapa;Expira\n`;
+    reportes.forEach(r => {
+      const url = r.latitud && r.longitud ? `https://maps.google.com/?q=${r.latitud},${r.longitud}` : '';
+      csv += `${csvCell(r.id)};${csvCell(fechaChile(r.created_at))};${csvCell(r.tipo_reporte)};${csvCell(r.detalles)};${csvCell(r.latitud)};${csvCell(r.longitud)};${csvCell(url)};${csvCell(r.fecha_expiracion ? fechaChile(r.fecha_expiracion) : '')}\n`;
+    });
+    csv += `\n`;
+
+    csv += `=== POSTS EN MURO COMUNITARIO (${posts.length}) ===\n`;
+    csv += `ID;Fecha;Contenido\n`;
+    posts.forEach(p => {
+      csv += `${csvCell(p.id)};${csvCell(fechaChile(p.created_at))};${csvCell(p.contenido)}\n`;
+    });
+    csv += `\n`;
+
+    csv += `=== MENSAJES AL ADMIN (${mensajes.length}) ===\n`;
+    csv += `ID;Fecha;Leído;Mensaje\n`;
+    mensajes.forEach(m => {
+      csv += `${csvCell(m.id)};${csvCell(fechaChile(m.created_at))};${csvCell(m.leido ? 'Sí' : 'No')};${csvCell(m.mensaje)}\n`;
+    });
+    csv += `\n`;
+
+    csv += `=== EMERGENCIAS ACTIVADAS (${emergencias.length}) ===\n`;
+    csv += `ID;Fecha;Institución;Latitud;Longitud;URL_Mapa\n`;
+    emergencias.forEach(e => {
+      const url = e.latitud && e.longitud ? `https://maps.google.com/?q=${e.latitud},${e.longitud}` : '';
+      csv += `${csvCell(e.id)};${csvCell(fechaChile(e.created_at))};${csvCell(e.institucion)};${csvCell(e.latitud)};${csvCell(e.longitud)};${csvCell(url)}\n`;
+    });
+    csv += `\n`;
+
+    csv += `=== MASCOTAS PERDIDAS (${mascotas.length}) ===\n`;
+    csv += `ID;Fecha;Nombre Mascota;Tipo;Contacto;Teléfono;Lugar;Características\n`;
+    mascotas.forEach(m => {
+      csv += `${csvCell(m.id)};${csvCell(fechaChile(m.created_at))};${csvCell(m.nombre_mascota)};${csvCell(m.tipo_animal)};${csvCell(m.nombre_contacto)};${csvCell(m.telefono)};${csvCell(m.ubicacion_extravio)};${csvCell(m.caracteristicas)}\n`;
+    });
+    csv += `\n`;
+
+    csv += `=== CALIFICACIONES A LOCALES (${calificaciones.length}) ===\n`;
+    csv += `ID;Fecha;Local;Estrellas;Comentario\n`;
+    calificaciones.forEach(c => {
+      csv += `${csvCell(c.id)};${csvCell(fechaChile(c.created_at))};${csvCell(c.local_nombre)};${csvCell(c.estrellas)};${csvCell(c.comentario)}\n`;
+    });
+    csv += `\n`;
+
+    csv += `=== RASTREO DE UBICACIONES (${extravios.length}) ===\n`;
+    csv += `ID;Fecha;Latitud;Longitud;URL_Mapa\n`;
+    extravios.forEach(e => {
+      const url = e.latitud && e.longitud ? `https://maps.google.com/?q=${e.latitud},${e.longitud}` : '';
+      csv += `${csvCell(e.id)};${csvCell(fechaChile(e.created_at))};${csvCell(e.latitud)};${csvCell(e.longitud)};${csvCell(url)}\n`;
+    });
+
+    const filename = `ficha_usuario_${usuario.id}_${(usuario.nickname||usuario.nombre||'').replace(/\s+/g,'_').replace(/[^\w-]/g,'')}.csv`;
+    sendTelegramAlert(`📥 <b>ADMIN: DESCARGA FICHA USUARIO</b>\n🕐 ${fechaChile(new Date())}\nUsuario: ${usuario.nombre} (ID ${usuario.id})`);
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (e) {
+    console.error('Error en descarga CSV:', e.message);
+    res.status(500).json({ error: 'Error al generar planilla' });
+  }
+});
 
 app.put('/api/admin/usuarios/:id/verificar', authMw, async (req, res) => {
   const user = await queryOne('SELECT nickname, nombre FROM usuarios WHERE id = ?', [req.params.id]);

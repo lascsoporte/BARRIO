@@ -642,6 +642,7 @@ const Admin = {
             <td>${this.formatDate(u.created_at)}</td>
             <td style="${u.baja_solicitada?'background:#FFEBEE;color:#D32F2F;font-weight:900;':''}">${u.baja_solicitada?`⚠️ ${this.formatDate(u.baja_fecha)}`:'No'}</td>
             <td style="white-space:nowrap;">
+              <button class="btn-edit btn-ver-ficha" data-id="${u.id}" style="background:#673AB7;margin:2px;">📋 Ficha</button>
               <button class="btn-ok btn-verify" data-id="${u.id}" data-val="${u.is_verified?1:0}" style="margin:2px;">${u.is_verified?'✅ Verif.':'⏳ Verificar'}</button>
               <button class="btn-edit btn-block" data-id="${u.id}" data-val="${u.is_blocked?1:0}" style="background:${u.is_blocked?'#FF9800':'#607D8B'};margin:2px;">${u.is_blocked?'🔓 Desbloquear':'🔒 Bloquear'}</button>
               <button class="btn-edit btn-stolen" data-id="${u.id}" data-val="${u.is_stolen?1:0}" style="background:${u.is_stolen?'#E53935':'#78909C'};margin:2px;">${u.is_stolen?'🚨 Extraviado':'📱 Normal'}</button>
@@ -650,6 +651,7 @@ const Admin = {
           </tr>`).join('')}
           </tbody></table></div>`;
         this.bindDownloads(box);
+        box.querySelectorAll('.btn-ver-ficha').forEach(btn => { btn.onclick = () => this.mostrarFichaUsuario(btn.dataset.id); });
         box.querySelectorAll('.btn-verify').forEach(btn => { btn.onclick = async () => { const n=parseInt(btn.dataset.val)?0:1; if(!confirm(`¿${n?'VERIFICAR':'Quitar verificación'}?`)) return; try { await API.adminVerifyUsuario(btn.dataset.id,n,this.token); this.loadTab(); } catch(e) { alert(e.message); } }; });
         box.querySelectorAll('.btn-block').forEach(btn => { btn.onclick = async () => { const n=parseInt(btn.dataset.val)?0:1; if(!confirm(`¿${n?'BLOQUEAR':'DESBLOQUEAR'}?`)) return; try { await API.adminToggleBlockUsuario(btn.dataset.id,n,this.token); this.loadTab(); } catch(e) { alert(e.message); } }; });
         box.querySelectorAll('.btn-stolen').forEach(btn => { btn.onclick = async () => { const n=parseInt(btn.dataset.val)?0:1; if(!confirm(`¿${n?'Marcar como EXTRAVIADO':'Marcar como NORMAL'}?`)) return; try { await API.adminToggleStolenUsuario(btn.dataset.id,n,this.token); this.loadTab(); } catch(e) { alert(e.message); } }; });
@@ -896,6 +898,143 @@ const Admin = {
     } catch(e) {
       if (String(e.message).includes('401')) { localStorage.removeItem('barrio_admin_token'); location.reload(); return; }
       box.innerHTML = `<p style="color:red;text-align:center;padding:20px;">❌ Error al cargar: ${this.esc(e.message)}</p>`;
+    }
+  },
+
+  // ─── HELPER PARA SECCIONES DE LA FICHA ──────────────────────────────
+  seccionFicha(titulo, items, renderFilaFn, headers) {
+    if (!items || items.length === 0) {
+      return `<div style="background:#FAFAFA;padding:10px;border-radius:8px;margin-bottom:10px;color:#999;font-size:13px;text-align:center;">${titulo} — Sin registros</div>`;
+    }
+    return `
+      <div style="background:#FAFAFA;padding:10px;border-radius:8px;margin-bottom:10px;">
+        <h4 style="margin:0 0 8px;font-size:0.9rem;color:#444;">${titulo} (${items.length})</h4>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:11px;">
+            <thead><tr style="background:#EEE;">
+              ${(headers||[]).map(h => `<th style="padding:6px;text-align:left;">${this.esc(h)}</th>`).join('')}
+            </tr></thead>
+            <tbody>
+              ${items.slice(0, 50).map(item => `<tr style="border-bottom:1px solid #EEE;">${renderFilaFn(item)}</tr>`).join('')}
+            </tbody>
+          </table>
+          ${items.length > 50 ? `<p style="font-size:11px;color:#999;text-align:center;margin-top:6px;">Mostrando 50 de ${items.length}. Descarga la planilla para ver todo.</p>` : ''}
+        </div>
+      </div>`;
+  },
+
+  // ─── FICHA COMPLETA DEL USUARIO ──────────────────────────────────────
+  async mostrarFichaUsuario(userId) {
+    const overlay = document.createElement('div');
+    overlay.id = 'fichaUsuarioOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = `
+      <div style="background:white;border-radius:14px;max-width:900px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="padding:30px;text-align:center;color:#888;">⏳ Cargando ficha del usuario...</div>
+      </div>`;
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    document.body.appendChild(overlay);
+
+    try {
+      const ficha = await API.adminGetFichaUsuario(userId, this.token);
+      const u = ficha.usuario;
+      const r = ficha.resumen;
+
+      overlay.querySelector('div').innerHTML = `
+        <div style="position:sticky;top:0;background:linear-gradient(135deg,#673AB7,#9C27B0);color:white;padding:20px;border-radius:14px 14px 0 0;display:flex;justify-content:space-between;align-items:center;z-index:10;">
+          <div>
+            <h2 style="margin:0;font-size:1.2rem;">👤 ${this.esc(u.nombre)}</h2>
+            <p style="margin:4px 0 0;opacity:0.9;font-size:0.85rem;">Nick: ${this.esc(u.nickname||'—')} · ID: ${u.id}</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button type="button" id="btnDescargarFicha" style="background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.4);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-weight:bold;">📥 Descargar CSV</button>
+            <button type="button" id="btnCerrarFicha" style="background:rgba(255,255,255,0.2);color:white;border:none;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;">✕</button>
+          </div>
+        </div>
+        <div style="padding:20px;">
+          <div style="background:#F3E5F5;padding:14px;border-radius:10px;margin-bottom:14px;">
+            <h4 style="margin:0 0 8px;font-size:0.95rem;color:#673AB7;">📋 Información del usuario</h4>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;font-size:13px;">
+              <div>📱 <b>Teléfono:</b> ${this.esc(u.telefono||'—')}</div>
+              <div>📧 <b>Email:</b> ${this.esc(u.email||'—')}</div>
+              <div>🏠 <b>Sector:</b> ${this.esc(u.direccion||'—')}</div>
+              <div>📅 <b>Registrado:</b> ${this.formatDate(u.created_at)}</div>
+              <div>${u.is_verified?'✅':'⏳'} <b>Verificado:</b> ${this.yn(u.is_verified)}</div>
+              <div>${u.is_blocked?'🔒':'🔓'} <b>Bloqueado:</b> ${this.yn(u.is_blocked)}</div>
+              <div>${u.is_stolen?'🚨':'📱'} <b>Extraviado:</b> ${this.yn(u.is_stolen)}</div>
+              <div>${u.baja_solicitada?'⚠️':'—'} <b>Baja:</b> ${u.baja_solicitada?this.formatDate(u.baja_fecha):'No'}</div>
+            </div>
+            <div style="margin-top:10px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:13px;">
+              <span>🗺️ Casa: ${this.mapBtn(u.home_lat,u.home_lng)}</span>
+              <span>🗺️ Última: ${this.mapBtn(u.last_lat,u.last_lng)}</span>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:14px;">
+            <div style="background:#FFF3E0;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:1.4rem;font-weight:900;color:#FF6B35;">${r.total_reportes}</div><div style="font-size:11px;">📢 Reportes</div></div>
+            <div style="background:#E3F2FD;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:1.4rem;font-weight:900;color:#1976D2;">${r.total_posts_muro}</div><div style="font-size:11px;">💬 Muro</div></div>
+            <div style="background:#E8F5E9;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:1.4rem;font-weight:900;color:#388E3C;">${r.total_mensajes_admin}</div><div style="font-size:11px;">✉️ Buzón</div></div>
+            <div style="background:#FFEBEE;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:1.4rem;font-weight:900;color:#D32F2F;">${r.total_emergencias}</div><div style="font-size:11px;">🚨 Emergencias</div></div>
+            <div style="background:#F3E5F5;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:1.4rem;font-weight:900;color:#9C27B0;">${r.total_mascotas}</div><div style="font-size:11px;">🐶 Mascotas</div></div>
+            <div style="background:#E0F2F1;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:1.4rem;font-weight:900;color:#00897B;">${r.total_calificaciones}</div><div style="font-size:11px;">⭐ Calif.</div></div>
+            <div style="background:#FFF9C4;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:1.4rem;font-weight:900;color:#F9A825;">${r.total_visitas}</div><div style="font-size:11px;">👀 Visitas</div></div>
+          </div>
+
+          ${this.seccionFicha('📢 Reportes ciudadanos', ficha.reportes, (item) => `
+            <td>${this.formatDate(item.created_at)}</td>
+            <td><b>${this.esc(item.tipo_reporte)}</b></td>
+            <td>${this.esc(this.trunc(item.detalles, 100))}</td>
+            <td>${this.mapBtn(item.latitud, item.longitud)}</td>
+            <td>${item.foto_base64?`<img src="${item.foto_base64}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;">`:'—'}</td>
+          `, ['Fecha', 'Tipo', 'Detalle', 'Mapa', 'Foto'])}
+
+          ${this.seccionFicha('💬 Posts en el muro', ficha.posts, (item) => `
+            <td>${this.formatDate(item.created_at)}</td>
+            <td>${this.esc(this.trunc(item.contenido, 200))}</td>
+          `, ['Fecha', 'Contenido'])}
+
+          ${this.seccionFicha('✉️ Mensajes al admin', ficha.mensajes, (item) => `
+            <td>${this.formatDate(item.created_at)}</td>
+            <td>${item.leido?'✅ Leído':'🔴 No leído'}</td>
+            <td>${this.esc(this.trunc(item.mensaje, 200))}</td>
+          `, ['Fecha', 'Estado', 'Mensaje'])}
+
+          ${this.seccionFicha('🚨 Emergencias activadas', ficha.emergencias, (item) => `
+            <td>${this.formatDate(item.created_at)}</td>
+            <td><b>${this.esc(item.institucion)}</b></td>
+            <td>${this.mapBtn(item.latitud, item.longitud)}</td>
+          `, ['Fecha', 'Institución', 'Mapa'])}
+
+          ${this.seccionFicha('🐶 Mascotas reportadas', ficha.mascotas, (item) => `
+            <td>${this.formatDate(item.created_at)}</td>
+            <td><b>${this.esc(item.nombre_mascota||'Sin nombre')}</b></td>
+            <td>${this.esc(item.tipo_animal||'—')}</td>
+            <td>${this.esc(this.trunc(item.ubicacion_extravio, 80))}</td>
+            <td>${item.foto_base64?`<img src="${item.foto_base64}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;">`:'—'}</td>
+          `, ['Fecha', 'Nombre', 'Tipo', 'Lugar', 'Foto'])}
+
+          ${this.seccionFicha('⭐ Calificaciones a locales', ficha.calificaciones, (item) => `
+            <td>${this.formatDate(item.created_at)}</td>
+            <td>${this.esc(item.local_nombre||'—')}</td>
+            <td>${'⭐'.repeat(Math.min(5, item.estrellas||0))}</td>
+            <td>${this.esc(this.trunc(item.comentario, 150))}</td>
+          `, ['Fecha', 'Local', 'Estrellas', 'Comentario'])}
+
+          ${this.seccionFicha('📍 Rastreo de ubicaciones (modo extravío)', ficha.extravios, (item) => `
+            <td>${this.formatDate(item.created_at)}</td>
+            <td>${this.esc(item.latitud)}</td>
+            <td>${this.esc(item.longitud)}</td>
+            <td>${this.mapBtn(item.latitud, item.longitud)}</td>
+          `, ['Fecha', 'Latitud', 'Longitud', 'Mapa'])}
+        </div>`;
+
+      document.getElementById('btnCerrarFicha').onclick = () => overlay.remove();
+      document.getElementById('btnDescargarFicha').onclick = () => {
+        API.adminDownloadBlob(`/api/admin/usuarios/${userId}/ficha-csv`, this.token, `ficha_usuario_${u.id}_${(u.nickname||u.nombre||'').replace(/\s+/g,'_')}.csv`)
+          .catch(e => alert('Error al descargar: ' + e.message));
+      };
+    } catch(e) {
+      overlay.querySelector('div').innerHTML = `<div style="padding:30px;text-align:center;color:#D32F2F;">❌ Error: ${this.esc(e.message)}<br><br><button onclick="document.getElementById('fichaUsuarioOverlay').remove()" style="padding:10px 20px;background:#673AB7;color:white;border:none;border-radius:8px;cursor:pointer;">Cerrar</button></div>`;
     }
   },
 };
