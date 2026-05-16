@@ -3,7 +3,95 @@ const path = require('path');
 const cors = require('cors');
 const http = require('http');
 const https = require('https');
+const crypto = require('crypto');
 const { URL } = require('url');
+
+// ─── HASH SEGURO DE PINS ──────────────────────────────────────────────────────
+// Usa scrypt (nativo de Node, no requiere npm install)
+// Compatible con PINs viejos sin hash durante migración gradual
+const PIN_SALT = 'BARRIO_2026_salt_secret';
+
+function hashPin(pin) {
+  // Genera hash determinístico para verificar
+  return crypto.scryptSync(String(pin), PIN_SALT, 64).toString('hex');
+}
+
+function verificarPin(pinIngresado, pinGuardado) {
+  if (!pinIngresado || !pinGuardado) return false;
+  // Si el PIN guardado tiene 128 caracteres (hash) → comparar con hash
+  if (pinGuardado.length === 128) {
+    return hashPin(pinIngresado) === pinGuardado;
+  }
+  // Si el PIN guardado es corto (4-6 dígitos) → comparación directa (PIN viejo sin hash)
+  return String(pinIngresado) === String(pinGuardado);
+}
+
+// ─── PROTECCIÓN CONTRA ATAQUES DE FUERZA BRUTA ────────────────────────────────
+const intentosFallidos = new Map(); // { 'telefono_o_ip' => { count, lockUntil } }
+
+function registrarIntentoFallido(clave) {
+  const ahora = Date.now();
+  const reg = intentosFallidos.get(clave) || { count: 0, lockUntil: 0 };
+  reg.count++;
+  if (reg.count >= 5) {
+    reg.lockUntil = ahora + 60 * 60 * 1000; // bloqueo 1 hora
+  }
+  intentosFallidos.set(clave, reg);
+  return reg;
+}
+
+function estaBloquedo(clave) {
+  const reg = intentosFallidos.get(clave);
+  if (!reg) return false;
+  if (reg.lockUntil > Date.now()) return true;
+  // Si pasó el bloqueo, resetear
+  if (reg.lockUntil > 0) intentosFallidos.delete(clave);
+  return false;
+}
+
+function limpiarIntentosFallidos(clave) {
+  intentosFallidos.delete(clave);
+}
+
+// Limpieza periódica de intentos antiguos (cada hora)
+setInterval(() => {
+  const ahora = Date.now();
+  for (const [k, v] of intentosFallidos.entries()) {
+    if (v.lockUntil > 0 && v.lockUntil < ahora) intentosFallidos.delete(k);
+  }
+}, 60 * 60 * 1000);
+
+// ─── RATE LIMITING SIMPLE ─────────────────────────────────────────────────────
+const peticionesPorIp = new Map(); // { ip => [timestamps] }
+
+function rateLimitMiddleware(maxPorMinuto = 60) {
+  return (req, res, next) => {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+    const ahora = Date.now();
+    const unMinAtras = ahora - 60000;
+    
+    const lista = peticionesPorIp.get(ip) || [];
+    const recientes = lista.filter(t => t > unMinAtras);
+    
+    if (recientes.length >= maxPorMinuto) {
+      return res.status(429).json({ error: 'Demasiadas peticiones. Espera un momento.' });
+    }
+    
+    recientes.push(ahora);
+    peticionesPorIp.set(ip, recientes);
+    next();
+  };
+}
+
+// Limpieza periódica del rate limiter (cada 5 min)
+setInterval(() => {
+  const limite = Date.now() - 60000;
+  for (const [ip, lista] of peticionesPorIp.entries()) {
+    const recientes = lista.filter(t => t > limite);
+    if (recientes.length === 0) peticionesPorIp.delete(ip);
+    else peticionesPorIp.set(ip, recientes);
+  }
+}, 5 * 60 * 1000);
 
 /** GET con redirecciones (sin depender de fetch; compatible Node 16 en Render). */
 function httpGetWithRedirects(targetUrl, maxRedirects = 5) {
@@ -375,7 +463,7 @@ app.post('/api/reportes', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/registro', async (req, res) => {
+app.post('/api/registro', rateLimitMiddleware(10), async (req, res) => {
   const { nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion } = req.body;
   
   // GEOFENCING: Validar que la ubicación esté dentro de Puerto Montt
@@ -402,29 +490,72 @@ app.post('/api/registro', async (req, res) => {
     }
   }
   
+  // Hashear el PIN antes de guardarlo
+  const pinPlano = pin_seguridad; // guardamos para enviar por correo
+  const pinHasheado = pin_seguridad ? hashPin(pin_seguridad) : '';
+
   let user = await queryOne('SELECT * FROM usuarios WHERE telefono = ?', [telefono]);
   if (!user) {
-    const r = await runSql('INSERT INTO usuarios (nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion, is_verified) VALUES (?,?,?,?,?,?,?,?,?,1)', [nombre, telefono, email||'', nickname||'', pin_seguridad||'', device_id||'', home_lat||null, home_lng||null, direccion||'']);
+    const r = await runSql('INSERT INTO usuarios (nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion, is_verified) VALUES (?,?,?,?,?,?,?,?,?,1)', [nombre, telefono, email||'', nickname||'', pinHasheado, device_id||'', home_lat||null, home_lng||null, direccion||'']);
     user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [r.insertId]);
     sendTelegramAlert(`🆕 <b>NUEVO REGISTRO</b>\n🕐 ${fechaChile(new Date())}\nNombre: ${nombre}\nNick: ${nickname}\nTel: ${telefono}\nEmail: ${email||'No indicado'}`);
-    if (email && pin_seguridad) sendEmailPin(email, nickname||nombre, pin_seguridad);
+    if (email && pinPlano) sendEmailPin(email, nickname||nombre, pinPlano);
   } else {
-    await runSql('UPDATE usuarios SET nombre=?, email=?, nickname=?, pin_seguridad=?, home_lat=?, home_lng=?, direccion=? WHERE id=?', [nombre, email||user.email, nickname||user.nickname, pin_seguridad||user.pin_seguridad, home_lat||user.home_lat, home_lng||user.home_lng, direccion||user.direccion, user.id]);
-    user = { ...user, nombre, email, nickname, pin_seguridad, home_lat, home_lng, direccion };
+    // Si proporciona pin nuevo, hashearlo. Si no, conservar el actual
+    const pinAGuardar = pinPlano ? pinHasheado : user.pin_seguridad;
+    await runSql('UPDATE usuarios SET nombre=?, email=?, nickname=?, pin_seguridad=?, home_lat=?, home_lng=?, direccion=? WHERE id=?', [nombre, email||user.email, nickname||user.nickname, pinAGuardar, home_lat||user.home_lat, home_lng||user.home_lng, direccion||user.direccion, user.id]);
+    user = { ...user, nombre, email, nickname, pin_seguridad: pinAGuardar, home_lat, home_lng, direccion };
     sendTelegramAlert(`🔄 <b>PERFIL ACTUALIZADO</b>\nUsuario: ${nickname || nombre}`);
   }
-  res.json({ user });
+  
+  // NO devolver el PIN hasheado al cliente
+  const userResponse = { ...user };
+  delete userResponse.pin_seguridad;
+  res.json({ user: userResponse });
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', rateLimitMiddleware(20), async (req, res) => {
   const { telefono, pin, device_id } = req.body;
   if (!telefono || !pin) return res.status(400).json({ error: 'Teléfono y PIN son obligatorios' });
 
+  // Protección contra fuerza bruta — por teléfono Y por IP
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  const claveTel = 'tel:' + telefono;
+  const claveIp = 'ip:' + ip;
+  
+  if (estaBloquedo(claveTel) || estaBloquedo(claveIp)) {
+    sendTelegramAlert(`🚨 <b>INTENTO DE LOGIN BLOQUEADO</b>\n🕐 ${fechaChile(new Date())}\nTel: ${telefono}\nIP: ${ip}\nCuenta o IP bloqueada por demasiados intentos.`);
+    return res.status(429).json({ error: 'Demasiados intentos fallidos. Espera 1 hora.' });
+  }
+
   const user = await queryOne('SELECT * FROM usuarios WHERE telefono = ?', [telefono]);
   
-  if (!user) return res.status(401).json({ error: 'Teléfono no registrado en BARRIO' });
-  if (String(user.pin_seguridad) !== String(pin)) return res.status(401).json({ error: 'PIN incorrecto' });
+  if (!user) {
+    registrarIntentoFallido(claveIp);
+    return res.status(401).json({ error: 'Teléfono no registrado en BARRIO' });
+  }
+  
+  if (!verificarPin(pin, user.pin_seguridad)) {
+    const regTel = registrarIntentoFallido(claveTel);
+    registrarIntentoFallido(claveIp);
+    sendTelegramAlert(`⚠️ <b>PIN INCORRECTO</b>\n🕐 ${fechaChile(new Date())}\nUsuario: ${user.nickname||user.nombre}\nTel: ${user.telefono}\nIntentos: ${regTel.count}/5`);
+    return res.status(401).json({ error: 'PIN incorrecto' });
+  }
+  
   if (user.is_blocked) return res.status(403).json({ error: 'Cuenta bloqueada. Contacta al administrador.' });
+
+  // PIN correcto → limpiar contador de intentos fallidos
+  limpiarIntentosFallidos(claveTel);
+  limpiarIntentosFallidos(claveIp);
+
+  // ── MIGRACIÓN GRADUAL: si el PIN era texto plano, ahora guardarlo como hash ──
+  if (user.pin_seguridad && user.pin_seguridad.length !== 128) {
+    try {
+      const hash = hashPin(pin);
+      await runSql('UPDATE usuarios SET pin_seguridad = ? WHERE id = ?', [hash, user.id]);
+      console.log(`🔒 PIN del usuario ${user.id} migrado a hash`);
+    } catch(e) { console.warn('No se pudo migrar PIN a hash:', e.message); }
+  }
 
   // Actualizar device_id con el nuevo celular
   if (device_id && device_id !== user.device_id) {
@@ -432,21 +563,29 @@ app.post('/api/login', async (req, res) => {
     user.device_id = device_id;
   }
 
+  // NO devolver el PIN al cliente — limpiar antes de responder
+  const userResponse = { ...user };
+  delete userResponse.pin_seguridad;
+
   sendTelegramAlert(`🔑 <b>LOGIN</b>\n🕐 ${fechaChile(new Date())}\nUsuario: ${user.nickname||user.nombre}\nTel: ${user.telefono}`);
-  res.json({ user });
+  res.json({ user: userResponse });
 });
 
 app.get('/api/verificar-usuario/:id', async (req, res) => {
   const u = await queryOne('SELECT * FROM usuarios WHERE id = ?', [req.params.id]);
   if (!u) return res.status(404).json({ error: 'No encontrado' });
-  res.json(u);
+  const userResponse = { ...u };
+  delete userResponse.pin_seguridad;
+  res.json(userResponse);
 });
 
 app.put('/api/usuarios/:id/accept-terms', async (req, res) => {
   await runSql('UPDATE usuarios SET terms_accepted = 1 WHERE id = ?', [req.params.id]);
   const u = await queryOne('SELECT * FROM usuarios WHERE id = ?', [req.params.id]);
   if (!u) return res.status(404).json({ error: 'No encontrado' });
-  res.json(u);
+  const userResponse = { ...u };
+  delete userResponse.pin_seguridad;
+  res.json(userResponse);
 });
 
 app.get('/api/muro', async (req, res) => {
@@ -523,10 +662,10 @@ app.post('/api/stolen-location', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/reportar-extravio', async (req, res) => {
+app.post('/api/reportar-extravio', rateLimitMiddleware(10), async (req, res) => {
   const { reported_phone, pin } = req.body;
-  const u = await queryOne('SELECT id, nickname, nombre FROM usuarios WHERE telefono = ? AND pin_seguridad = ?', [reported_phone, pin]);
-  if (!u) {
+  const u = await queryOne('SELECT id, nickname, nombre, pin_seguridad FROM usuarios WHERE telefono = ?', [reported_phone]);
+  if (!u || !verificarPin(pin, u.pin_seguridad)) {
     sendTelegramAlert(`⚠️ <b>FALLO REPORTE EXTRAVÍO</b>\nIntento para: ${reported_phone} (PIN Incorrecto)`);
     return res.status(403).json({ error: 'PIN incorrecto' });
   }
