@@ -20,18 +20,17 @@ const DB_PATH = path.join(__dirname, 'barrio.db');
 let mysqlPool = null;
 let dbReady = false;
 
-// Configuración MySQL Clever Cloud
+// Configuración MySQL Clever Cloud (plan gratuito: máx 5 conexiones simultáneas)
 const mysqlConfig = {
   host: 'blmmp8n5ku7ibhlbw78j-mysql.services.clever-cloud.com',
   user: 'uaeljzbnpravc2uc',
   password: 'MLiC609Fh7UXinx861mQ',
   database: 'blmmp8n5ku7ibhlbw78j',
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 3,
   queueLimit: 0,
   ssl: { rejectUnauthorized: false },
-  connectTimeout: 15000,
-  acquireTimeout: 15000
+  connectTimeout: 15000
 };
 
 // ─── INICIALIZACIÓN ────────────────────────────────────────────────────────────
@@ -45,6 +44,14 @@ async function initDatabase() {
   while (intentos < maxIntentos) {
     intentos++;
     try {
+      // Cerrar pool anterior si existe (libera conexiones)
+      if (mysqlPool) {
+        try { await mysqlPool.end(); } catch (_) {}
+        mysqlPool = null;
+        // Esperar a que Clever Cloud libere las conexiones
+        await new Promise(r => setTimeout(r, 2000));
+      }
+
       mysqlPool = mysql.createPool(mysqlConfig);
 
       // Probar conexión real
@@ -73,18 +80,20 @@ async function initDatabase() {
 
     } catch (e) {
       console.error(`❌ Intento ${intentos}/${maxIntentos} fallido: ${e.message}`);
+      // Cerrar el pool fallido inmediatamente para liberar conexiones
       if (mysqlPool) {
         try { await mysqlPool.end(); } catch (_) {}
         mysqlPool = null;
       }
       if (intentos < maxIntentos) {
-        console.log('⏳ Reintentando en 5 segundos...');
-        await new Promise(r => setTimeout(r, 5000));
+        // Esperar más tiempo si el error es de demasiadas conexiones
+        const espera = e.message.includes('max_user_connections') ? 15000 : 5000;
+        console.log(`⏳ Reintentando en ${espera/1000} segundos...`);
+        await new Promise(r => setTimeout(r, espera));
       }
     }
   }
 
-  // Si llegamos aquí, MySQL no conectó después de todos los intentos
   throw new Error('No se pudo conectar a MySQL después de ' + maxIntentos + ' intentos. Verifica la conexión a Clever Cloud.');
 }
 
