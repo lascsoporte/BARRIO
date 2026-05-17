@@ -1068,12 +1068,12 @@ const App = {
 
  footerHtml() {
  return `
- <footer class="legal-footer" style="margin-top: 0px; padding: 5px 10px; text-align: center; border-top: 1px solid rgba(0,0,0,0.08); position: relative;">
+ <footer class="legal-footer" style="margin-top: 0px; padding: 5px 50px 5px 10px; text-align: center; border-top: 1px solid rgba(0,0,0,0.08); position: relative;">
  <p style="font-size: 0.65rem; color: var(--text-light); margin: 0;">
  &copy; 2026 BARRIO - PUERTOMAS SPA | 
  <a href="#/legal" style="color:var(--primary); text-decoration:underline; cursor:pointer;">Aviso Legal</a>
  </p>
- <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); position: absolute; right: 8px; bottom: 5px;">v3.9.1</div>
+ <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); position: absolute; right: 8px; bottom: 5px;">v3.9.3</div>
  </footer>
  `;
  },
@@ -1957,18 +1957,14 @@ const App = {
       try {
         const termsAccepted = localStorage.getItem('barrio_disclaimer_v2') === 'true';
         
-        // Obtener GPS real del celular para verificación (no bloquea si falla)
+        // GPS NO bloqueante: solo usar si YA está disponible. NO pedir nuevo permiso aquí.
+        // (Si pedimos getCurrentPosition aquí, el navegador puede quedar colgado
+        // esperando la decisión del usuario indefinidamente.)
         let gpsLat = null, gpsLng = null;
         try {
-          if (Geo.userLat && Geo.userLng) {
+          if (Geo && Geo.userLat && Geo.userLng) {
             gpsLat = Geo.userLat;
             gpsLng = Geo.userLng;
-          } else if (navigator.geolocation) {
-            const pos = await new Promise((resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, enableHighAccuracy: false });
-            });
-            gpsLat = pos.coords.latitude;
-            gpsLng = pos.coords.longitude;
           }
         } catch(e) { /* sin GPS no bloqueamos el registro */ }
         

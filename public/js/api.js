@@ -26,13 +26,22 @@ const API = {
   async post(url, data, token) {
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    const res = await fetch(this.base + url, { method: 'POST', headers, body: JSON.stringify(data) });
-    if (!res.ok) {
-      if (res.status === 401) throw new Error('401-EXPIRADO');
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `Error ${res.status}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    try {
+      const res = await fetch(this.base + url, { method: 'POST', headers, body: JSON.stringify(data), signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!res.ok) {
+        if (res.status === 401) throw new Error('401-EXPIRADO');
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Error ${res.status}`);
+      }
+      return res.json();
+    } catch (e) {
+      clearTimeout(timeoutId);
+      if (e.name === 'AbortError') throw new Error('El servidor tardó demasiado en responder. Intenta de nuevo en unos segundos.');
+      throw e;
     }
-    return res.json();
   },
 
   async put(url, data, token) {
