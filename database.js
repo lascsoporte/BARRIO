@@ -404,6 +404,7 @@ async function runSql(sql, params = []) {
 
 async function cleanupMascotas() {
   try {
+    // Borrar mascotas perdidas con más de 30 días (15 iniciales + 15 de gracia si no se renovó)
     const result = await runSql(
       "DELETE FROM mascotas_perdidas WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)"
     );
@@ -416,6 +417,7 @@ async function cleanupMascotas() {
 
 async function cleanupReportes() {
   try {
+    // Borrar reportes con fecha de expiración pasada
     const result = await runSql(
       "DELETE FROM reportes_ciudadanos WHERE fecha_expiracion IS NOT NULL AND fecha_expiracion < NOW()"
     );
@@ -426,7 +428,35 @@ async function cleanupReportes() {
   }
 }
 
+async function cleanupMuro() {
+  try {
+    // Borrar posts del muro con más de 7 días
+    const result = await runSql(
+      "DELETE FROM muro_comunitario WHERE created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)"
+    );
+    return result.affectedRows || 0;
+  } catch (e) {
+    console.error('Error en limpieza de muro:', e);
+    return 0;
+  }
+}
+
+async function getMascotasParaRecordatorio() {
+  // Mascotas que cumplen exactamente entre 14 y 15 días (ventana para recordar al dueño una sola vez)
+  try {
+    return await queryAll(
+      `SELECT m.id, m.nombre_mascota, m.nombre_contacto, m.telefono, m.created_at
+       FROM mascotas_perdidas m
+       WHERE m.created_at < DATE_SUB(NOW(), INTERVAL 14 DAY)
+         AND m.created_at > DATE_SUB(NOW(), INTERVAL 15 DAY)`
+    );
+  } catch (e) {
+    console.error('Error obteniendo mascotas para recordatorio:', e);
+    return [];
+  }
+}
+
 // isUsingMysql siempre retorna true — solo usamos MySQL
 function isUsingMysql() { return true; }
 
-module.exports = { initDatabase, queryAll, queryOne, runSql, cleanupMascotas, cleanupReportes, isUsingMysql };
+module.exports = { initDatabase, queryAll, queryOne, runSql, cleanupMascotas, cleanupReportes, cleanupMuro, getMascotasParaRecordatorio, isUsingMysql };

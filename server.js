@@ -138,7 +138,7 @@ function httpGetWithRedirects(targetUrl, maxRedirects = 5) {
     follow(targetUrl, maxRedirects);
   });
 }
-const { initDatabase, cleanupMascotas, cleanupReportes, isUsingMysql, ...dbHelper } = require('./database');
+const { initDatabase, cleanupMascotas, cleanupReportes, cleanupMuro, getMascotasParaRecordatorio, isUsingMysql, ...dbHelper } = require('./database');
 const nodemailer = require('nodemailer');
 const webpush = require('web-push');
 const { Server: SocketIO } = require('socket.io');
@@ -539,23 +539,26 @@ app.post('/api/reportes', rateLimitMiddleware(20), async (req, res) => {
 });
 
 app.post('/api/registro', rateLimitMiddleware(10), async (req, res) => {
-  const { nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion } = req.body;
+  const { nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion, gps_lat, gps_lng } = req.body;
   
+  // Función auxiliar para calcular distancia entre dos puntos (km)
+  const calcularDistanciaKm = (lat1, lng1, lat2, lng2) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) ** 2 +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  };
+
   // GEOFENCING: Validar que la ubicación esté dentro de Puerto Montt
   if (home_lat && home_lng) {
     const PM_CENTER_LAT = -41.4693;
     const PM_CENTER_LNG = -72.9423;
-    const MAX_RADIUS_KM = 25; // Radio máximo desde el centro (Puerto Montt + alrededores)
+    const MAX_RADIUS_KM = 25; // Radio máximo desde el centro
     
-    // Calcular distancia usando fórmula Haversine
-    const R = 6371; // Radio de la Tierra en km
-    const dLat = (home_lat - PM_CENTER_LAT) * Math.PI / 180;
-    const dLng = (home_lng - PM_CENTER_LNG) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(PM_CENTER_LAT * Math.PI / 180) * Math.cos(home_lat * Math.PI / 180) *
-              Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const distance = R * c;
+    const distance = calcularDistanciaKm(PM_CENTER_LAT, PM_CENTER_LNG, home_lat, home_lng);
     
     if (distance > MAX_RADIUS_KM) {
       return res.status(400).json({
@@ -564,23 +567,38 @@ app.post('/api/registro', rateLimitMiddleware(10), async (req, res) => {
       });
     }
   }
+
+  // ─── VERIFICACIÓN GPS: comparar GPS real con punto marcado ─────────────
+  let avisoGPS = '';
+  if (gps_lat && gps_lng && home_lat && home_lng) {
+    const distanciaGPS = calcularDistanciaKm(gps_lat, gps_lng, home_lat, home_lng);
+    
+    if (distanciaGPS < 1) {
+      avisoGPS = `\n📍 <b>GPS COINCIDE</b> (${distanciaGPS.toFixed(2)} km del punto marcado)`;
+    } else if (distanciaGPS < 5) {
+      avisoGPS = `\n⚠️ <b>GPS CERCANO</b> (${distanciaGPS.toFixed(2)} km del punto marcado) - posible legítimo`;
+    } else {
+      avisoGPS = `\n🚨 <b>GPS LEJANO</b> (${distanciaGPS.toFixed(2)} km del punto marcado) - VERIFICAR USUARIO\n📱 GPS real: <a href="https://maps.google.com/?q=${gps_lat},${gps_lng}">Ver</a>\n🏠 Casa marcada: <a href="https://maps.google.com/?q=${home_lat},${home_lng}">Ver</a>`;
+    }
+  } else if (home_lat && home_lng) {
+    avisoGPS = `\n⚠️ <b>Sin GPS verificado</b> (el usuario no permitió ubicación)`;
+  }
   
   // Hashear el PIN antes de guardarlo
-  const pinPlano = pin_seguridad; // guardamos para enviar por correo
+  const pinPlano = pin_seguridad;
   const pinHasheado = pin_seguridad ? hashPin(pin_seguridad) : '';
 
   let user = await queryOne('SELECT * FROM usuarios WHERE telefono = ?', [telefono]);
   if (!user) {
-    const r = await runSql('INSERT INTO usuarios (nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion, is_verified) VALUES (?,?,?,?,?,?,?,?,?,1)', [nombre, telefono, email||'', nickname||'', pinHasheado, device_id||'', home_lat||null, home_lng||null, direccion||'']);
+    const r = await runSql('INSERT INTO usuarios (nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion, last_lat, last_lng, is_verified) VALUES (?,?,?,?,?,?,?,?,?,?,?,1)', [nombre, telefono, email||'', nickname||'', pinHasheado, device_id||'', home_lat||null, home_lng||null, direccion||'', gps_lat||null, gps_lng||null]);
     user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [r.insertId]);
-    sendTelegramAlert(`🆕 <b>NUEVO REGISTRO</b>\n🕐 ${fechaChile(new Date())}\nNombre: ${nombre}\nNick: ${nickname}\nTel: ${telefono}\nEmail: ${email||'No indicado'}`);
+    sendTelegramAlert(`🆕 <b>NUEVO REGISTRO</b>\n🕐 ${fechaChile(new Date())}\nNombre: ${nombre}\nNick: ${nickname}\nTel: ${telefono}\nEmail: ${email||'No indicado'}\nSector: ${direccion||'—'}${avisoGPS}`);
     if (email && pinPlano) sendEmailPin(email, nickname||nombre, pinPlano);
   } else {
-    // Si proporciona pin nuevo, hashearlo. Si no, conservar el actual
     const pinAGuardar = pinPlano ? pinHasheado : user.pin_seguridad;
     await runSql('UPDATE usuarios SET nombre=?, email=?, nickname=?, pin_seguridad=?, home_lat=?, home_lng=?, direccion=? WHERE id=?', [nombre, email||user.email, nickname||user.nickname, pinAGuardar, home_lat||user.home_lat, home_lng||user.home_lng, direccion||user.direccion, user.id]);
     user = { ...user, nombre, email, nickname, pin_seguridad: pinAGuardar, home_lat, home_lng, direccion };
-    sendTelegramAlert(`🔄 <b>PERFIL ACTUALIZADO</b>\nUsuario: ${nickname || nombre}`);
+    sendTelegramAlert(`🔄 <b>PERFIL ACTUALIZADO</b>\nUsuario: ${nickname || nombre}${avisoGPS}`);
   }
   
   // NO devolver el PIN hasheado al cliente
@@ -664,11 +682,12 @@ app.put('/api/usuarios/:id/accept-terms', async (req, res) => {
 });
 
 app.get('/api/muro', async (req, res) => {
-  res.json(await queryAll('SELECT m.*, COALESCE(u.nickname, u.nombre) as autor FROM muro_comunitario m JOIN usuarios u ON m.usuario_id = u.id ORDER BY m.created_at DESC LIMIT 50'));
+  res.json(await queryAll('SELECT m.*, COALESCE(u.nickname, u.nombre) as autor FROM muro_comunitario m JOIN usuarios u ON m.usuario_id = u.id WHERE m.created_at > DATE_SUB(NOW(), INTERVAL 7 DAY) ORDER BY m.created_at DESC LIMIT 50'));
 });
 
 app.get('/api/mascotas', async (req, res) => {
-  res.json(await queryAll('SELECT * FROM mascotas_perdidas ORDER BY created_at DESC'));
+  // Solo mostrar mascotas con menos de 15 días (después aún quedan 15 de gracia para que el dueño la borre)
+  res.json(await queryAll('SELECT * FROM mascotas_perdidas WHERE created_at > DATE_SUB(NOW(), INTERVAL 15 DAY) ORDER BY created_at DESC'));
 });
 
 app.post('/api/mascotas', rateLimitMiddleware(15), async (req, res) => {
@@ -698,6 +717,33 @@ app.post('/api/mascotas', rateLimitMiddleware(15), async (req, res) => {
   }
 
   res.json({ ok: true });
+});
+
+// ─── DUEÑO MARCA MASCOTA COMO ENCONTRADA ─────────────────────────────────
+// Verifica con teléfono + PIN del dueño para que solo él pueda cerrar su reporte
+app.post('/api/mascotas/:id/encontrada', rateLimitMiddleware(10), async (req, res) => {
+  const { telefono, pin } = req.body;
+  const mascotaId = parseInt(req.params.id);
+  if (!mascotaId || !telefono || !pin) {
+    return res.status(400).json({ error: 'Faltan datos' });
+  }
+
+  // Verificar que el dueño existe con ese teléfono y PIN correcto
+  const user = await queryOne('SELECT id, nickname, nombre, pin_seguridad FROM usuarios WHERE telefono = ?', [telefono]);
+  if (!user || !verificarPin(pin, user.pin_seguridad)) {
+    return res.status(403).json({ error: 'Teléfono o PIN incorrecto' });
+  }
+
+  // Verificar que la mascota fue reportada con ese mismo teléfono
+  const mascota = await queryOne('SELECT * FROM mascotas_perdidas WHERE id = ? AND telefono = ?', [mascotaId, telefono]);
+  if (!mascota) {
+    return res.status(404).json({ error: 'No encontramos esta mascota a tu nombre' });
+  }
+
+  // Eliminar el aviso
+  await runSql('DELETE FROM mascotas_perdidas WHERE id = ?', [mascotaId]);
+  sendTelegramAlert(`🎉 <b>MASCOTA ENCONTRADA</b>\n🕐 ${fechaChile(new Date())}\nDueño: ${user.nickname || user.nombre}\nMascota: ${mascota.nombre_mascota || 'Sin nombre'}\nFue removida del listado.`);
+  res.json({ ok: true, mensaje: '¡Gracias por avisar! Tu aviso fue eliminado.' });
 });
 
 app.post('/api/muro', rateLimitMiddleware(20), async (req, res) => {
@@ -1480,6 +1526,37 @@ async function start() {
       scheduleRenderKeepAlive();
       sendTelegramAlert(`🚀 <b>SISTEMA BARRIO INICIADO</b>\nServidor online y base de datos lista.`);
     });
+
+    // ── LIMPIEZA AUTOMÁTICA cada 6 horas ──
+    setInterval(async () => {
+      try {
+        const reportesBorrados = await cleanupReportes();
+        const mascotasBorradas = await cleanupMascotas();
+        const muroBorrados = await cleanupMuro();
+        if (reportesBorrados + mascotasBorradas + muroBorrados > 0) {
+          console.log(`🧹 Limpieza: ${reportesBorrados} reportes, ${mascotasBorradas} mascotas, ${muroBorrados} muro`);
+        }
+      } catch (e) {
+        console.error('Error en limpieza automática:', e.message);
+      }
+    }, 6 * 60 * 60 * 1000); // cada 6 horas
+
+    // ── RECORDATORIO DIARIO de mascotas próximas a expirar ──
+    setInterval(async () => {
+      try {
+        const mascotas = await getMascotasParaRecordatorio();
+        if (mascotas.length > 0) {
+          let mensaje = `🔔 <b>RECORDATORIO MASCOTAS</b>\n${mascotas.length} aviso(s) de mascotas perdidas cumplen 15 días.\nContacta a los dueños por si ya las encontraron:\n\n`;
+          mascotas.forEach(m => {
+            mensaje += `• ${m.nombre_mascota || 'Sin nombre'} - ${m.nombre_contacto} (${m.telefono})\n`;
+          });
+          sendTelegramAlert(mensaje);
+        }
+      } catch (e) {
+        console.error('Error en recordatorio mascotas:', e.message);
+      }
+    }, 24 * 60 * 60 * 1000); // cada 24 horas
+
   } catch (e) {
     console.error('CRITICAL START ERROR:', e);
     try { sendTelegramAlert(`🚨 <b>ERROR CRÍTICO DE INICIO</b>\n${e.message}`); } catch (_) { /* ignore */ }

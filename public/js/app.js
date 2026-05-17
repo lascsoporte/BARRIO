@@ -441,7 +441,8 @@ const App = {
     }
     else if (hash.startsWith('#/buscar')) this.renderSearch(app);
     else if (hash.startsWith('#/local/')) this.renderStore(app);
-    else if (hash === '#/mascotas' || hash === '#/reportar') this.renderReportar(app);
+    else if (hash === '#/mascotas') this.renderMascotasPerdidas(app);
+    else if (hash === '#/reportar') this.renderReportar(app);
     else if (hash === '#/legal') this.renderLegal(app);
     else if (hash === '#/emergencia') this.renderEmergencia(app);
     else if (hash === '#/muro') this.renderMuro(app);
@@ -480,6 +481,11 @@ const App = {
           <div class="qa-text" style="font-weight:900;">EL MURO</div>
         </div>
       </div>
+
+      <button onclick="location.hash='#/mascotas'" style="margin-top:8px; width:100%; padding:10px; background:linear-gradient(135deg,#9C27B0,#673AB7); color:white; border:none; border-radius:12px; font-weight:900; font-size:0.95rem; cursor:pointer; box-shadow:0 2px 8px rgba(156,39,176,0.3); display:flex; align-items:center; justify-content:center; gap:8px;">
+        🐶 MASCOTAS PERDIDAS
+        <span id="contadorMascotas" style="background:rgba(255,255,255,0.25); border-radius:12px; padding:2px 8px; font-size:0.8rem; font-weight:700;"></span>
+      </button>
 
       <div style="margin-top:10px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:8px; padding-bottom:5px;">
         <p style="font-size:0.8rem; color:var(--text-light); margin-bottom:0; padding:5px 0; line-height:1.2;">📍 <b>Georreferencia activa</b> para seguridad ciudadana.</p>
@@ -589,6 +595,17 @@ const App = {
         });
       } catch(e) {}
     }, 500);
+
+    // Cargar contador de mascotas perdidas en el botón del HOME
+    API.getMascotas().then(mascotas => {
+      const contadorEl = document.getElementById('contadorMascotas');
+      if (contadorEl && mascotas && mascotas.length > 0) {
+        contadorEl.textContent = mascotas.length;
+        contadorEl.style.display = 'inline-block';
+      } else if (contadorEl) {
+        contadorEl.style.display = 'none';
+      }
+    }).catch(() => {});
 
     // Mostrar banner de instalación si corresponde
     setTimeout(() => {
@@ -1056,7 +1073,7 @@ const App = {
  &copy; 2026 BARRIO - PUERTOMAS SPA | 
  <a href="#/legal" style="color:var(--primary); text-decoration:underline; cursor:pointer;">Aviso Legal</a>
  </p>
- <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); position: absolute; right: 8px; bottom: 5px;">v3.2</div>
+ <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); position: absolute; right: 8px; bottom: 5px;">v3.8</div>
  </footer>
  `;
  },
@@ -1843,10 +1860,27 @@ const App = {
 
       try {
         const termsAccepted = localStorage.getItem('barrio_disclaimer_v2') === 'true';
+        
+        // Obtener GPS real del celular para verificación (no bloquea si falla)
+        let gpsLat = null, gpsLng = null;
+        try {
+          if (Geo.userLat && Geo.userLng) {
+            gpsLat = Geo.userLat;
+            gpsLng = Geo.userLng;
+          } else if (navigator.geolocation) {
+            const pos = await new Promise((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, enableHighAccuracy: false });
+            });
+            gpsLat = pos.coords.latitude;
+            gpsLng = pos.coords.longitude;
+          }
+        } catch(e) { /* sin GPS no bloqueamos el registro */ }
+        
         const res = await API.registerUser({ 
           nombre, nickname, telefono, email, pin_seguridad: pin, 
           direccion, device_id: this.deviceId, terms_accepted: termsAccepted,
-          home_lat: homeLat, home_lng: homeLng
+          home_lat: homeLat, home_lng: homeLng,
+          gps_lat: gpsLat, gps_lng: gpsLng
         });
         const savedUser = res.user;
         localStorage.setItem('barrio_user', JSON.stringify(savedUser));
@@ -1880,6 +1914,155 @@ const App = {
  </div>
  `;
  document.body.appendChild(modal);
+ },
+
+ // ===== PÁGINA DE MASCOTAS PERDIDAS =====
+ async renderMascotasPerdidas(container) {
+   container.innerHTML = `
+     <h2 class="section-title">🐶 Mascotas Perdidas</h2>
+     <div style="background:#F3E5F5; padding:12px; border-radius:10px; margin-bottom:12px; font-size:0.85rem; color:#555;">
+       Ayuda a tus vecinos a reencontrarse con sus mascotas. Si reconoces alguna, contacta directamente al dueño.
+     </div>
+     <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+       <button onclick="location.hash='#/reportar'" style="flex:1; min-width:140px; background:#673AB7; color:white; border:none; padding:10px; border-radius:10px; font-weight:900; font-size:0.9rem; cursor:pointer;">
+         + Reportar mascota
+       </button>
+       <button onclick="App.mostrarMiMascotaAparecio()" style="flex:1; min-width:140px; background:#4CAF50; color:white; border:none; padding:10px; border-radius:10px; font-weight:900; font-size:0.9rem; cursor:pointer;">
+         🎉 Mi mascota apareció
+       </button>
+     </div>
+     <div id="mascotasLista" style="display:flex; flex-direction:column; gap:12px;">
+       <div style="text-align:center; padding:20px; color:#999;">⏳ Cargando mascotas...</div>
+     </div>
+   `;
+
+   try {
+     const mascotas = await API.getMascotas();
+     const listaEl = document.getElementById('mascotasLista');
+     
+     if (!mascotas || mascotas.length === 0) {
+       listaEl.innerHTML = `
+         <div style="background:#E8F5E9; padding:30px 20px; border-radius:12px; text-align:center; color:#2E7D32;">
+           <div style="font-size:3rem; margin-bottom:10px;">🏘️🐾</div>
+           <p style="margin:0; font-weight:bold;">¡No hay mascotas perdidas reportadas!</p>
+           <p style="margin:8px 0 0; font-size:0.85rem;">Eso significa que todas están en casa 💚</p>
+         </div>`;
+       return;
+     }
+
+     // Calcular días transcurridos para cada mascota
+     const ahora = Date.now();
+     listaEl.innerHTML = mascotas.map(m => {
+       const fecha = new Date(m.created_at);
+       const dias = Math.floor((ahora - fecha.getTime()) / (1000 * 60 * 60 * 24));
+       const colorBorde = dias < 3 ? '#D32F2F' : dias < 7 ? '#FF9800' : '#9E9E9E';
+       const labelDias = dias === 0 ? 'Hoy' : dias === 1 ? 'Ayer' : `Hace ${dias} días`;
+       const icono = (m.tipo_animal||'').toLowerCase().includes('gat') ? '🐱' : '🐶';
+       const waLink = `https://wa.me/${(m.telefono||'').replace(/[^0-9]/g,'')}?text=${encodeURIComponent(`Hola, vi tu aviso de BARRIO sobre ${m.nombre_mascota||'tu mascota'} perdida. Tengo información.`)}`;
+       
+       return `
+         <div class="card fade-in" style="border-left:4px solid ${colorBorde}; padding:12px;">
+           <div style="display:flex; gap:12px;">
+             ${m.foto_base64 ? 
+               `<img src="${m.foto_base64}" style="width:90px; height:90px; object-fit:cover; border-radius:10px; flex-shrink:0; cursor:pointer;" onclick="window.open(this.src,'_blank')">` :
+               `<div style="width:90px; height:90px; background:#EEE; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:2.5rem; flex-shrink:0;">${icono}</div>`
+             }
+             <div style="flex:1; min-width:0;">
+               <div style="display:flex; justify-content:space-between; align-items:start; gap:8px;">
+                 <div>
+                   <div style="font-weight:900; font-size:1.05rem;">${icono} ${this._esc(m.nombre_mascota || 'Mascota sin nombre')}</div>
+                   <div style="font-size:0.8rem; color:#666; margin-top:2px;">${this._esc(m.tipo_animal || '')}</div>
+                 </div>
+                 <span style="background:${colorBorde}; color:white; padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:bold; white-space:nowrap;">${labelDias}</span>
+               </div>
+               ${m.ubicacion_extravio ? `<div style="font-size:0.8rem; color:#555; margin-top:6px;">📍 ${this._esc(m.ubicacion_extravio)}</div>` : ''}
+               ${m.caracteristicas ? `<div style="font-size:0.8rem; color:#666; margin-top:4px;">${this._esc(this._truncar(m.caracteristicas, 120))}</div>` : ''}
+               <div style="margin-top:8px; font-size:0.8rem;">📞 <b>${this._esc(m.nombre_contacto)}</b>: ${this._esc(m.telefono)}</div>
+             </div>
+           </div>
+           <div style="display:flex; gap:6px; margin-top:10px;">
+             <a href="tel:${this._esc(m.telefono)}" style="flex:1; background:#1976D2; color:white; padding:8px; border-radius:8px; text-align:center; text-decoration:none; font-weight:bold; font-size:0.85rem;">📞 Llamar</a>
+             <a href="${waLink}" target="_blank" style="flex:1; background:#25D366; color:white; padding:8px; border-radius:8px; text-align:center; text-decoration:none; font-weight:bold; font-size:0.85rem;">💬 WhatsApp</a>
+             <a href="https://wa.me/?text=${encodeURIComponent(`🐶 MASCOTA PERDIDA - BARRIO\\n${m.nombre_mascota||''} - ${m.tipo_animal||''}\\nLugar: ${m.ubicacion_extravio||''}\\nContacto: ${m.nombre_contacto} - ${m.telefono}`)}" target="_blank" style="flex:0 0 40px; background:#673AB7; color:white; padding:8px; border-radius:8px; text-align:center; text-decoration:none; font-weight:bold; font-size:0.85rem;" title="Compartir">📤</a>
+           </div>
+         </div>`;
+     }).join('');
+   } catch(e) {
+     document.getElementById('mascotasLista').innerHTML = `<div style="text-align:center; color:#D32F2F; padding:20px;">❌ Error al cargar mascotas: ${e.message}</div>`;
+   }
+ },
+
+ // ===== HELPER: ESCAPE HTML =====
+ _esc(s) {
+   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ },
+
+ _truncar(s, n) {
+   if (!s) return '';
+   return s.length > n ? s.slice(0, n) + '…' : s;
+ },
+
+ // ===== MODAL "MI MASCOTA APARECIÓ" =====
+ mostrarMiMascotaAparecio() {
+   const modal = document.createElement('div');
+   modal.className = 'auth-overlay';
+   modal.innerHTML = `
+     <div class="auth-modal fade-in" style="max-width:380px;">
+       <button class="auth-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
+       <div style="font-size:3rem; margin-bottom:10px;">🎉</div>
+       <h2 style="font-size:1.2rem; margin:0 0 8px;">¡Mi mascota apareció!</h2>
+       <p style="font-size:0.85rem; color:#666; margin-bottom:16px;">Para quitar tu aviso necesitamos verificar que eres el dueño.</p>
+       <div style="text-align:left; margin-bottom:12px;">
+         <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:4px;">ID del aviso</label>
+         <input type="number" id="aparecioId" placeholder="Lo ves en el aviso" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; font-size:1rem; box-sizing:border-box;" autocomplete="off">
+       </div>
+       <div style="text-align:left; margin-bottom:12px;">
+         <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:4px;">Tu teléfono registrado</label>
+         <input type="tel" id="aparecioTel" placeholder="+56912345678" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; font-size:1rem; box-sizing:border-box;" autocomplete="off">
+       </div>
+       <div style="text-align:left; margin-bottom:16px;">
+         <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:4px;">Tu PIN</label>
+         <input type="password" id="aparecioPin" maxlength="4" placeholder="****" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; font-size:1.3rem; text-align:center; letter-spacing:6px; box-sizing:border-box;" autocomplete="off">
+       </div>
+       <p id="aparecioError" style="color:#D32F2F; font-size:0.85rem; margin:0 0 10px; display:none;"></p>
+       <button id="btnAparecioOk" class="btn btn-primary" style="width:100%; font-weight:900;">QUITAR AVISO</button>
+     </div>
+   `;
+   document.body.appendChild(modal);
+   
+   document.getElementById('btnAparecioOk').onclick = async () => {
+     const id = document.getElementById('aparecioId').value.trim();
+     const tel = document.getElementById('aparecioTel').value.trim();
+     const pin = document.getElementById('aparecioPin').value.trim();
+     const err = document.getElementById('aparecioError');
+     const btn = document.getElementById('btnAparecioOk');
+     
+     if (!id || !tel || !pin) { err.textContent = 'Completa todos los campos'; err.style.display = 'block'; return; }
+     err.style.display = 'none';
+     btn.disabled = true; btn.textContent = 'Procesando...';
+     
+     try {
+       const res = await fetch(`/api/mascotas/${id}/encontrada`, {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ telefono: tel, pin })
+       });
+       const data = await res.json();
+       if (!res.ok) {
+         err.textContent = data.error || 'Error al procesar';
+         err.style.display = 'block';
+         btn.disabled = false; btn.textContent = 'QUITAR AVISO';
+         return;
+       }
+       modal.remove();
+       App.toast('🎉 ¡Aviso eliminado!');
+       if (location.hash === '#/mascotas') App.route();
+     } catch(e) {
+       err.textContent = 'Error de conexión. Intenta de nuevo.';
+       err.style.display = 'block';
+       btn.disabled = false; btn.textContent = 'QUITAR AVISO';
+     }
+   };
  },
 
  // ===== MURO COMUNITARIO =====
