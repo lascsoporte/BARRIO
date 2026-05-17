@@ -27,7 +27,7 @@ const mysqlConfig = {
   password: 'MLiC609Fh7UXinx861mQ',
   database: 'blmmp8n5ku7ibhlbw78j',
   waitForConnections: true,
-  connectionLimit: 3,
+  connectionLimit: 2,
   queueLimit: 0,
   ssl: { rejectUnauthorized: false },
   connectTimeout: 15000
@@ -474,4 +474,17 @@ async function getMascotasParaRecordatorio() {
 // isUsingMysql siempre retorna true — solo usamos MySQL
 function isUsingMysql() { return true; }
 
-module.exports = { initDatabase, queryAll, queryOne, runSql, cleanupMascotas, cleanupReportes, cleanupMuro, getMascotasParaRecordatorio, isUsingMysql };
+// Cierre limpio de conexiones (importante al reiniciar el servidor)
+async function closeDatabase() {
+  if (mysqlPool) {
+    try {
+      await mysqlPool.end();
+      console.log('✅ Conexiones MySQL cerradas');
+    } catch (e) {
+      console.error('Error cerrando MySQL:', e.message);
+    }
+    mysqlPool = null;
+  }
+}
+
+module.exports = { initDatabase, queryAll, queryOne, runSql, cleanupMascotas, cleanupReportes, cleanupMuro, getMascotasParaRecordatorio, isUsingMysql, closeDatabase };

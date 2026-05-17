@@ -138,7 +138,7 @@ function httpGetWithRedirects(targetUrl, maxRedirects = 5) {
     follow(targetUrl, maxRedirects);
   });
 }
-const { initDatabase, cleanupMascotas, cleanupReportes, cleanupMuro, getMascotasParaRecordatorio, isUsingMysql, ...dbHelper } = require('./database');
+const { initDatabase, cleanupMascotas, cleanupReportes, cleanupMuro, getMascotasParaRecordatorio, isUsingMysql, closeDatabase, ...dbHelper } = require('./database');
 const nodemailer = require('nodemailer');
 const webpush = require('web-push');
 const { Server: SocketIO } = require('socket.io');
@@ -1765,5 +1765,19 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
+
+// ─── CIERRE LIMPIO: liberar conexiones MySQL cuando Render reinicia ─────────
+const shutdown = async (signal) => {
+  console.log(`📴 Recibido ${signal}, cerrando limpiamente...`);
+  try {
+    await closeDatabase();
+    console.log('✅ Cierre limpio completado');
+  } catch(e) {
+    console.error('Error en cierre:', e.message);
+  }
+  process.exit(0);
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 start();
