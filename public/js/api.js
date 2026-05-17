@@ -27,7 +27,7 @@ const API = {
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
     try {
       const res = await fetch(this.base + url, { method: 'POST', headers, body: JSON.stringify(data), signal: controller.signal });
       clearTimeout(timeoutId);
@@ -39,7 +39,7 @@ const API = {
       return res.json();
     } catch (e) {
       clearTimeout(timeoutId);
-      if (e.name === 'AbortError') throw new Error('El servidor tardó demasiado en responder. Intenta de nuevo en unos segundos.');
+      if (e.name === 'AbortError') throw new Error('El servidor tardó demasiado en responder. Por favor, intenta de nuevo.');
       throw e;
     }
   },

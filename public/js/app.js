@@ -1073,7 +1073,7 @@ const App = {
  &copy; 2026 BARRIO - PUERTOMAS SPA | 
  <a href="#/legal" style="color:var(--primary); text-decoration:underline; cursor:pointer;">Aviso Legal</a>
  </p>
- <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); position: absolute; right: 8px; bottom: 5px;">v3.9.3</div>
+ <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); position: absolute; right: 8px; bottom: 5px;">v3.9.4</div>
  </footer>
  `;
  },
@@ -1980,12 +1980,15 @@ const App = {
         modal.remove();
         this.continueInit(savedUser);
       } catch (err) {
+        console.error('Error en registro:', err);
         btn.disabled = false;
         btn.textContent = 'REGISTRARME AHORA';
         if (err.message && err.message.includes('FUERA_DE_COBERTURA')) {
           alert('⚠️ Ubicación fuera del área de cobertura\n\nPor favor, marca tu casa dentro de Puerto Montt en el mapa.');
+        } else if (err.message && err.message.includes('tardó demasiado')) {
+          alert('⏳ El servidor está despertando\n\nPuede tardar unos segundos. Toca REGISTRARME de nuevo en 10 segundos.');
         } else {
-          this.toast(err.message || 'Error al registrar');
+          alert('❌ Error al registrar\n\n' + (err.message || 'Verifica tu conexión a internet e intenta de nuevo.'));
         }
       }
     });

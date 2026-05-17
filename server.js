@@ -541,6 +541,13 @@ app.post('/api/reportes', rateLimitMiddleware(20), async (req, res) => {
 app.post('/api/registro', rateLimitMiddleware(10), async (req, res) => {
   const { nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion, gps_lat, gps_lng } = req.body;
   
+  console.log(`📝 [REGISTRO] Inicio: tel=${telefono}, nombre=${nombre}`);
+  
+  // Validación básica
+  if (!nombre || !telefono) {
+    return res.status(400).json({ error: 'Nombre y teléfono son obligatorios' });
+  }
+  
   // Función auxiliar para calcular distancia entre dos puntos (km)
   const calcularDistanciaKm = (lat1, lng1, lat2, lng2) => {
     const R = 6371;
@@ -556,11 +563,12 @@ app.post('/api/registro', rateLimitMiddleware(10), async (req, res) => {
   if (home_lat && home_lng) {
     const PM_CENTER_LAT = -41.4693;
     const PM_CENTER_LNG = -72.9423;
-    const MAX_RADIUS_KM = 25; // Radio máximo desde el centro
+    const MAX_RADIUS_KM = 25;
     
     const distance = calcularDistanciaKm(PM_CENTER_LAT, PM_CENTER_LNG, home_lat, home_lng);
     
     if (distance > MAX_RADIUS_KM) {
+      console.log(`❌ [REGISTRO] Fuera de cobertura: ${distance.toFixed(1)}km`);
       return res.status(400).json({
         error: 'FUERA_DE_COBERTURA',
         message: `Tu ubicación está fuera del área de cobertura de BARRIO Puerto Montt. Por favor, marca tu casa en el mapa dentro de Puerto Montt y alrededores.`
@@ -568,43 +576,74 @@ app.post('/api/registro', rateLimitMiddleware(10), async (req, res) => {
     }
   }
 
-  // ─── VERIFICACIÓN GPS: comparar GPS real con punto marcado ─────────────
+  // Verificación GPS (solo para alerta de telegram)
   let avisoGPS = '';
   if (gps_lat && gps_lng && home_lat && home_lng) {
     const distanciaGPS = calcularDistanciaKm(gps_lat, gps_lng, home_lat, home_lng);
-    
-    if (distanciaGPS < 1) {
-      avisoGPS = `\n📍 <b>GPS COINCIDE</b> (${distanciaGPS.toFixed(2)} km del punto marcado)`;
-    } else if (distanciaGPS < 5) {
-      avisoGPS = `\n⚠️ <b>GPS CERCANO</b> (${distanciaGPS.toFixed(2)} km del punto marcado) - posible legítimo`;
-    } else {
-      avisoGPS = `\n🚨 <b>GPS LEJANO</b> (${distanciaGPS.toFixed(2)} km del punto marcado) - VERIFICAR USUARIO\n📱 GPS real: <a href="https://maps.google.com/?q=${gps_lat},${gps_lng}">Ver</a>\n🏠 Casa marcada: <a href="https://maps.google.com/?q=${home_lat},${home_lng}">Ver</a>`;
-    }
+    if (distanciaGPS < 1) avisoGPS = `\n📍 <b>GPS COINCIDE</b> (${distanciaGPS.toFixed(2)} km)`;
+    else if (distanciaGPS < 5) avisoGPS = `\n⚠️ <b>GPS CERCANO</b> (${distanciaGPS.toFixed(2)} km)`;
+    else avisoGPS = `\n🚨 <b>GPS LEJANO</b> (${distanciaGPS.toFixed(2)} km) - VERIFICAR\n📱 GPS: <a href="https://maps.google.com/?q=${gps_lat},${gps_lng}">Ver</a>\n🏠 Casa: <a href="https://maps.google.com/?q=${home_lat},${home_lng}">Ver</a>`;
   } else if (home_lat && home_lng) {
-    avisoGPS = `\n⚠️ <b>Sin GPS verificado</b> (el usuario no permitió ubicación)`;
+    avisoGPS = `\n⚠️ Sin GPS verificado`;
   }
   
-  // Hashear el PIN antes de guardarlo
-  const pinPlano = pin_seguridad;
-  const pinHasheado = pin_seguridad ? hashPin(pin_seguridad) : '';
+  try {
+    // Hashear el PIN
+    const pinPlano = pin_seguridad;
+    const pinHasheado = pin_seguridad ? hashPin(pin_seguridad) : '';
 
-  let user = await queryOne('SELECT * FROM usuarios WHERE telefono = ?', [telefono]);
-  if (!user) {
-    const r = await runSql('INSERT INTO usuarios (nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion, last_lat, last_lng, is_verified) VALUES (?,?,?,?,?,?,?,?,?,?,?,1)', [nombre, telefono, email||'', nickname||'', pinHasheado, device_id||'', home_lat||null, home_lng||null, direccion||'', gps_lat||null, gps_lng||null]);
-    user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [r.insertId]);
-    sendTelegramAlert(`🆕 <b>NUEVO REGISTRO</b>\n🕐 ${fechaChile(new Date())}\nNombre: ${nombre}\nNick: ${nickname}\nTel: ${telefono}\nEmail: ${email||'No indicado'}\nSector: ${direccion||'—'}${avisoGPS}`);
-    if (email && pinPlano) sendEmailPin(email, nickname||nombre, pinPlano);
-  } else {
-    const pinAGuardar = pinPlano ? pinHasheado : user.pin_seguridad;
-    await runSql('UPDATE usuarios SET nombre=?, email=?, nickname=?, pin_seguridad=?, home_lat=?, home_lng=?, direccion=? WHERE id=?', [nombre, email||user.email, nickname||user.nickname, pinAGuardar, home_lat||user.home_lat, home_lng||user.home_lng, direccion||user.direccion, user.id]);
-    user = { ...user, nombre, email, nickname, pin_seguridad: pinAGuardar, home_lat, home_lng, direccion };
-    sendTelegramAlert(`🔄 <b>PERFIL ACTUALIZADO</b>\nUsuario: ${nickname || nombre}${avisoGPS}`);
+    console.log(`📝 [REGISTRO] Buscando usuario existente...`);
+    let user = await queryOne('SELECT * FROM usuarios WHERE telefono = ?', [telefono]);
+    let esNuevo = false;
+    
+    if (!user) {
+      console.log(`📝 [REGISTRO] Usuario NUEVO, insertando...`);
+      const r = await runSql(
+        'INSERT INTO usuarios (nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion, last_lat, last_lng, is_verified) VALUES (?,?,?,?,?,?,?,?,?,?,?,1)',
+        [nombre, telefono, email||'', nickname||'', pinHasheado, device_id||'', home_lat||null, home_lng||null, direccion||'', gps_lat||null, gps_lng||null]
+      );
+      user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [r.insertId]);
+      esNuevo = true;
+      console.log(`✅ [REGISTRO] Usuario nuevo creado: id=${user.id}`);
+    } else {
+      console.log(`📝 [REGISTRO] Usuario EXISTENTE, actualizando id=${user.id}...`);
+      const pinAGuardar = pinPlano ? pinHasheado : user.pin_seguridad;
+      await runSql(
+        'UPDATE usuarios SET nombre=?, email=?, nickname=?, pin_seguridad=?, home_lat=?, home_lng=?, direccion=? WHERE id=?',
+        [nombre, email||user.email, nickname||user.nickname, pinAGuardar, home_lat||user.home_lat, home_lng||user.home_lng, direccion||user.direccion, user.id]
+      );
+      user = { ...user, nombre, email, nickname, pin_seguridad: pinAGuardar, home_lat, home_lng, direccion };
+      console.log(`✅ [REGISTRO] Usuario existente actualizado`);
+    }
+    
+    // RESPONDER AL USUARIO INMEDIATAMENTE — sin esperar email ni telegram
+    const userResponse = { ...user };
+    delete userResponse.pin_seguridad;
+    res.json({ user: userResponse });
+    console.log(`✅ [REGISTRO] Respuesta enviada al cliente`);
+    
+    // Tareas pesadas EN SEGUNDO PLANO (no bloquean la respuesta al usuario)
+    setImmediate(() => {
+      try {
+        if (esNuevo) {
+          sendTelegramAlert(`🆕 <b>NUEVO REGISTRO</b>\n🕐 ${fechaChile(new Date())}\nNombre: ${nombre}\nNick: ${nickname}\nTel: ${telefono}\nEmail: ${email||'No indicado'}\nSector: ${direccion||'—'}${avisoGPS}`);
+          if (email && pinPlano) {
+            sendEmailPin(email, nickname||nombre, pinPlano).catch(e => console.error('Error enviando email:', e.message));
+          }
+        } else {
+          sendTelegramAlert(`🔄 <b>PERFIL ACTUALIZADO</b>\nUsuario: ${nickname || nombre}${avisoGPS}`);
+        }
+      } catch(e) {
+        console.error('Error en tareas en segundo plano:', e.message);
+      }
+    });
+    
+  } catch (e) {
+    console.error('❌ [REGISTRO] Error fatal:', e.message);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Error al registrar. Intenta de nuevo.' });
+    }
   }
-  
-  // NO devolver el PIN hasheado al cliente
-  const userResponse = { ...user };
-  delete userResponse.pin_seguridad;
-  res.json({ user: userResponse });
 });
 
 app.post('/api/login', rateLimitMiddleware(20), async (req, res) => {
