@@ -458,10 +458,10 @@ const App = {
       <header class="app-header">
         <h1 style="margin:0; letter-spacing:2px;">BARRIO</h1>
         <span class="city-subtitle">PUERTO MONTT</span>
-        <div style="font-size:1.2rem; margin-top:5px;">🇨🇱</div>
+        <div style="font-size:1.2rem; margin-top:2px;">🇨🇱</div>
       </header>
 
-      <div id="homeMap" style="height: 264px; width: 100%; border-radius: 16px; margin: 10px 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
+      <div id="homeMap" style="height: 264px; width: 100%; border-radius: 16px; margin: 5px 0 0 0; border: 2px solid var(--primary); box-shadow: var(--shadow); z-index:1;"></div>
 
       <div class="qa-grid" style="margin-top: 5px;">
         <div class="qa-item" style="background: #D32F2F; color:white;" onclick="location.hash='#/emergencia-menu'">
@@ -1073,7 +1073,7 @@ const App = {
  &copy; 2026 BARRIO - PUERTOMAS SPA | 
  <a href="#/legal" style="color:var(--primary); text-decoration:underline; cursor:pointer;">Aviso Legal</a>
  </p>
- <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); position: absolute; right: 8px; bottom: 5px;">v3.9</div>
+ <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); position: absolute; right: 8px; bottom: 5px;">v3.9.1</div>
  </footer>
  `;
  },

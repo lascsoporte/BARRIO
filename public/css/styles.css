@@ -119,7 +119,9 @@ body {
   letter-spacing: 2px;
   text-transform: uppercase;
   filter: drop-shadow(0 4px 8px rgba(255,107,53,0.2));
-  margin-top: 5px;
+  margin-top: 0;
+  margin-bottom: -8px;
+  line-height: 1;
 }
 
 .app-header .city-subtitle {
