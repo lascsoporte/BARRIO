@@ -232,6 +232,21 @@ async function crearTablas() {
       subscription_json TEXT NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
+    `CREATE TABLE IF NOT EXISTS solicitudes_pin (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      usuario_id INT NULL,
+      nombre_ingresado VARCHAR(255),
+      telefono_ingresado VARCHAR(50),
+      email_ingresado VARCHAR(255),
+      sector_ingresado TEXT,
+      ip_origen VARCHAR(100),
+      datos_correctos TINYINT(1) DEFAULT 0,
+      campo_fallido VARCHAR(50),
+      resultado VARCHAR(50) DEFAULT 'pendiente',
+      modo VARCHAR(20) DEFAULT 'automatico',
+      pin_enviado TINYINT(1) DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
     `CREATE TABLE IF NOT EXISTS configuracion (
       clave VARCHAR(100) PRIMARY KEY,
       valor TEXT

@@ -681,6 +681,104 @@ app.put('/api/usuarios/:id/accept-terms', async (req, res) => {
   res.json(userResponse);
 });
 
+// ─── SISTEMA "OLVIDÉ MI PIN" HÍBRIDO ─────────────────────────────────────
+// Verifica 4 datos: nombre, teléfono, email, sector
+// AUTOMÁTICO si todo coincide y no hay nada sospechoso
+// MANUAL si hay señales de alerta (queda pendiente para que el admin apruebe)
+app.post('/api/olvide-pin', rateLimitMiddleware(5), async (req, res) => {
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  const nombre = String(req.body.nombre || '').trim();
+  const telefono = String(req.body.telefono || '').trim();
+  const email = String(req.body.email || '').trim();
+  const sector = String(req.body.sector || '').trim();
+
+  if (!nombre || !telefono || !email || !sector) {
+    return res.status(400).json({ error: 'Debes completar los 4 campos' });
+  }
+
+  // Verificar si hay demasiadas solicitudes desde esta IP en la última hora
+  const intentosIP = await queryOne(`SELECT COUNT(*) as total FROM solicitudes_pin WHERE ip_origen = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)`, [ip]);
+  if (intentosIP && intentosIP.total >= 5) {
+    sendTelegramAlert(`🚨 <b>ATAQUE OLVIDÉ PIN</b>\nIP: ${ip}\nIntentos en 1 hora: ${intentosIP.total}\nBloqueado temporalmente.`);
+    return res.status(429).json({ error: 'Demasiadas solicitudes desde tu dispositivo. Intenta más tarde.' });
+  }
+
+  // Buscar usuario por teléfono
+  const user = await queryOne('SELECT * FROM usuarios WHERE telefono = ?', [telefono]);
+
+  // Determinar si los datos coinciden
+  let datosCorrectos = false;
+  let campoFallido = null;
+  if (!user) {
+    campoFallido = 'telefono';
+  } else if (user.is_blocked) {
+    campoFallido = 'bloqueado';
+  } else {
+    // Comparar campos con tolerancia (insensible a mayúsculas/minúsculas y espacios)
+    const norm = (s) => String(s||'').trim().toLowerCase();
+    if (norm(user.nombre) !== norm(nombre)) campoFallido = 'nombre';
+    else if (norm(user.email) !== norm(email)) campoFallido = 'email';
+    else if (!norm(user.direccion).includes(norm(sector)) && !norm(sector).includes(norm(user.direccion))) campoFallido = 'sector';
+    else datosCorrectos = true;
+  }
+
+  // Detectar señales de alerta para decidir AUTOMÁTICO vs MANUAL
+  let modo = 'automatico';
+  const motivosAlerta = [];
+
+  if (datosCorrectos) {
+    // ¿Hizo reset en los últimos 7 días?
+    const recientes = await queryOne(`SELECT COUNT(*) as total FROM solicitudes_pin WHERE usuario_id = ? AND resultado = 'enviado' AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)`, [user.id]);
+    if (recientes && recientes.total > 0) {
+      modo = 'manual';
+      motivosAlerta.push('Ya se envió un PIN hace menos de 7 días');
+    }
+
+    // ¿Hay intentos fallidos previos para este usuario?
+    const fallidos = await queryOne(`SELECT COUNT(*) as total FROM solicitudes_pin WHERE telefono_ingresado = ? AND datos_correctos = 0 AND created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)`, [telefono]);
+    if (fallidos && fallidos.total >= 2) {
+      modo = 'manual';
+      motivosAlerta.push(`${fallidos.total} intentos fallidos previos hoy`);
+    }
+  }
+
+  // Registrar la solicitud en la BD
+  let pinEnviado = 0;
+  let resultado = datosCorrectos ? (modo === 'automatico' ? 'enviado' : 'pendiente_aprobacion') : 'rechazado';
+
+  // Si es AUTOMÁTICO y datos correctos, generar y enviar PIN nuevo
+  if (datosCorrectos && modo === 'automatico') {
+    const pinNuevo = String(Math.floor(1000 + Math.random() * 9000));
+    const pinHasheado = hashPin(pinNuevo);
+    await runSql('UPDATE usuarios SET pin_seguridad = ? WHERE id = ?', [pinHasheado, user.id]);
+    if (user.email) sendEmailPin(user.email, user.nickname || user.nombre, pinNuevo);
+    pinEnviado = 1;
+  }
+
+  await runSql(
+    'INSERT INTO solicitudes_pin (usuario_id, nombre_ingresado, telefono_ingresado, email_ingresado, sector_ingresado, ip_origen, datos_correctos, campo_fallido, resultado, modo, pin_enviado) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+    [user?.id || null, nombre, telefono, email, sector, ip, datosCorrectos ? 1 : 0, campoFallido, resultado, modo, pinEnviado]
+  );
+
+  // Notificar por Telegram
+  if (datosCorrectos && modo === 'automatico') {
+    sendTelegramAlert(`🔑 <b>PIN ENVIADO (Automático)</b>\n🕐 ${fechaChile(new Date())}\nUsuario: ${user.nombre} (${user.nickname})\nTel: ${telefono}\nEmail: ${user.email}\n✅ Verificación correcta. PIN nuevo enviado al correo.`);
+  } else if (datosCorrectos && modo === 'manual') {
+    sendTelegramAlert(`⚠️ <b>SOLICITUD PIN PENDIENTE DE APROBACIÓN</b>\n🕐 ${fechaChile(new Date())}\nUsuario: ${user.nombre} (${user.nickname})\nTel: ${telefono}\nMotivos:\n• ${motivosAlerta.join('\n• ')}\n\nRevisa la pestaña "🔑 Solicitudes PIN" en el panel admin.`);
+  } else {
+    sendTelegramAlert(`❌ <b>INTENTO FALLIDO OLVIDÉ PIN</b>\n🕐 ${fechaChile(new Date())}\nTel ingresado: ${telefono}\nNombre: ${nombre}\nEmail: ${email}\nCampo que falló: ${campoFallido}\nIP: ${ip}`);
+  }
+
+  // Respuesta al usuario (siempre la misma para no revelar información)
+  if (datosCorrectos && modo === 'automatico') {
+    res.json({ ok: true, modo: 'automatico', mensaje: '✅ Verificación correcta. Te enviamos un PIN nuevo a tu correo electrónico.' });
+  } else if (datosCorrectos && modo === 'manual') {
+    res.json({ ok: true, modo: 'manual', mensaje: '✅ Tu solicitud fue recibida. El administrador la revisará y te enviará el PIN al correo en las próximas horas.' });
+  } else {
+    res.json({ ok: false, mensaje: 'Los datos ingresados no coinciden con tu cuenta. Si tu mascota apareció o tienes problemas, contacta al administrador por WhatsApp.' });
+  }
+});
+
 app.get('/api/muro', async (req, res) => {
   res.json(await queryAll('SELECT m.*, COALESCE(u.nickname, u.nombre) as autor FROM muro_comunitario m JOIN usuarios u ON m.usuario_id = u.id WHERE m.created_at > DATE_SUB(NOW(), INTERVAL 7 DAY) ORDER BY m.created_at DESC LIMIT 50'));
 });
@@ -984,6 +1082,62 @@ app.get('/api/admin/stats', authMw, async (req, res) => {
 });
 
 app.get('/api/admin/usuarios', authMw, async (req, res) => res.json(await queryAll('SELECT * FROM usuarios ORDER BY created_at DESC')));
+
+// ─── ADMIN: SOLICITUDES DE PIN ───────────────────────────────────────────
+app.get('/api/admin/solicitudes-pin', authMw, async (req, res) => {
+  res.json(await queryAll(`
+    SELECT s.*, u.nombre as user_nombre, u.nickname as user_nickname, u.email as user_email
+    FROM solicitudes_pin s
+    LEFT JOIN usuarios u ON s.usuario_id = u.id
+    ORDER BY s.created_at DESC
+    LIMIT 200
+  `));
+});
+
+app.post('/api/admin/solicitudes-pin/:id/aprobar', authMw, async (req, res) => {
+  const id = parseInt(req.params.id);
+  const solicitud = await queryOne('SELECT * FROM solicitudes_pin WHERE id = ?', [id]);
+  if (!solicitud) return res.status(404).json({ error: 'Solicitud no encontrada' });
+  if (solicitud.resultado !== 'pendiente_aprobacion') return res.status(400).json({ error: 'Esta solicitud ya fue procesada' });
+  if (!solicitud.usuario_id) return res.status(400).json({ error: 'No hay usuario asociado' });
+
+  const user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [solicitud.usuario_id]);
+  if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+  // Generar PIN nuevo y enviar al correo registrado
+  const pinNuevo = String(Math.floor(1000 + Math.random() * 9000));
+  const pinHasheado = hashPin(pinNuevo);
+  await runSql('UPDATE usuarios SET pin_seguridad = ? WHERE id = ?', [pinHasheado, user.id]);
+  if (user.email) sendEmailPin(user.email, user.nickname || user.nombre, pinNuevo);
+
+  await runSql('UPDATE solicitudes_pin SET resultado = ?, pin_enviado = 1 WHERE id = ?', ['enviado_manual', id]);
+  sendTelegramAlert(`✅ <b>ADMIN: PIN APROBADO Y ENVIADO</b>\n🕐 ${fechaChile(new Date())}\nUsuario: ${user.nombre} (${user.nickname})\nTel: ${user.telefono}\nEl PIN nuevo fue enviado a: ${user.email}`);
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/solicitudes-pin/:id/rechazar', authMw, async (req, res) => {
+  const id = parseInt(req.params.id);
+  const solicitud = await queryOne('SELECT * FROM solicitudes_pin WHERE id = ?', [id]);
+  if (!solicitud) return res.status(404).json({ error: 'Solicitud no encontrada' });
+
+  await runSql('UPDATE solicitudes_pin SET resultado = ? WHERE id = ?', ['rechazado_admin', id]);
+  sendTelegramAlert(`❌ <b>ADMIN: SOLICITUD PIN RECHAZADA</b>\n🕐 ${fechaChile(new Date())}\nTel: ${solicitud.telefono_ingresado}\nNombre: ${solicitud.nombre_ingresado}`);
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/export/solicitudes-pin', authMw, async (req, res) => {
+  const rows = await queryAll(`
+    SELECT s.id, s.nombre_ingresado, s.telefono_ingresado, s.email_ingresado, s.sector_ingresado,
+           s.ip_origen, s.datos_correctos, s.campo_fallido, s.resultado, s.modo, s.pin_enviado, s.created_at
+    FROM solicitudes_pin s
+    ORDER BY s.created_at DESC
+  `);
+  sendTelegramAlert(`📥 <b>ADMIN: DESCARGA PLANILLA SOLICITUDES PIN</b>\n🕐 ${fechaChile(new Date())}`);
+  sendCsvDownload(res, 'planilla_solicitudes_pin.csv',
+    ['ID','Nombre','Teléfono','Email','Sector','IP','Datos Correctos','Campo Fallido','Resultado','Modo','PIN Enviado','Fecha'],
+    ['id','nombre_ingresado','telefono_ingresado','email_ingresado','sector_ingresado','ip_origen','datos_correctos','campo_fallido','resultado','modo','pin_enviado','created_at'],
+    rows);
+});
 
 // ─── FICHA COMPLETA DEL USUARIO — toda su actividad en BARRIO ──────────────
 app.get('/api/admin/usuarios/:id/ficha', authMw, async (req, res) => {

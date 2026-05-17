@@ -1073,7 +1073,7 @@ const App = {
  &copy; 2026 BARRIO - PUERTOMAS SPA | 
  <a href="#/legal" style="color:var(--primary); text-decoration:underline; cursor:pointer;">Aviso Legal</a>
  </p>
- <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); position: absolute; right: 8px; bottom: 5px;">v3.8</div>
+ <div style="font-size: 0.65rem; color: rgba(0,0,0,0.25); position: absolute; right: 8px; bottom: 5px;">v3.9</div>
  </footer>
  `;
  },
@@ -1681,7 +1681,34 @@ const App = {
         </div>
         <p id="loginError" style="color:#D32F2F;font-size:0.85rem;margin:8px 0;display:none;"></p>
         <button id="btnLoginSubmit" class="btn btn-primary" style="width:100%;margin-top:12px;font-weight:900;padding:14px;">ENTRAR</button>
-        <button id="btnVolver1" style="background:none;border:none;color:#999;margin-top:12px;cursor:pointer;width:100%;font-size:0.9rem;">← Volver</button>
+        <button id="btnOlvidePin" type="button" style="background:none;border:none;color:#673AB7;margin-top:10px;cursor:pointer;width:100%;font-size:0.85rem;text-decoration:underline;">¿Olvidaste tu PIN?</button>
+        <button id="btnVolver1" style="background:none;border:none;color:#999;margin-top:6px;cursor:pointer;width:100%;font-size:0.9rem;">← Volver</button>
+      </div>
+
+      <!-- PASO 2C: Recuperación de PIN olvidado -->
+      <div id="authStep2Olvide" style="display:none;">
+        <div style="font-size:2.5rem; margin-bottom:10px;">🔓</div>
+        <h2 style="text-transform:uppercase; letter-spacing:1px; font-size:1.1rem;">Recuperar PIN</h2>
+        <p style="font-size:0.82rem; color:var(--text-light); margin-bottom:14px;">Te enviaremos un PIN nuevo al correo registrado. Verifica los 4 datos exactos de tu cuenta:</p>
+        <div class="form-group" style="text-align:left;">
+          <label style="font-size:0.8rem;font-weight:bold;">Nombre completo</label>
+          <input type="text" id="olvideNombre" autocomplete="off" placeholder="Como te registraste" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;box-sizing:border-box;">
+        </div>
+        <div class="form-group" style="text-align:left;margin-top:8px;">
+          <label style="font-size:0.8rem;font-weight:bold;">Teléfono</label>
+          <input type="tel" id="olvideTelefono" autocomplete="off" inputmode="tel" placeholder="+56912345678" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;box-sizing:border-box;">
+        </div>
+        <div class="form-group" style="text-align:left;margin-top:8px;">
+          <label style="font-size:0.8rem;font-weight:bold;">Correo electrónico</label>
+          <input type="email" id="olvideEmail" autocomplete="off" placeholder="tu@correo.com" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;box-sizing:border-box;">
+        </div>
+        <div class="form-group" style="text-align:left;margin-top:8px;">
+          <label style="font-size:0.8rem;font-weight:bold;">Sector de tu casa</label>
+          <input type="text" id="olvideSector" autocomplete="off" placeholder="Ej: Mirasol, Pelluco" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;box-sizing:border-box;">
+        </div>
+        <p id="olvideMensaje" style="font-size:0.85rem;margin:10px 0;display:none;padding:10px;border-radius:8px;"></p>
+        <button id="btnOlvideSubmit" class="btn btn-primary" style="width:100%;margin-top:12px;font-weight:900;padding:14px;">ENVIAR SOLICITUD</button>
+        <button id="btnVolverOlvide" style="background:none;border:none;color:#999;margin-top:10px;cursor:pointer;width:100%;font-size:0.9rem;">← Volver</button>
       </div>
 
       <!-- PASO 2B: Formulario de registro nuevo -->
@@ -1799,6 +1826,75 @@ const App = {
     // Permitir Enter en el PIN para hacer login
     document.getElementById('loginPin').onkeypress = (e) => {
       if (e.key === 'Enter') document.getElementById('btnLoginSubmit').click();
+    };
+
+    // ── OLVIDÉ MI PIN ──
+    document.getElementById('btnOlvidePin').onclick = () => {
+      step2Login.style.display = 'none';
+      document.getElementById('authStep2Olvide').style.display = 'block';
+      // Pre-llenar el teléfono si ya lo había escrito
+      const telPrellenado = document.getElementById('loginTelefono').value;
+      if (telPrellenado) document.getElementById('olvideTelefono').value = telPrellenado;
+      document.getElementById('olvideNombre').focus();
+    };
+
+    document.getElementById('btnVolverOlvide').onclick = () => {
+      document.getElementById('authStep2Olvide').style.display = 'none';
+      step2Login.style.display = 'block';
+    };
+
+    document.getElementById('btnOlvideSubmit').onclick = async () => {
+      const nombreO = document.getElementById('olvideNombre').value.trim();
+      const telO = document.getElementById('olvideTelefono').value.trim();
+      const emailO = document.getElementById('olvideEmail').value.trim();
+      const sectorO = document.getElementById('olvideSector').value.trim();
+      const msgEl = document.getElementById('olvideMensaje');
+      const btn = document.getElementById('btnOlvideSubmit');
+
+      if (!nombreO || !telO || !emailO || !sectorO) {
+        msgEl.textContent = '❌ Debes completar los 4 campos.';
+        msgEl.style.background = '#FFEBEE';
+        msgEl.style.color = '#D32F2F';
+        msgEl.style.display = 'block';
+        return;
+      }
+
+      msgEl.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Verificando...';
+
+      try {
+        const res = await API.olvidePin({ nombre: nombreO, telefono: telO, email: emailO, sector: sectorO });
+        msgEl.textContent = res.mensaje || 'Solicitud procesada.';
+        if (res.ok) {
+          msgEl.style.background = '#E8F5E9';
+          msgEl.style.color = '#2E7D32';
+        } else {
+          msgEl.style.background = '#FFEBEE';
+          msgEl.style.color = '#D32F2F';
+        }
+        msgEl.style.display = 'block';
+
+        if (res.ok && res.modo === 'automatico') {
+          btn.textContent = '✅ PIN ENVIADO';
+          setTimeout(() => {
+            document.getElementById('authStep2Olvide').style.display = 'none';
+            step2Login.style.display = 'block';
+            document.getElementById('loginTelefono').value = telO;
+            document.getElementById('loginPin').focus();
+          }, 3000);
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'ENVIAR SOLICITUD';
+        }
+      } catch (e) {
+        msgEl.textContent = e.message || 'Error de conexión. Intenta de nuevo.';
+        msgEl.style.background = '#FFEBEE';
+        msgEl.style.color = '#D32F2F';
+        msgEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'ENVIAR SOLICITUD';
+      }
     };
 
     // ── REGISTRO NUEVO ──

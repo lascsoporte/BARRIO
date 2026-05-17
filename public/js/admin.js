@@ -171,6 +171,7 @@ const Admin = {
           <button type="button" class="admin-tab" data-tab="productos">📦 Productos</button>
           <button type="button" class="admin-tab" data-tab="servicios">🔧 Servicios</button>
           <button type="button" class="admin-tab" data-tab="resumen">📊 Resumen</button>
+          <button type="button" class="admin-tab" data-tab="solicitudes-pin">🔑 Solicitudes PIN</button>
           <button type="button" class="admin-tab" data-tab="configuracion">⚙️ Configuración</button>
         </div>
         <div id="adminContent" style="background:white;padding:14px;border-radius:12px;min-height:300px;box-shadow:0 4px 10px rgba(0,0,0,0.05);"></div>
@@ -249,6 +250,85 @@ const Admin = {
           btn.onclick = async () => {
             if (!confirm('¿Eliminar este aviso de mascota?')) return;
             try { await API.del(`/api/admin/mascotas/${btn.dataset.id}`, this.token); this.toast('Aviso eliminado'); this.loadTab(); }
+            catch(e) { alert(e.message); }
+          };
+        });
+        return;
+      }
+
+      // ── SOLICITUDES PIN ──
+      if (this.currentTab === 'solicitudes-pin') {
+        const data = await API.adminGetSolicitudesPin(this.token);
+        const pendientes = data.filter(s => s.resultado === 'pendiente_aprobacion');
+        const procesadas = data.filter(s => s.resultado !== 'pendiente_aprobacion');
+
+        const colorEstado = (r) => {
+          if (r === 'enviado' || r === 'enviado_manual') return '#388E3C';
+          if (r === 'pendiente_aprobacion') return '#FF9800';
+          if (r === 'rechazado_admin' || r === 'rechazado') return '#D32F2F';
+          return '#666';
+        };
+        const labelEstado = (r) => {
+          if (r === 'enviado') return '✅ PIN enviado (auto)';
+          if (r === 'enviado_manual') return '✅ PIN enviado (admin)';
+          if (r === 'pendiente_aprobacion') return '⏳ Pendiente aprobación';
+          if (r === 'rechazado_admin') return '❌ Rechazado por admin';
+          if (r === 'rechazado') return '❌ Datos incorrectos';
+          return r;
+        };
+
+        const renderFila = (s, esPendiente) => `
+          <tr style="${esPendiente?'background:#FFF8E1;':''}">
+            <td>${this.esc(s.id)}</td>
+            <td>${this.formatDate(s.created_at)}</td>
+            <td><b>${this.esc(s.nombre_ingresado)}</b>${s.user_nickname?` <small style="color:#999;">(${this.esc(s.user_nickname)})</small>`:''}</td>
+            <td>${this.esc(s.telefono_ingresado)}</td>
+            <td>${this.esc(s.email_ingresado)}</td>
+            <td>${this.esc(this.trunc(s.sector_ingresado, 40))}</td>
+            <td>${this.esc(s.ip_origen)}</td>
+            <td>${s.datos_correctos?'✅':'❌'} ${s.campo_fallido?`<small style="color:#D32F2F;">(${this.esc(s.campo_fallido)})</small>`:''}</td>
+            <td><span style="background:${colorEstado(s.resultado)};color:white;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:bold;">${labelEstado(s.resultado)}</span></td>
+            <td style="white-space:nowrap;">
+              ${esPendiente ? `
+                <button class="btn-ok btn-aprobar-pin" data-id="${s.id}" data-nombre="${this.esc(s.nombre_ingresado)}" style="margin:2px;">✅ Aprobar</button>
+                <button class="btn-del btn-rechazar-pin" data-id="${s.id}" data-nombre="${this.esc(s.nombre_ingresado)}" style="margin:2px;">❌ Rechazar</button>
+              ` : '—'}
+            </td>
+          </tr>`;
+
+        box.innerHTML = `
+          <div class="admin-toolbar">
+            ${this.exportBtn('/api/admin/export/solicitudes-pin','planilla_solicitudes_pin.csv','📥 Planilla solicitudes PIN')}
+          </div>
+          ${pendientes.length > 0 ? `
+            <h3 style="margin:14px 0 8px;font-size:0.95rem;color:#FF9800;">⏳ Pendientes de aprobación (${pendientes.length})</h3>
+            <p style="font-size:0.82rem;color:#666;margin:0 0 10px;">Aprueba SOLO si reconoces al usuario o verificas su identidad por WhatsApp.</p>
+            <div class="admin-table-wrap"><table class="admin-table"><thead><tr>
+              <th>ID</th><th>Fecha</th><th>Nombre</th><th>Teléfono</th><th>Email</th><th>Sector</th><th>IP</th><th>Datos</th><th>Estado</th><th>Acción</th>
+            </tr></thead><tbody>
+            ${pendientes.map(s => renderFila(s, true)).join('')}
+            </tbody></table></div>
+          ` : '<p style="text-align:center;color:#999;padding:14px;">No hay solicitudes pendientes.</p>'}
+
+          <h3 style="margin:18px 0 8px;font-size:0.95rem;color:#666;">📋 Historial (últimas 200)</h3>
+          <div class="admin-table-wrap"><table class="admin-table"><thead><tr>
+            <th>ID</th><th>Fecha</th><th>Nombre</th><th>Teléfono</th><th>Email</th><th>Sector</th><th>IP</th><th>Datos</th><th>Estado</th><th>Acción</th>
+          </tr></thead><tbody>
+          ${procesadas.map(s => renderFila(s, false)).join('')}
+          </tbody></table></div>`;
+        
+        this.bindDownloads(box);
+        box.querySelectorAll('.btn-aprobar-pin').forEach(btn => {
+          btn.onclick = async () => {
+            if (!confirm(`¿APROBAR solicitud de "${btn.dataset.nombre}"?\n\nSe enviará un PIN nuevo a su correo registrado.`)) return;
+            try { await API.adminAprobarSolicitudPin(btn.dataset.id, this.token); this.toast('✅ PIN enviado'); this.loadTab(); }
+            catch(e) { alert(e.message); }
+          };
+        });
+        box.querySelectorAll('.btn-rechazar-pin').forEach(btn => {
+          btn.onclick = async () => {
+            if (!confirm(`¿RECHAZAR solicitud de "${btn.dataset.nombre}"?`)) return;
+            try { await API.adminRechazarSolicitudPin(btn.dataset.id, this.token); this.toast('Solicitud rechazada'); this.loadTab(); }
             catch(e) { alert(e.message); }
           };
         });

@@ -135,6 +135,10 @@ const API = {
   adminGetRastreo(token) { return this.get('/api/admin/ubicacion', token); },
   adminGetMascotas(token) { return this.get('/api/admin/mascotas', token); },
   adminGetFichaUsuario(id, token) { return this.get(`/api/admin/usuarios/${id}/ficha`, token); },
+  adminGetSolicitudesPin(token) { return this.get('/api/admin/solicitudes-pin', token); },
+  adminAprobarSolicitudPin(id, token) { return this.post(`/api/admin/solicitudes-pin/${id}/aprobar`, {}, token); },
+  adminRechazarSolicitudPin(id, token) { return this.post(`/api/admin/solicitudes-pin/${id}/rechazar`, {}, token); },
+  olvidePin(data) { return this.post('/api/olvide-pin', data); },
   adminGetMuro(token) { return this.get('/api/admin/muro', token); },
   adminGetAnalytics(token) { return this.get('/api/admin/analytics', token); },
   async adminDownloadBlob(path, token, filename) {
