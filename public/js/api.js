@@ -29,17 +29,35 @@ const API = {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
     try {
+      console.log('[API.post] →', url);
       const res = await fetch(this.base + url, { method: 'POST', headers, body: JSON.stringify(data), signal: controller.signal });
       clearTimeout(timeoutId);
+      console.log('[API.post] ← status:', res.status, url);
       if (!res.ok) {
         if (res.status === 401) throw new Error('401-EXPIRADO');
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Error ${res.status}`);
+        // Intentar leer el error como JSON, si no se puede leer como texto
+        let errorMsg = `Error ${res.status}`;
+        try {
+          const errJson = await res.json();
+          if (errJson.error) errorMsg = errJson.error;
+          else if (errJson.message) errorMsg = errJson.message;
+        } catch(_) {
+          try { errorMsg = await res.text() || errorMsg; } catch(_) {}
+        }
+        throw new Error(errorMsg);
       }
-      return res.json();
+      // Verificar que la respuesta sea JSON válido
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch(e) {
+        console.error('[API.post] Respuesta no es JSON:', text.substring(0, 200));
+        throw new Error('Respuesta inválida del servidor');
+      }
     } catch (e) {
       clearTimeout(timeoutId);
       if (e.name === 'AbortError') throw new Error('El servidor tardó demasiado en responder. Por favor, intenta de nuevo.');
+      console.error('[API.post] Error:', e.message);
       throw e;
     }
   },
