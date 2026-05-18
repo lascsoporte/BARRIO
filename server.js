@@ -360,10 +360,12 @@ function sendCsvDownload(res, filename, headerLabels, keys, rows) {
   const tituloPlano = filename.replace('.csv', '').replace(/_/g, ' ').toUpperCase();
   const fechaGeneracion = fechaChile(new Date());
 
-  let csv = '\ufeff'; 
-  csv += `"${tituloPlano}"\n`;
-  csv += `"GENERADO EL: ${fechaGeneracion}"\n\n`;
-  csv += `"--- SECCION DE DATOS ---"\n`;
+  // 'sep=;' fuerza a Excel a reconocer las columnas sin importar la configuracion regional
+  let csv = '\ufeffsep=;\n'; 
+  csv += `"${tituloPlano}";;;;;;\n`;
+  csv += `"GENERADO EL: ${fechaGeneracion}";;;;;;\n`;
+  csv += `\n`;
+  csv += `"--- SECCION DE DATOS ---";;;;;;\n`;
   
   const formatHeader = (h) => {
     const map = {
