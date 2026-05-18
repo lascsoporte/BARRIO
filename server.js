@@ -357,27 +357,25 @@ function fechaChile(v) {
 function sendCsvDownload(res, filename, headerLabels, keys, rows) {
   const dateKeys = ['created_at', 'baja_fecha', 'fecha_expiracion'];
   
-  // Crear Título a partir del nombre de archivo
   const tituloPlano = filename.replace('.csv', '').replace(/_/g, ' ').toUpperCase();
   const fechaGeneracion = fechaChile(new Date());
 
-  let csv = '\ufeff'; // BOM para que Excel detecte UTF-8
+  let csv = '\ufeff'; 
   csv += `"${tituloPlano}"\n`;
   csv += `"GENERADO EL: ${fechaGeneracion}"\n\n`;
-  csv += `"--- SECCIÓN DE DATOS ---"\n`;
+  csv += `"--- SECCION DE DATOS ---"\n`;
   
-  // Traducir y formatear cabeceras al español
   const formatHeader = (h) => {
     const map = {
-      'id': 'ID', 'usuario_id': 'ID Usuario', 'nombre': 'Nombre', 'telefono': 'Teléfono', 'latitud': 'Latitud', 'longitud': 'Longitud',
+      'id': 'ID', 'usuario_id': 'ID Usuario', 'nombre': 'Nombre', 'telefono': 'Telefono', 'latitud': 'Latitud', 'longitud': 'Longitud',
       'created_at': 'Fecha de Registro', 'is_verified': 'Verificado', 'is_stolen': 'Reportado Robado', 'nickname': 'Apodo',
-      'email': 'Correo', 'direccion': 'Dirección', 'last_lat': 'Última Latitud', 'last_lng': 'Última Longitud',
-      'url_ultima_ubicacion': 'URL Última Ubicación', 'url_mapa': 'Enlace Mapa', 'autor': 'Autor', 'contenido': 'Contenido',
-      'mensaje': 'Mensaje', 'leido': 'Leído', 'institucion': 'Institución', 'local_nombre': 'Nombre Local', 'marca': 'Marca',
+      'email': 'Correo', 'direccion': 'Direccion', 'last_lat': 'Ultima Latitud', 'last_lng': 'Ultima Longitud',
+      'url_ultima_ubicacion': 'URL Ultima Ubicacion', 'url_mapa': 'Enlace Mapa', 'autor': 'Autor', 'contenido': 'Contenido',
+      'mensaje': 'Mensaje', 'leido': 'Leido', 'institucion': 'Institucion', 'local_nombre': 'Nombre Local', 'marca': 'Marca',
       'precio': 'Precio', 'en_stock': 'En Stock', 'unidad': 'Unidad', 'tipo': 'Tipo', 'nombre_prestador': 'Prestador',
-      'nombre_contacto': 'Contacto', 'ubicacion_extravio': 'Lugar de Extravío', 'caracteristicas': 'Características',
-      'baja_solicitada': 'Baja Solicitada', 'baja_fecha': 'Fecha de Baja', 'terms_accepted': 'Términos Aceptados',
-      'nombre_usuario': 'Nombre Usuario', 'telefono_usuario': 'Teléfono Usuario', 'usuario_tel': 'Teléfono Usuario'
+      'nombre_contacto': 'Contacto', 'ubicacion_extravio': 'Lugar de Extravio', 'caracteristicas': 'Caracteristicas',
+      'baja_solicitada': 'Baja Solicitada', 'baja_fecha': 'Fecha de Baja', 'terms_accepted': 'Terminos Aceptados',
+      'nombre_usuario': 'Nombre Usuario', 'telefono_usuario': 'Telefono Usuario', 'usuario_tel': 'Telefono Usuario'
     };
     return map[h] || h.charAt(0).toUpperCase() + h.slice(1).replace(/_/g, ' ');
   };
@@ -389,9 +387,8 @@ function sendCsvDownload(res, filename, headerLabels, keys, rows) {
     csv += keys.map((k) => {
       const v = row[k];
       if (dateKeys.includes(k) && v) return csvCell(fechaChile(v));
-      // Convertir 0/1 a No/Sí para campos booleanos
       if (k.startsWith('is_') || k === 'leido' || k === 'en_stock' || k === 'acepta_efectivo' || k === 'acepta_tarjeta' || k === 'terms_accepted' || k === 'baja_solicitada') {
-        return csvCell(v ? 'Sí' : 'No');
+        return csvCell(v ? 'SI' : 'NO');
       }
       return csvCell(v);
     }).join(';') + '\n';
