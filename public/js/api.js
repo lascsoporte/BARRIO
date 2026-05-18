@@ -184,11 +184,16 @@ const API = {
       if (res.status === 401) throw new Error('401-EXPIRADO');
       throw new Error(`Error ${res.status}`);
     }
+    let realFilename = filename;
+    const cd = res.headers.get('Content-Disposition');
+    if (cd && cd.includes('filename=')) {
+      realFilename = cd.split('filename=')[1].replace(/"/g, '').trim();
+    }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename || 'export.csv';
+    a.download = realFilename || 'export.xlsx';
     document.body.appendChild(a);
     a.click();
     a.remove();

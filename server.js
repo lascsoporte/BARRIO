@@ -354,51 +354,75 @@ function fechaChile(v) {
   } catch(e) { return String(v); }
 }
 
-function sendCsvDownload(res, filename, headerLabels, keys, rows) {
-  const dateKeys = ['created_at', 'baja_fecha', 'fecha_expiracion'];
-  
-  const tituloPlano = filename.replace('.csv', '').replace(/_/g, ' ').toUpperCase();
-  const fechaGeneracion = fechaChile(new Date());
+async function sendCsvDownload(res, filename, headerLabels, keys, rows) {
+  try {
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Datos');
 
-  // 'sep=;' fuerza a Excel a reconocer las columnas sin importar la configuracion regional
-  let csv = '\ufeffsep=;\n'; 
-  csv += `"${tituloPlano}";;;;;;\n`;
-  csv += `"GENERADO EL: ${fechaGeneracion}";;;;;;\n`;
-  csv += `\n`;
-  csv += `"--- SECCION DE DATOS ---";;;;;;\n`;
-  
-  const formatHeader = (h) => {
-    const map = {
-      'id': 'ID', 'usuario_id': 'ID Usuario', 'nombre': 'Nombre', 'telefono': 'Telefono', 'latitud': 'Latitud', 'longitud': 'Longitud',
-      'created_at': 'Fecha de Registro', 'is_verified': 'Verificado', 'is_stolen': 'Reportado Robado', 'nickname': 'Apodo',
-      'email': 'Correo', 'direccion': 'Direccion', 'last_lat': 'Ultima Latitud', 'last_lng': 'Ultima Longitud',
-      'url_ultima_ubicacion': 'URL Ultima Ubicacion', 'url_mapa': 'Enlace Mapa', 'autor': 'Autor', 'contenido': 'Contenido',
-      'mensaje': 'Mensaje', 'leido': 'Leido', 'institucion': 'Institucion', 'local_nombre': 'Nombre Local', 'marca': 'Marca',
-      'precio': 'Precio', 'en_stock': 'En Stock', 'unidad': 'Unidad', 'tipo': 'Tipo', 'nombre_prestador': 'Prestador',
-      'nombre_contacto': 'Contacto', 'ubicacion_extravio': 'Lugar de Extravio', 'caracteristicas': 'Caracteristicas',
-      'baja_solicitada': 'Baja Solicitada', 'baja_fecha': 'Fecha de Baja', 'terms_accepted': 'Terminos Aceptados',
-      'nombre_usuario': 'Nombre Usuario', 'telefono_usuario': 'Telefono Usuario', 'usuario_tel': 'Telefono Usuario'
+    const dateKeys = ['created_at', 'baja_fecha', 'fecha_expiracion'];
+    const tituloPlano = filename.replace('.csv', '').replace(/_/g, ' ').toUpperCase();
+    const fechaGeneracion = fechaChile(new Date());
+
+    worksheet.addRow([tituloPlano]);
+    worksheet.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FFFF6B35' } };
+    worksheet.addRow([`GENERADO EL: ${fechaGeneracion}`]);
+    worksheet.addRow([]);
+    worksheet.addRow(['--- SECCION DE DATOS ---']);
+    worksheet.getCell('A4').font = { bold: true, color: { argb: 'FF555555' } };
+
+    const formatHeader = (h) => {
+      const map = {
+        'id': 'ID', 'usuario_id': 'ID Usuario', 'nombre': 'Nombre', 'telefono': 'Telefono', 'latitud': 'Latitud', 'longitud': 'Longitud',
+        'created_at': 'Fecha de Registro', 'is_verified': 'Verificado', 'is_stolen': 'Reportado Robado', 'nickname': 'Apodo',
+        'email': 'Correo', 'direccion': 'Direccion', 'last_lat': 'Ultima Latitud', 'last_lng': 'Ultima Longitud',
+        'url_ultima_ubicacion': 'URL Ultima Ubicacion', 'url_mapa': 'Enlace Mapa', 'autor': 'Autor', 'contenido': 'Contenido',
+        'mensaje': 'Mensaje', 'leido': 'Leido', 'institucion': 'Institucion', 'local_nombre': 'Nombre Local', 'marca': 'Marca',
+        'precio': 'Precio', 'en_stock': 'En Stock', 'unidad': 'Unidad', 'tipo': 'Tipo', 'nombre_prestador': 'Prestador',
+        'nombre_contacto': 'Contacto', 'ubicacion_extravio': 'Lugar de Extravio', 'caracteristicas': 'Caracteristicas',
+        'baja_solicitada': 'Baja Solicitada', 'baja_fecha': 'Fecha de Baja', 'terms_accepted': 'Terminos Aceptados',
+        'nombre_usuario': 'Nombre Usuario', 'telefono_usuario': 'Telefono Usuario', 'usuario_tel': 'Telefono Usuario'
+      };
+      return map[h] || h.charAt(0).toUpperCase() + h.slice(1).replace(/_/g, ' ');
     };
-    return map[h] || h.charAt(0).toUpperCase() + h.slice(1).replace(/_/g, ' ');
-  };
-  const translatedHeaders = headerLabels.map(formatHeader);
+    
+    const translatedHeaders = headerLabels.map(formatHeader);
+    const headerRow = worksheet.addRow(translatedHeaders);
+    headerRow.font = { bold: true };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3E0' } };
 
-  csv += translatedHeaders.join(';') + '\n';
-  
-  for (const row of rows) {
-    csv += keys.map((k) => {
-      const v = row[k];
-      if (dateKeys.includes(k) && v) return csvCell(fechaChile(v));
-      if (k.startsWith('is_') || k === 'leido' || k === 'en_stock' || k === 'acepta_efectivo' || k === 'acepta_tarjeta' || k === 'terms_accepted' || k === 'baja_solicitada') {
-        return csvCell(v ? 'SI' : 'NO');
-      }
-      return csvCell(v);
-    }).join(';') + '\n';
+    for (const row of rows) {
+      const rowData = keys.map((k) => {
+        const v = row[k];
+        if (dateKeys.includes(k) && v) return fechaChile(v);
+        if (k.startsWith('is_') || k === 'leido' || k === 'en_stock' || k === 'acepta_efectivo' || k === 'acepta_tarjeta' || k === 'terms_accepted' || k === 'baja_solicitada') {
+          return v ? 'SI' : 'NO';
+        }
+        if (typeof v === 'string') return v.replace(/\r?\n|\r/g, ' ').trim();
+        return v;
+      });
+      worksheet.addRow(rowData);
+    }
+
+    worksheet.columns.forEach(column => {
+      let maxLength = 0;
+      column["eachCell"]({ includeEmpty: true }, function(cell) {
+        const columnLength = cell.value ? cell.value.toString().length : 10;
+        if (columnLength > maxLength) { maxLength = columnLength; }
+      });
+      column.width = Math.min(maxLength < 10 ? 10 : maxLength + 2, 50);
+    });
+
+    const safeFilename = filename.replace('.csv', '');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}.xlsx"`);
+    
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error('Error generando Excel:', error);
+    if (!res.headersSent) res.status(500).json({ error: 'Error generando Excel' });
   }
-  
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="${String(filename).replace(/"/g, '')}"`);
-  res.send(csv);
 }
 
 const adminTokens = new Set();
@@ -631,7 +655,7 @@ app.post('/api/registro', rateLimitMiddleware(10), async (req, res) => {
     if (!user) {
       console.log(`📝 [REGISTRO] Usuario NUEVO, insertando...`);
       const r = await runSql(
-        'INSERT INTO usuarios (nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion, last_lat, last_lng, is_verified) VALUES (?,?,?,?,?,?,?,?,?,?,?,1)',
+        'INSERT INTO usuarios (nombre, telefono, email, nickname, pin_seguridad, device_id, home_lat, home_lng, direccion, last_lat, last_lng, is_verified, terms_accepted) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,1)',
         [nombre, telefono, email||'', nickname||'', pinHasheado, device_id||'', home_lat||null, home_lng||null, direccion||'', gps_lat||null, gps_lng||null]
       );
       user = await queryOne('SELECT * FROM usuarios WHERE id = ?', [r.insertId]);
