@@ -490,7 +490,7 @@ const App = {
 
       <button onclick="location.hash='#/mascotas'" style="margin-top:8px; width:100%; padding:10px; background:linear-gradient(135deg,#9C27B0,#673AB7); color:white; border:none; border-radius:12px; font-weight:900; font-size:0.95rem; cursor:pointer; box-shadow:0 2px 8px rgba(156,39,176,0.3); display:flex; align-items:center; justify-content:center; gap:8px;">
         🐶 MASCOTAS PERDIDAS
-        <span id="contadorMascotas" style="background:rgba(255,255,255,0.25); border-radius:12px; padding:2px 8px; font-size:0.8rem; font-weight:700;"></span>
+        <span id="contadorMascotas" style="display:none; background:rgba(255,255,255,0.25); border-radius:12px; padding:2px 8px; font-size:0.8rem; font-weight:700;"></span>
       </button>
 
       <div style="margin-top:10px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:8px; padding-bottom:5px;">
