@@ -114,7 +114,7 @@ async function crearTablas() {
       terms_accepted TINYINT(1) DEFAULT 0,
       nickname VARCHAR(100),
       email VARCHAR(255),
-      pin_seguridad VARCHAR(10),
+      pin_seguridad VARCHAR(150),
       push_enabled TINYINT(1) DEFAULT 0,
       last_lat DOUBLE,
       last_lng DOUBLE,
@@ -274,7 +274,7 @@ async function agregarColumnasNuevas() {
     ['usuarios', 'terms_accepted', 'TINYINT(1) DEFAULT 0'],
     ['usuarios', 'nickname', 'VARCHAR(100)'],
     ['usuarios', 'email', 'VARCHAR(255)'],
-    ['usuarios', 'pin_seguridad', 'VARCHAR(10)'],
+    ['usuarios', 'pin_seguridad', 'VARCHAR(150)'],
     ['servicios', 'latitud', 'DOUBLE NULL'],
     ['servicios', 'longitud', 'DOUBLE NULL'],
   ];

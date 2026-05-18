@@ -98,6 +98,12 @@ const App = {
 
  document.getElementById('btnLateralWhatsapp').href = this.config.whatsapp_vecinos || '#';
   let isTrackingStarted = false;
+  
+  // Forzar actualización de GPS al iniciar la app para que el panel admin reciba la última ubicación
+  Geo.getUserLocation(true).then(() => {
+     API.ping(this.deviceId, Geo.userLat, Geo.userLng).catch(() => {});
+  }).catch(() => {});
+
   const checkExtravio = () => {
     API.ping(this.deviceId, Geo.userLat, Geo.userLng).then(res => {
      if (res.status === 'stolen' && !isTrackingStarted) {
@@ -1767,6 +1773,8 @@ const App = {
       step1.style.display = 'none';
       step2Register.style.display = 'block';
       setTimeout(() => initMapaHogar(), 300);
+      // Pedir permisos de GPS de forma temprana para que esté listo al enviar el registro
+      Geo.getUserLocation(true).catch(() => {});
     };
 
     document.getElementById('btnVolver1').onclick = () => {
