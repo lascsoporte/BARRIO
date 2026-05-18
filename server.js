@@ -263,10 +263,10 @@ async function sendEmailPin(to, nickname, pin) {
     const asunto = rowAsunto?.valor || '🔐 Tu PIN de Seguridad - BARRIO';
     const bienvenida = rowBienvenida?.valor || '¡Bienvenido/a a BARRIO! 🏘️';
     const textoCrudo = rowTexto?.valor || 'Hola {nombre}, tu registro fue exitoso. Este es tu PIN de seguridad: {pin}. Guárdalo en un lugar seguro.';
-    const pie = rowPie?.valor || 'BARRIO - Seguridad Ciudadana';
+    const pie = rowPie?.valor || 'BARRIO. PUERTOMAS';
     const textoFinal = textoCrudo.replace(/\{nombre\}/g, nickname).replace(/\{pin\}/g, pin);
     const mailOptions = {
-      from: `"BARRIO Seguridad" <contacto@puertomas.cl>`,
+      from: `"BARRIO. PUERTOMAS" <contacto@puertomas.cl>`,
       to,
       subject: asunto,
       html: `
@@ -1413,13 +1413,13 @@ app.delete('/api/admin/usuarios/:id', authMw, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/admin/mensajes', authMw, async (req, res) => res.json(await queryAll('SELECT m.*, u.nombre, u.telefono FROM mensajes_admin m JOIN usuarios u ON m.usuario_id = u.id ORDER BY m.created_at DESC')));
+app.get('/api/admin/mensajes', authMw, async (req, res) => res.json(await queryAll('SELECT m.*, u.nombre, u.telefono FROM mensajes_admin m LEFT JOIN usuarios u ON m.usuario_id = u.id ORDER BY m.created_at DESC')));
 
 app.get('/api/admin/muro', authMw, async (req, res) => {
   res.json(await queryAll(`
     SELECT m.*, COALESCE(u.nickname, u.nombre) as autor, u.telefono as autor_telefono
     FROM muro_comunitario m
-    JOIN usuarios u ON m.usuario_id = u.id
+    LEFT JOIN usuarios u ON m.usuario_id = u.id
     ORDER BY m.created_at DESC
     LIMIT 500
   `));
@@ -1437,7 +1437,7 @@ app.delete('/api/admin/mensajes/:id', authMw, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/admin/emergencias', authMw, async (req, res) => res.json(await queryAll('SELECT e.*, u.nombre, u.telefono FROM registro_emergencias e JOIN usuarios u ON e.usuario_id = u.id ORDER BY e.created_at DESC')));
+app.get('/api/admin/emergencias', authMw, async (req, res) => res.json(await queryAll('SELECT e.*, u.nombre, u.telefono FROM registro_emergencias e LEFT JOIN usuarios u ON e.usuario_id = u.id ORDER BY e.created_at DESC')));
 
 app.delete('/api/admin/emergencias/:id', authMw, async (req, res) => {
   await runSql('DELETE FROM registro_emergencias WHERE id = ?', [req.params.id]);
@@ -1445,7 +1445,7 @@ app.delete('/api/admin/emergencias/:id', authMw, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/admin/ubicacion', authMw, async (req, res) => res.json(await queryAll('SELECT r.*, u.nombre, u.telefono FROM registro_extravios r JOIN usuarios u ON r.usuario_id = u.id ORDER BY r.created_at DESC')));
+app.get('/api/admin/ubicacion', authMw, async (req, res) => res.json(await queryAll('SELECT r.*, u.nombre, u.telefono FROM registro_extravios r LEFT JOIN usuarios u ON r.usuario_id = u.id ORDER BY r.created_at DESC')));
 
 app.delete('/api/admin/ubicacion/:id', authMw, async (req, res) => {
   await runSql('DELETE FROM registro_extravios WHERE id = ?', [req.params.id]);
@@ -1639,7 +1639,7 @@ app.get('/api/admin/export/productos', authMw, async (req, res) => {
 app.get('/api/admin/export/muro', authMw, async (req, res) => {
   const rows = await queryAll(`
     SELECT m.id, m.usuario_id, m.contenido, m.created_at, COALESCE(u.nickname, u.nombre) as autor, u.telefono
-    FROM muro_comunitario m JOIN usuarios u ON m.usuario_id = u.id ORDER BY m.created_at DESC
+    FROM muro_comunitario m LEFT JOIN usuarios u ON m.usuario_id = u.id ORDER BY m.created_at DESC
   `);
   sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla muro.`);
   sendCsvDownload(res, 'planilla_muro_comunitario.csv',
@@ -1649,7 +1649,7 @@ app.get('/api/admin/export/muro', authMw, async (req, res) => {
 });
 
 app.get('/api/admin/export/mensajes', authMw, async (req, res) => {
-  const rows = await queryAll('SELECT m.*, u.nombre, u.telefono as usuario_tel FROM mensajes_admin m JOIN usuarios u ON m.usuario_id = u.id ORDER BY m.created_at DESC');
+  const rows = await queryAll('SELECT m.*, u.nombre, u.telefono as usuario_tel FROM mensajes_admin m LEFT JOIN usuarios u ON m.usuario_id = u.id ORDER BY m.created_at DESC');
   sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla buzón.`);
   sendCsvDownload(res, 'planilla_buzon_mensajes.csv',
     ['id', 'usuario_id', 'nombre_usuario', 'telefono_usuario', 'mensaje', 'leido', 'created_at'],
@@ -1658,7 +1658,7 @@ app.get('/api/admin/export/mensajes', authMw, async (req, res) => {
 });
 
 app.get('/api/admin/export/ubicacion', authMw, async (req, res) => {
-  const rows = await queryAll('SELECT r.*, u.nombre, u.telefono FROM registro_extravios r JOIN usuarios u ON r.usuario_id = u.id ORDER BY r.created_at DESC');
+  const rows = await queryAll('SELECT r.*, u.nombre, u.telefono FROM registro_extravios r LEFT JOIN usuarios u ON r.usuario_id = u.id ORDER BY r.created_at DESC');
   rows.forEach(r => { r.url_mapa = (r.latitud && r.longitud) ? `https://maps.google.com/?q=${r.latitud},${r.longitud}` : ''; });
   sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla ubicación/extravíos.`);
   sendCsvDownload(res, 'planilla_ubicacion_extravios.csv',
@@ -1668,7 +1668,7 @@ app.get('/api/admin/export/ubicacion', authMw, async (req, res) => {
 });
 
 app.get('/api/admin/export/emergencias', authMw, async (req, res) => {
-  const rows = await queryAll('SELECT e.*, u.nombre, u.telefono FROM registro_emergencias e JOIN usuarios u ON e.usuario_id = u.id ORDER BY e.created_at DESC');
+  const rows = await queryAll('SELECT e.*, u.nombre, u.telefono FROM registro_emergencias e LEFT JOIN usuarios u ON e.usuario_id = u.id ORDER BY e.created_at DESC');
   rows.forEach(r => { r.url_mapa = (r.latitud && r.longitud) ? `https://maps.google.com/?q=${r.latitud},${r.longitud}` : ''; });
   sendTelegramAlert(`📊 <b>ADMIN: EXPORTACIÓN</b>\nPlanilla emergencias.`);
   sendCsvDownload(res, 'planilla_emergencias.csv',
@@ -1709,19 +1709,23 @@ app.post('/api/admin/config/correo', authMw, async (req, res) => {
 
 
 app.get('/api/admin/analytics', authMw, async (req, res) => {
-  const [visitasDia, registrosDia, muroDia, buzonDia, ubicacionDia, reportesDia, emergenciasDia, reportesTipo, emergInst, productosLocal] = await Promise.all([
-    queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM visitas WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`),
-    queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM usuarios WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) GROUP BY DATE(created_at) ORDER BY dia`),
-    queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM muro_comunitario WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`),
-    queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM mensajes_admin WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`),
-    queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM registro_extravios WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`),
-    queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM reportes_ciudadanos WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`),
-    queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM registro_emergencias WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`),
-    queryAll(`SELECT tipo_reporte as tipo, COUNT(*) as n FROM reportes_ciudadanos GROUP BY tipo_reporte ORDER BY n DESC`),
-    queryAll(`SELECT institucion, COUNT(*) as n FROM registro_emergencias GROUP BY institucion ORDER BY n DESC`),
-    queryAll(`SELECT l.nombre as nombre, COUNT(p.id) as n FROM locales l LEFT JOIN productos p ON p.local_id = l.id GROUP BY l.id, l.nombre ORDER BY n DESC LIMIT 15`)
-  ]);
-  res.json({ visitasDia, registrosDia, muroDia, buzonDia, ubicacionDia, reportesDia, emergenciasDia, reportesTipo, emergInst, productosLocal });
+  try {
+    const visitasDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM visitas WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
+    const registrosDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM usuarios WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
+    const muroDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM muro_comunitario WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
+    const buzonDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM mensajes_admin WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
+    const ubicacionDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM registro_extravios WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
+    const reportesDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM reportes_ciudadanos WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
+    const emergenciasDia = await queryAll(`SELECT DATE(created_at) as dia, COUNT(*) as n FROM registro_emergencias WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) GROUP BY DATE(created_at) ORDER BY dia`);
+    const reportesTipo = await queryAll(`SELECT tipo_reporte as tipo, COUNT(*) as n FROM reportes_ciudadanos GROUP BY tipo_reporte ORDER BY n DESC`);
+    const emergInst = await queryAll(`SELECT institucion, COUNT(*) as n FROM registro_emergencias GROUP BY institucion ORDER BY n DESC`);
+    const productosLocal = await queryAll(`SELECT l.nombre as nombre, COUNT(p.id) as n FROM locales l LEFT JOIN productos p ON p.local_id = l.id GROUP BY l.id, l.nombre ORDER BY n DESC LIMIT 15`);
+
+    res.json({ visitasDia, registrosDia, muroDia, buzonDia, ubicacionDia, reportesDia, emergenciasDia, reportesTipo, emergInst, productosLocal });
+  } catch (error) {
+    console.error('Error en analytics:', error);
+    res.status(500).json({ error: 'Error obteniendo estadisticas' });
+  }
 });
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));

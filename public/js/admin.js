@@ -905,7 +905,6 @@ const Admin = {
             <h4 style="margin:0 0 10px;font-size:0.95rem;color:#333;">📡 Parámetros generales</h4>
             <div class="admin-form-grid">
               <div><label>Radio de alertas push (metros)</label><input type="number" id="cfgRadio" value="${this.esc(config.push_radius||'500')}" min="100" max="5000"></div>
-              <div><label>WhatsApp vecinos (número)</label><input type="text" id="cfgWhatsapp" value="${this.esc(config.whatsapp_vecinos||'')}"></div>
             </div>
             <button type="button" id="btnGuardarConfig" class="btn btn-primary">💾 Guardar parámetros</button>
             <p id="msgConfig" style="font-size:12px;margin-top:8px;display:none;"></p>
@@ -949,7 +948,7 @@ const Admin = {
           const msg = document.getElementById('msgConfig');
           btn.disabled = true;
           try {
-            await API.put('/api/admin/config', { push_radius: document.getElementById('cfgRadio').value, whatsapp_vecinos: document.getElementById('cfgWhatsapp').value }, this.token);
+            await API.put('/api/admin/config', { push_radius: document.getElementById('cfgRadio').value }, this.token);
             msg.textContent = '✅ Parámetros guardados';
             msg.style.color = 'green'; msg.style.display = 'block';
           } catch(e) { msg.textContent = '❌ Error: '+e.message; msg.style.color='red'; msg.style.display='block'; }
