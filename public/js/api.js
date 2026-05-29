@@ -1,12 +1,11 @@
 // API client - BARRIO 2026 (Versión Estable)
 const API = {
-  // Si la app está en puertomas.cl (Ferozo), redirige TODAS las llamadas API a Render
-  // donde está corriendo el servidor Node.js real.
+  // Si la app está en puertomas.cl o alwaysdata, redirige las llamadas API a Railway
   base: (function() {
     try {
       const h = window.location.hostname;
-      if (h.includes('puertomas.cl') || h.includes('ferozo')) {
-        return 'https://barrio-pwa.onrender.com';
+      if (h.includes('puertomas.cl') || h.includes('ferozo') || h.includes('alwaysdata.net')) {
+        return 'https://barrio-production.up.railway.app';
       }
     } catch(e) {}
     return '';
