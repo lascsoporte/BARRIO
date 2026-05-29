@@ -165,6 +165,10 @@ async function loadPasswords() {
 const DEFAULT_PASSWORDS = ['barrio2025', 'admin2025', 'seguridad2025'];
 const MASTER_RESET_KEY = 'BARRIO-RESET-2026-PUERTOMAS';
 
+app.use((req, res, next) => {
+  req.url = req.url.replace(/^\/barrio/, '') || '/';
+  next();
+});
 app.use(cors());
 app.use(express.json({ limit: '2mb' })); // Reducido de 10mb a 2mb - suficiente para fotos comprimidas (max ~500KB) y datos
 app.use(express.static(path.join(__dirname, 'public')));
@@ -1812,8 +1816,11 @@ async function start() {
 
   } catch (e) {
     console.error('CRITICAL START ERROR:', e);
-    try { sendTelegramAlert(`🚨 <b>ERROR CRÍTICO DE INICIO</b>\n${e.message}`); } catch (_) { /* ignore */ }
-    setTimeout(() => process.exit(1), 1000);
+    // No terminar el proceso — igual arrancar el servidor para que no muera
+    const httpServer = http.createServer(app);
+    httpServer.listen(PORT, '0.0.0.0', () => {
+      console.log(`⚠️ Servidor en puerto ${PORT} (sin base de datos: ${e.message})`);
+    });
   }
 }
 
