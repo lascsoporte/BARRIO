@@ -3,66 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="BARRIO - Encuentra productos y servicios en tu barrio. Puerto Montt, Chile.">
+    <meta name="description" content="PUERTOMAS - Plataforma comunitaria de Puerto Montt. BARRIO (comercios y servicios) y TRACKMAS (rescatistas).">
     <meta name="theme-color" content="#FF6B35">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>PUERTOMAS - Portal Comunitario Puerto Montt</title>
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏘️</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        :root { --primary: #FF6B35; --secondary: #2EC4B6; --bg: #F9F1E7; --text: #1A1A2E; }
-        body { font-family: 'Nunito', sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; padding: 10px; }
-        .portal-container { text-align: center; padding: 20px; max-width: 450px; width: 95%; background: white; border-radius: 25px; box-shadow: 0 15px 40px rgba(0,0,0,0.1); animation: fadeIn 0.6s ease-out; display: flex; flex-direction: column; gap: 15px; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        h1 { font-size: 3rem; font-weight: 900; background: linear-gradient(135deg, var(--primary), #FF2E00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; }
-        p.subtitle { font-size: 0.95rem; color: #666; margin: 0; }
-        .city-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
-        .city-btn { padding: 15px; border-radius: 15px; border: 2px solid #EEE; background: white; text-decoration: none; color: var(--text); font-weight: 800; font-size: 1.1rem; transition: all 0.3s; display: flex; align-items: center; justify-content: space-between; }
-        .city-btn:hover { border-color: var(--primary); background: #FFF3E0; }
-        .whatsapp-section { border-top: 1px solid #EEE; padding-top: 15px; }
-        .wa-btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; background: #25D366; color: white; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 0.9rem; }
-        .footer-inline { margin-top: 5px; display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; color: #AAA; border-top: 1px solid #F5F5F5; padding-top: 10px; }
-        .footer-inline a { color: var(--primary); text-decoration: none; font-weight: bold; }
+        :root { --barrio: #FF6B35; --trackmas: #2cb67d; --bg: #F9F1E7; --text: #1A1A2E; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Nunito', sans-serif; background: var(--bg); color: var(--text); margin: 0; min-height: 100vh; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        h1 { font-size: 2.5rem; font-weight: 900; background: linear-gradient(135deg, var(--barrio), #FF2E00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 20px 0 5px; text-align: center; }
+        .subtitle { font-size: 0.95rem; color: #666; margin: 0 0 25px; text-align: center; }
+        .cards { display: grid; grid-template-columns: 1fr; gap: 20px; max-width: 480px; width: 100%; }
+        .card { background: white; border-radius: 20px; padding: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); border: 3px solid transparent; transition: all 0.3s; }
+        .card.barrio { border-color: var(--barrio); }
+        .card.trackmas { border-color: var(--trackmas); }
+        .card-icon { font-size: 2.5rem; margin-bottom: 8px; }
+        .card-title { font-size: 1.6rem; font-weight: 900; margin: 0 0 4px; }
+        .card.barrio .card-title { color: var(--barrio); }
+        .card.trackmas .card-title { color: var(--trackmas); }
+        .card-desc { font-size: 0.9rem; color: #555; margin: 0 0 16px; line-height: 1.4; }
+        .btn-group { display: flex; flex-direction: column; gap: 10px; }
+        .btn { display: block; padding: 14px 18px; border-radius: 12px; text-decoration: none; font-weight: 800; font-size: 1rem; text-align: center; transition: transform 0.2s, opacity 0.2s; color: white; }
+        .btn:active { transform: scale(0.97); opacity: 0.9; }
+        .btn-barrio-app { background: var(--barrio); }
+        .btn-barrio-admin { background: #B5421B; }
+        .btn-trackmas-app { background: var(--trackmas); }
+        .btn-trackmas-panel { background: #1a6e50; }
+        .whatsapp { display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; background: #25D366; color: white; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 0.9rem; margin-top: 25px; }
+        .footer { margin-top: 20px; font-size: 0.75rem; color: #888; text-align: center; }
+        .footer a { color: var(--barrio); text-decoration: none; font-weight: bold; }
+        @media (min-width: 720px) { .cards { grid-template-columns: 1fr 1fr; max-width: 900px; } }
     </style>
 </head>
 <body>
-    <div class="portal-container">
-        <h1>BARRIO</h1>
-        <p class="subtitle">Selecciona tu ciudad para entrar a la red comunitaria.</p>
-        <div class="city-grid">
-            <a href="/app.html" class="city-btn">
-                <span>📍 PUERTO MONTT</span>
-                <span>🇨🇱</span>
-            </a>
+    <h1>PUERTOMAS</h1>
+    <p class="subtitle">Portal Comunitario · Puerto Montt 🇨🇱</p>
+
+    <div class="cards">
+        <div class="card barrio">
+            <div class="card-icon">🏘️</div>
+            <h2 class="card-title">BARRIO</h2>
+            <p class="card-desc">Comercios locales, productos, servicios, delivery, emergencias y comunicación vecinal.</p>
+            <div class="btn-group">
+                <a class="btn btn-barrio-app" href="/app.html">Abrir App BARRIO</a>
+                <a class="btn btn-barrio-admin" href="/app.html#/admin">Panel Administrador</a>
+            </div>
         </div>
-        <div class="whatsapp-section">
-            <p style="font-size: 0.8rem; margin-bottom: 10px; color: #555; line-height: 1.3;">
-                ¿Eres Cliente Delivery o comerciante, quieres figurar en la app? <br>
-                <b>Contáctanos con el botón verde...</b>
-            </p>
-            <a href="https://wa.me/56987606517" class="wa-btn">
-                <span>PUERTOMAS DELIVERY</span>
-            </a>
-        </div>
-        <div class="footer-inline">
-            <div>&copy; 2026 PUERTOMAS SPA | <a href="/app.html#/legal">Aviso Legal</a></div>
-            <div style="font-weight: bold; cursor: pointer;" id="versionInfo">v3.9.7</div>
+
+        <div class="card trackmas">
+            <div class="card-icon">🐾</div>
+            <h2 class="card-title">TRACKMAS</h2>
+            <p class="card-desc">Plataforma para rescatistas y coordinadores de mascotas extraviadas en Puerto Montt.</p>
+            <div class="btn-group">
+                <a class="btn btn-trackmas-app" href="https://barrio.alwaysdata.net/trackmas/app">App Rescatista</a>
+                <a class="btn btn-trackmas-panel" href="https://barrio.alwaysdata.net/trackmas/panel">Panel Coordinador</a>
+            </div>
         </div>
     </div>
 
-    <script>
-        // SISTEMA SELF-PING: Mantiene Render despierto (cada 13 min)
-        setInterval(() => {
-            fetch(window.location.origin).then(() => console.log("Servidor Activo")).catch(() => {});
-        }, 780000);
+    <a href="https://wa.me/56987606517" class="whatsapp">
+        <span>📦 PUERTOMAS DELIVERY</span>
+    </a>
 
-        // Registro de Service Worker
+    <div class="footer">
+        &copy; 2026 PUERTOMAS SPA · <a href="/app.html#/legal">Aviso Legal</a> · <span id="versionInfo" style="cursor:pointer">v4.0.0</span>
+    </div>
+
+    <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js').catch(() => {});
         }
-
-        // Acceso secreto: 5 clics en la versión para entrar como Admin
         let clickCount = 0;
         document.getElementById('versionInfo').addEventListener('click', () => {
             clickCount++;
