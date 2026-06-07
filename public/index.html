@@ -3,11 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="PUERTOMAS - Plataforma comunitaria de Puerto Montt. BARRIO (comercios y servicios) y TRACKMAS (rescatistas).">
-    <meta name="theme-color" content="#FF6B35">
-    <title>PUERTOMAS - Portal Comunitario Puerto Montt</title>
+    <meta name="description" content="PUERTOMAS">
+    <meta name="theme-color" content="#1a2a3a">
+    <title>PUERTOMAS</title>
     <link rel="manifest" href="/manifest.json">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏘️</text></svg>">
+    <!-- Favicon limpio: "P" blanca sobre fondo azul oscuro, sin emojis -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%231a2a3a' rx='15'/><text x='50' y='72' font-family='Arial,sans-serif' font-size='70' font-weight='900' fill='white' text-anchor='middle'>P</text></svg>">
+    <!-- Bloqueo de indexación + frame-busting (Seguridad Nivel 1) -->
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+    <meta name="googlebot" content="noindex, nofollow">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta name="author" content="PUERTOMAS">
+    <meta name="copyright" content="© 2026 PUERTOMAS. Todos los derechos reservados.">
+    <script>
+        (function(){ if(window.top!==window.self){ try{ window.top.location=window.self.location; }catch(e){ document.documentElement.innerHTML='<body style=\"font-family:sans-serif;padding:40px;text-align:center;color:#e63946;background:#0d1b2a;\"><h2>PuertoMas</h2><p>Esta plataforma no puede ser cargada dentro de otra página.</p></body>'; } } })();
+        window._PUERTOMAS_BUILD = 'portal-railway-2026-06-06';
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         :root { --barrio: #FF6B35; --trackmas: #2cb67d; --bg: #F9F1E7; --text: #1A1A2E; }
